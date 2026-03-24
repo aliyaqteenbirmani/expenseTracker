@@ -1,0 +1,3 @@
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\publish\ExpenseTrackingSystem.Domain.dll
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\publish\ExpenseTrackingSystem.Domain.deps.json
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\publish\ExpenseTrackingSystem.Domain.pdb

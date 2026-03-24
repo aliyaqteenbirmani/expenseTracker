@@ -1,0 +1,44 @@
+[
+  {
+    "ContainingType": "ExpenseTrackingSystem.API.Controllers.AuthController",
+    "Method": "Login",
+    "RelativePath": "api/Auth/Login",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "loginDto",
+        "Type": "ExpenseTrackingSystem.Domain.DTOs.LoginDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "ExpenseTrackingSystem.Domain.Entities.UserApiResponse\u00601[[ExpenseTrackingSystem.Domain.DTOs.LoginResponseDto, ExpenseTrackingSystem.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "ExpenseTrackingSystem.API.Controllers.AuthController",
+    "Method": "Register",
+    "RelativePath": "api/Auth/Registration",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userDto",
+        "Type": "ExpenseTrackingSystem.Domain.DTOs.UserDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  }
+]

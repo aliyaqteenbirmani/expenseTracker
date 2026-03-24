@@ -1,0 +1,15 @@
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\bin\Release\net9.0\ExpenseTrackingSystem.Application.deps.json
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\bin\Release\net9.0\ExpenseTrackingSystem.Application.dll
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\bin\Release\net9.0\ExpenseTrackingSystem.Application.pdb
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\bin\Release\net9.0\ExpenseTrackingSystem.Domain.dll
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\bin\Release\net9.0\ExpenseTrackingSystem.Domain.pdb
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\ExpenseTrackingSystem.Application.csproj.AssemblyReference.cache
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\ExpenseTrackingSystem.Application.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\ExpenseTrackingSystem.Application.AssemblyInfoInputs.cache
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\ExpenseTrackingSystem.Application.AssemblyInfo.cs
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\ExpenseTrackingSystem.Application.csproj.CoreCompileInputs.cache
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\ExpenseT.B9F49E38.Up2Date
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\ExpenseTrackingSystem.Application.dll
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\refint\ExpenseTrackingSystem.Application.dll
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\ExpenseTrackingSystem.Application.pdb
+C:\Users\T480s\source\repos\ExpenseTrackingSystem\ExpenseTrackingSystem.Application\obj\Release\net9.0\ref\ExpenseTrackingSystem.Application.dll
