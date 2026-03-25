@@ -19,4 +19,10 @@ namespace ExpenseTrackingSystem.Domain.DTOs
         public string Password { get; set; }
 
     }
+
+    public class UserRegisterResponseDto
+    {
+        public int StatusCode { get; set; }
+        public string ResponseMessage { get; set; }
+    }
 }

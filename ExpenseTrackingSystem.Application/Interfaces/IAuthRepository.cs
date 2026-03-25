@@ -6,8 +6,8 @@ namespace ExpenseTrackingSystem.Application.Interfaces
 {
     public interface IAuthRepository
     {
-        Task<bool> RegisterUser(User user);
-        Task<UserApiResponse<User>> Login(LoginDto loginDto);
+        Task<ApiResponse<User>> RegisterUser(User user);
+        Task<ApiResponse<User>> Login(LoginDto loginDto);
 
     }
 }

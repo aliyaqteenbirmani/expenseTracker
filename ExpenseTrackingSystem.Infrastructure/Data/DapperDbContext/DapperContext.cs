@@ -28,7 +28,7 @@ namespace ExpenseTrackingSystem.Infrastructure.Data.DbContext
         {
             
                 using var db = GetDbconnection();
-                return await db.ExecuteAsync(sp, parms, commandType: commandType) == 0;
+                return await db.ExecuteAsync(sp, parms, commandType: commandType) > 0;
 
         }
         //public async Task SaveAPILogs(string sp, object? parms = null, CommandType commandType = CommandType.StoredProcedure)
