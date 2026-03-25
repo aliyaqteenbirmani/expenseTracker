@@ -19,12 +19,12 @@ namespace ExpenseTrackingSystem.Application.Services.AuthService
             _tokenService = tokenService;
         }
 
-        public async Task<UserApiResponse<LoginResponseDto>> LoginUser(LoginDto loginDto)
+        public async Task<ApiResponse<LoginResponseDto>> LoginUser(LoginDto loginDto)
         {
             var responseFromRepo = await _authRepository.Login(loginDto);
             if (!responseFromRepo.Success)
             {
-                return new UserApiResponse<LoginResponseDto>
+                return new ApiResponse<LoginResponseDto>
                 {
                     Success = false,
                     Message = "Invalid login credentials.",
@@ -48,23 +48,17 @@ namespace ExpenseTrackingSystem.Application.Services.AuthService
                 Email = responseFromRepo.Data.Email,
                 Phone = responseFromRepo.Data.Phone,
                 Gender = (Gender)responseFromRepo.Data.Gender,
-                IsDeleted = responseFromRepo.Data.IsDeleted,
-                IsActive = responseFromRepo.Data.IsActive,
-                ModifiedOn = responseFromRepo.Data.ModifiedOn,
-                ModifiedBy = responseFromRepo.Data.ModifiedBy,
-                CreatedOn = responseFromRepo.Data.CreatedOn,
-                CreatedBy = responseFromRepo.Data.CreatedBy
+                Token = token,
             };
-            return new UserApiResponse<LoginResponseDto>
+            return new ApiResponse<LoginResponseDto>
             {
                 Success = true,
                 Message = "Login successful.",
                 Data = userResponse,
-                Token = token
             };
         }
 
-        public async Task<bool> RegisterUser(UserDto userDto)
+        public async Task<ApiResponse<User>> RegisterUser(UserDto userDto)
         {
             var hmac = new HMACSHA256();
             var user = new User

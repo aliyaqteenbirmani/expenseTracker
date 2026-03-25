@@ -5,7 +5,7 @@ namespace ExpenseTrackingSystem.Application.Services.AuthService
 {
     public interface IAuthService
     {
-        public Task<bool> RegisterUser(UserDto userDto);
-        public Task<UserApiResponse<LoginResponseDto>> LoginUser(LoginDto loginDto);
+        public Task<ApiResponse<User>> RegisterUser(UserDto userDto);
+        public Task<ApiResponse<LoginResponseDto>> LoginUser(LoginDto loginDto);
     }
 }

@@ -1,12 +1,15 @@
 ﻿using ExpenseTrackingSystem.Application.Expressions;
+using ExpenseTrackingSystem.Application.Helper;
 using ExpenseTrackingSystem.Application.Interfaces;
 using ExpenseTrackingSystem.Application.Services.AuthService;
 using ExpenseTrackingSystem.Domain.DTOs;
 using ExpenseTrackingSystem.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using System;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace ExpenseTrackingSystem.API.Controllers
 {
@@ -28,32 +31,70 @@ namespace ExpenseTrackingSystem.API.Controllers
             {
                 var response = await _authService.RegisterUser(userDto);
 
-                if(!response)
+                // If registration failed for some reason (e.g., email conflict)
+                if (!response.Success)
                 {
-                    return BadRequest(new UserApiResponse<UserDto>
-                    {
-                        Success = false,
-                        Message = " Registration failed",
-                        Data = null
-                    });
+                    return BadRequest(
+                        ApiResponses.Conflict("Unable to process request. Please try again or use a different email.")
+                    );
                 }
-                return Ok(new UserApiResponse<UserDto>
-                {
-                    Success = true,
-                    Message = " Registration successful",
-                    Data = userDto
-                });
+
+                // Registration successful
+                return Created(
+                    "", // or the URL of the newly created resource
+                    ApiResponses.Created(userDto, "Registration successful")
+                );
             }
-            catch(SqlException ex) when (ex.Number == 50001)
+            catch (SqlException ex) when (ex.Number == 50001) // Custom SQL error for duplicate email
             {
-                return Conflict(new UserApiResponse<UserDto>
-                {
-                    Success = false,
-                    Message = " Email already registered",
-                    Data = null
-                });
+                return Conflict(
+                    ApiResponses.Conflict("Unable to process request. Please try again or use a different email.")
+                );
+            }
+            catch (Exception ex)
+            {
+                // Generic internal server error
+                return StatusCode(
+                    500,
+                    ApiResponses.InternalServerError("An unexpected error occurred. Please try again later.")
+                );
             }
         }
+        /*public async Task<ActionResult> Register(UserDto userDto)
+        //{
+        //    try
+        //    {
+        //        var response = await _authService.RegisterUser(userDto);
+
+        //        if(!response.Success)
+        //        {
+        //            return BadRequest(new ApiResponse<UserRegisterResponseDto>
+        //            {
+        //                StatusCode = 200,
+        //                Success = true,
+        //                Message = "Success",
+        //                Data = new UserRegisterResponseDto { ResponseMessage= "Unable to process request. Please try again or use different email.", StatusCode=409 }
+        //            });
+        //        }
+        //        return Ok(new ApiResponse<UserDto>
+        //        {
+        //            StatusCode = 201,
+        //            Success = true,
+        //            Message = " Registration successful",
+        //            Data = userDto
+        //        });
+        //    }
+        //    catch(SqlException ex) when (ex.Number == 50001)
+        //    {
+        //        return Conflict(new ApiResponse<UserDto>
+        //        {
+        //            StatusCode = 409,
+        //            Success = false,
+        //            Message = ex.Message+" Email already registered",
+        //            Data = null
+        //        });
+        //    }
+        //}*/
 
 
         /*[HttpDelete("delete-user")]
@@ -71,13 +112,13 @@ namespace ExpenseTrackingSystem.API.Controllers
 
 
         [HttpPost("Login")]
-        public async Task<ActionResult<UserApiResponse<LoginResponseDto>>> Login([FromBody] LoginDto loginDto)
+        public async Task<ActionResult<ApiResponse<LoginResponseDto>>> Login([FromBody] LoginDto loginDto)
         {
             var serviceResponse = await _authService.LoginUser(loginDto);
 
             if (!serviceResponse.Success)
             {
-                return BadRequest(new UserApiResponse<User>
+                return BadRequest(new ApiResponse<User>
                 {
                     Success = false,
                     Message = serviceResponse.Message,
@@ -86,12 +127,12 @@ namespace ExpenseTrackingSystem.API.Controllers
             }
                 //return NotFound(new { message = "Invalid UserName or Password" });
 
-            return Ok(new UserApiResponse<LoginResponseDto>
+            return Ok(new ApiResponse<LoginResponseDto>
             {
+                StatusCode = 200,
                 Success = true,
                 Message = "Login successful",
                 Data = serviceResponse.Data,
-                Token = serviceResponse.Token
             });
         }
 

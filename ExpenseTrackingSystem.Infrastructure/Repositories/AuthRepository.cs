@@ -18,7 +18,7 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
         }
 
 
-        public async Task<UserApiResponse<User>> Login(LoginDto loginDto)
+        public async Task<ApiResponse<User>> Login(LoginDto loginDto)
         {
             var userFromDb = await _dapperContext.GetSingleAsync<User>("SP_GetUserByEmail", new 
             {   Email = loginDto.UserName
@@ -26,7 +26,7 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
            
             if (userFromDb is null)
             {
-                return new UserApiResponse<User>
+                return new ApiResponse<User>
                 {
                     Success = false,
                     Message = "Invalid UserName",
@@ -36,13 +36,13 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
             var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(loginDto.Password));
             if (!userFromDb.PasswordHash.SequenceEqual(computedHash))
             {
-                return new UserApiResponse<User>
+                return new ApiResponse<User>
                 {
                     Success = false,
                     Message = "Invalid Email or Password",
                 };
             }
-            return new UserApiResponse<User>
+            return new ApiResponse<User>
             {
                 Success = true,
                 Message = "Login successful",
@@ -50,7 +50,7 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
             };
         }
 
-        public async Task<bool> RegisterUser(User user)
+        public async Task<ApiResponse<User>> RegisterUser(User user)
         {
             var parameters = new
             {
@@ -65,14 +65,18 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
             };
             try
             {
-                var resultFromDb = await _dapperContext.ExecuteAsync("SP_AddUser", parameters);
+                var resultFromDb = await _dapperContext.GetSingleAsync<ApiResponse<User>>("SP_AddUser", parameters);
                 return resultFromDb;
             }
             catch (Exception ex)
             {
                 // Log the exception (you can use a logging framework like Serilog, NLog, etc.)
                 Console.WriteLine($"An error occurred while registering the user: {ex.Message}");
-                return false;
+                return new ApiResponse<User>
+                {
+                    Success = false,
+                    Message = $"{ex.Message} {(ex.InnerException != null ? ex.InnerException.Message : string.Empty)}"
+                };
             }
         }
 
