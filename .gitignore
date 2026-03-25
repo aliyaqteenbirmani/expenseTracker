@@ -25,3 +25,10 @@ Thumbs.db
 /ExpenseTrackingSystem/obj/Debug/net9.0/ExpenseTrackingSystem.API.GeneratedMSBuildEditorConfig.editorconfig
 /ExpenseTrackingSystem/obj/Debug/net9.0/ExpenseTrackingSystem.API.GlobalUsings.g.cs
 /ExpenseTrackingSystem/obj/Debug/net9.0/rpswa.dswa.cache.json
+/ExpenseTrackingSystem.sln
+/ExpenseTrackingSystem.Infrastructure/obj/Debug/net9.0/ExpenseTrackingSystem.Infrastructure.AssemblyInfo.cs
+/ExpenseTrackingSystem.Infrastructure/obj/Debug/net9.0/ExpenseTrackingSystem.Infrastructure.AssemblyInfoInputs.cache
+/ExpenseTrackingSystem.Infrastructure/obj/Debug/net9.0/ExpenseTrackingSystem.Infrastructure.assets.cache
+/ExpenseTrackingSystem.Infrastructure/obj/Debug/net9.0/ExpenseTrackingSystem.Infrastructure.csproj.AssemblyReference.cache
+/ExpenseTrackingSystem.Infrastructure/obj/Debug/net9.0/ExpenseTrackingSystem.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/ExpenseTrackingSystem.Infrastructure/obj/Debug/net9.0/ExpenseTrackingSystem.Infrastructure.GlobalUsings.g.cs
