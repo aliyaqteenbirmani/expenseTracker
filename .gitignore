@@ -1,0 +1,20 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Rider / VS Code optional
+
+.idea/
+.vscode/
+#Logs/
+*.log
+
+#NUGet
+packages/
+*.nupkg
+/ExpenseTrackingSystem/ExpenseTrackingSystem.API.csproj
