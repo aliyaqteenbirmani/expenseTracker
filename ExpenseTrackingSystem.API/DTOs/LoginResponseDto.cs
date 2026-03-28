@@ -1,6 +1,6 @@
-﻿using ExpenseTrackingSystem.Domain.Enums;
+using SpendwiseSystem.Domain.Enums;
 
-namespace ExpenseTrackingSystem.Domain.DTOs
+namespace SpendwiseSystem.Domain.DTOs
 {
     public class LoginResponseDto
     {
@@ -16,3 +16,5 @@ namespace ExpenseTrackingSystem.Domain.DTOs
 
     }
 }
+
+

@@ -1,8 +1,8 @@
-﻿using ExpenseTrackingSystem.Domain.Enums;
+using SpendwiseSystem.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace ExpenseTrackingSystem.Domain.DTOs
+namespace SpendwiseSystem.Domain.DTOs
 {
     public class UserDto
     {
@@ -26,3 +26,5 @@ namespace ExpenseTrackingSystem.Domain.DTOs
         public string ResponseMessage { get; set; }
     }
 }
+
+

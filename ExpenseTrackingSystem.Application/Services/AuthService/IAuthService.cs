@@ -1,7 +1,7 @@
-﻿using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
 
-namespace ExpenseTrackingSystem.Application.Services.AuthService
+namespace SpendwiseSystem.Application.Services.AuthService
 {
     public interface IAuthService
     {
@@ -9,3 +9,5 @@ namespace ExpenseTrackingSystem.Application.Services.AuthService
         public Task<ApiResponse<LoginResponseDto>> LoginUser(LoginDto loginDto);
     }
 }
+
+

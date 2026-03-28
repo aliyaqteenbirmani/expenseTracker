@@ -1,6 +1,6 @@
-using ExpenseTrackingSystem.Domain.Enums;
+using SpendwiseSystem.Domain.Enums;
 
-namespace ExpenseTrackingSystem.Domain.DBOs
+namespace SpendwiseSystem.Domain.DBOs
 {
     public class LoginResponseDbo
     {
@@ -18,3 +18,5 @@ namespace ExpenseTrackingSystem.Domain.DBOs
         public byte[] PasswordSalt { get; set; }
     }
 }
+
+

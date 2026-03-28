@@ -1,12 +1,12 @@
-using ExpenseTrackingSystem.Application.Interfaces;
-using ExpenseTrackingSystem.Domain.DBOs;
-using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
-using ExpenseTrackingSystem.Infrastructure.Data.DbContext;
+using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Domain.DBOs;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
+using SpendwiseSystem.Infrastructure.Data.DbContext;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace ExpenseTrackingSystem.Infrastructure.Repositories
+namespace SpendwiseSystem.Infrastructure.Repositories
 {
     public class AuthRepository : IAuthRepository
     {
@@ -73,3 +73,5 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
         }
     }
 }
+
+

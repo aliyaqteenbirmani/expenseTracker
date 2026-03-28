@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ExpenseTrackingSystem.Infrastructure.Migrations
+namespace SpendwiseSystem.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class _1st : Migration
@@ -68,3 +68,5 @@ namespace ExpenseTrackingSystem.Infrastructure.Migrations
         }
     }
 }
+
+

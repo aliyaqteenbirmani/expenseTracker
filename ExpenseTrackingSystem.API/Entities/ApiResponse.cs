@@ -1,4 +1,4 @@
-﻿namespace ExpenseTrackingSystem.Domain.Entities
+namespace SpendwiseSystem.Domain.Entities
 {
     public class ApiResponse<T>
     {
@@ -9,3 +9,5 @@
         public T Data { get; set; }
     }
 }
+
+

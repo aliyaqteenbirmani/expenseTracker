@@ -1,8 +1,8 @@
-using ExpenseTrackingSystem.Domain.DBOs;
-using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
+using SpendwiseSystem.Domain.DBOs;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
 
-namespace ExpenseTrackingSystem.Application.Interfaces
+namespace SpendwiseSystem.Application.Interfaces
 {
     public interface IAuthRepository
     {
@@ -10,3 +10,5 @@ namespace ExpenseTrackingSystem.Application.Interfaces
         Task<ApiResponse<LoginResponseDbo>> Login(LoginDto loginDto);
     }
 }
+
+

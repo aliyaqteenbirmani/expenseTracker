@@ -1,4 +1,4 @@
-﻿namespace ExpenseTrackingSystem.Domain.Enums
+namespace SpendwiseSystem.Domain.Enums
 {
     public enum Gender
     {
@@ -7,3 +7,5 @@
         Other = 0
     }
 }
+
+

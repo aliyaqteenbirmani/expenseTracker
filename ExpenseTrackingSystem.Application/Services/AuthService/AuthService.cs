@@ -1,12 +1,12 @@
 using AutoMapper;
-using ExpenseTrackingSystem.Application.Interfaces;
-using ExpenseTrackingSystem.Application.Services.TokenService;
-using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
+using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Services.TokenService;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace ExpenseTrackingSystem.Application.Services.AuthService
+namespace SpendwiseSystem.Application.Services.AuthService
 {
     public class AuthService : IAuthService
     {
@@ -71,3 +71,5 @@ namespace ExpenseTrackingSystem.Application.Services.AuthService
         }
     }
 }
+
+

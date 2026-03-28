@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ExpenseTrackingSystem.Domain.DTOs
+namespace SpendwiseSystem.Domain.DTOs
 {
     public class LoginDto
     {
@@ -12,3 +12,5 @@ namespace ExpenseTrackingSystem.Domain.DTOs
         public string Password { get; set; }
     }
 }
+
+

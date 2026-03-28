@@ -1,14 +1,15 @@
-﻿using ExpenseTrackingSystem.Domain.Entities;
+using SpendwiseSystem.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using SpendwiseEntity = SpendwiseSystem.Domain.Entities.Spendwise;
 
-namespace ExpenseTrackingSystem.Infrastructure.Data.Migrations
+namespace SpendwiseSystem.Infrastructure.Data.Migrations
 {
     // Ensure the correct DbContext base class is referenced, not a namespace
     public class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-        public DbSet<CashBook> CashBooks { get; set; }
+        public DbSet<SpendwiseEntity> Spendwises { get; set; }
         public DbSet<User> Users { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -16,3 +17,6 @@ namespace ExpenseTrackingSystem.Infrastructure.Data.Migrations
         }
     }
 }
+
+
+

@@ -1,10 +1,10 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using System.Data;
 using System.Data.Common;
 using static Dapper.SqlMapper;
 
-namespace ExpenseTrackingSystem.Infrastructure.Data.DbContext
+namespace SpendwiseSystem.Infrastructure.Data.DbContext
 {
     public class DapperContext : IDapperContext
     {
@@ -193,3 +193,5 @@ namespace ExpenseTrackingSystem.Infrastructure.Data.DbContext
     }
 
 }
+
+

@@ -1,20 +1,25 @@
+using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Profiles;
+using SpendwiseSystem.Application.Services.AuthService;
+using SpendwiseSystem.Application.Services.SpendwiseService;
+using SpendwiseSystem.Application.Services.TokenService;
+using SpendwiseSystem.Infrastructure.Data.DbContext;
+using SpendwiseSystem.Infrastructure.Data.Migrations;
+using SpendwiseSystem.Infrastructure.Repositories;
 using AutoMapper;
-using ExpenseTrackingSystem.Application.Interfaces;
-using ExpenseTrackingSystem.Application.Profiles;
-using ExpenseTrackingSystem.Application.Services.AuthService;
-using ExpenseTrackingSystem.Application.Services.CashBookService;
-using ExpenseTrackingSystem.Application.Services.TokenService;
-using ExpenseTrackingSystem.Infrastructure.Data.DbContext;
-using ExpenseTrackingSystem.Infrastructure.Data.Migrations;
-using ExpenseTrackingSystem.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Jwt Authentication middleware
 var jwtSetting = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSetting["Key"] ?? throw new Exception("JWT Key missing");
 var key = Encoding.ASCII.GetBytes(jwtKey);
@@ -38,6 +43,7 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
+// Add services to the container.
 builder.Services.AddAuthorization();
 builder.Services.AddCors(options =>
 {
@@ -50,10 +56,8 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddScoped<IDapperContext, DapperContext>();
-
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnectionStr"),
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnectionStr"),
         sqlOptions =>
         {
             sqlOptions.EnableRetryOnFailure(
@@ -61,13 +65,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
                 maxRetryDelay: TimeSpan.FromSeconds(10),
                 errorNumbersToAdd: null
             );
-        }
-    ));
+        }));
 
 builder.Services.AddTransient<IAuthService, AuthService>();
 builder.Services.AddTransient<IAuthRepository, AuthRepository>();
-builder.Services.AddTransient<ICashBookService, CashBookService>();
-builder.Services.AddTransient<ICashBookRepository, CashBookRepository>();
+builder.Services.AddTransient<ISpendwiseService, SpendwiseService>();
+builder.Services.AddTransient<ISpendwiseRepository, SpendwiseRepository>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddSingleton<AutoMapper.IConfigurationProvider>(_ =>
 {
@@ -81,20 +84,20 @@ builder.Services.AddControllers();
 builder.Services.AddHttpLogging(logging =>
 {
     logging.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.All;
-    logging.RequestBodyLogLimit = 4096;
-    logging.ResponseBodyLogLimit = 4096;
+    logging.RequestBodyLogLimit = 4096; // Adjust as needed
+    logging.ResponseBodyLogLimit = 4096; // Adjust as needed
 });
 
 builder.Services.AddSwaggerGen();
-
 var app = builder.Build();
 
 app.UseHttpLogging();
 app.UseSwagger();
+// Always enable Swagger UI
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Expense Tracking System API v1");
-    c.RoutePrefix = "swagger";
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "SpendwiseSystem API v1");
+    c.RoutePrefix = "swagger"; // Visit /swagger
 });
 
 app.UseCors("AllowFlutterApp");

@@ -1,12 +1,12 @@
-﻿using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace ExpenseTrackingSystem.Application.Services.TokenService
+namespace SpendwiseSystem.Application.Services.TokenService
 {
         public class TokenService : ITokenService
         {
@@ -52,3 +52,5 @@ namespace ExpenseTrackingSystem.Application.Services.TokenService
         }
 
 }
+
+

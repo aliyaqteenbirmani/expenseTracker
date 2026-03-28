@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$project = Join-Path $PSScriptRoot "ExpenseTrackingSystem\ExpenseTrackingSystem.API.csproj"
+$project = Join-Path $PSScriptRoot "ExpenseTrackingSystem\SpendwiseSystem.API.csproj"
 $outputPath = Join-Path $PSScriptRoot $Output
 
 if (Test-Path $outputPath) {
@@ -23,3 +23,5 @@ dotnet publish $project `
 Write-Host ""
 Write-Host "Linux publish output:"
 Write-Host $outputPath
+
+

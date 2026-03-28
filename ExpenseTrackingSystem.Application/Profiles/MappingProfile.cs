@@ -1,9 +1,9 @@
 using AutoMapper;
-using ExpenseTrackingSystem.Domain.DBOs;
-using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
+using SpendwiseSystem.Domain.DBOs;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
 
-namespace ExpenseTrackingSystem.Application.Profiles
+namespace SpendwiseSystem.Application.Profiles
 {
     public class MappingProfile : Profile
     {
@@ -15,3 +15,5 @@ namespace ExpenseTrackingSystem.Application.Profiles
         }
     }
 }
+
+

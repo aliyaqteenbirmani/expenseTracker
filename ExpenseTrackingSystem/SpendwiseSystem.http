@@ -1,0 +1,8 @@
+@SpendwiseSystem_HostAddress = http://localhost:5282
+
+GET {{SpendwiseSystem_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+

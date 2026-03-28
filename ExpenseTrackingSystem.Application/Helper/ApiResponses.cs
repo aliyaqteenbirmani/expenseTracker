@@ -1,11 +1,11 @@
-﻿using ExpenseTrackingSystem.Domain.Entities;
+using SpendwiseSystem.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ExpenseTrackingSystem.Application.Helper
+namespace SpendwiseSystem.Application.Helper
 {
     public static class ApiResponses
     {
@@ -109,3 +109,5 @@ namespace ExpenseTrackingSystem.Application.Helper
         };
     }
 }
+
+

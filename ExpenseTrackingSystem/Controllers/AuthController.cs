@@ -1,9 +1,9 @@
-﻿using ExpenseTrackingSystem.Application.Expressions;
-using ExpenseTrackingSystem.Application.Helper;
-using ExpenseTrackingSystem.Application.Interfaces;
-using ExpenseTrackingSystem.Application.Services.AuthService;
-using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
+using SpendwiseSystem.Application.Expressions;
+using SpendwiseSystem.Application.Helper;
+using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Services.AuthService;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System;
@@ -12,7 +12,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ExpenseTrackingSystem.API.Controllers
+namespace SpendwiseSystem.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -290,4 +290,6 @@ namespace ExpenseTrackingSystem.API.Controllers
     }
 
 }
+
+
 

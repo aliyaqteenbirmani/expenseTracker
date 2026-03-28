@@ -1,6 +1,6 @@
-﻿using ExpenseTrackingSystem.Domain.Enums;
+using SpendwiseSystem.Domain.Enums;
 
-namespace ExpenseTrackingSystem.Domain.Entities
+namespace SpendwiseSystem.Domain.Entities
 {
     public class User
     {
@@ -25,3 +25,5 @@ namespace ExpenseTrackingSystem.Domain.Entities
 
     }
 }
+
+
