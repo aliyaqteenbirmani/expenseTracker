@@ -1,19 +1,17 @@
-﻿using AutoMapper;
+using AutoMapper;
+using ExpenseTrackingSystem.Domain.DBOs;
 using ExpenseTrackingSystem.Domain.DTOs;
 using ExpenseTrackingSystem.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ExpenseTrackingSystem.Application.Profiles
 {
     public class MappingProfile : Profile
     {
-        public MappingProfile() 
+        public MappingProfile()
         {
             CreateMap<UserDto, User>();
+            CreateMap<LoginResponseDbo, LoginResponseDto>();
+            CreateMap<LoginResponseDbo, UserDataForTokenGeneration>();
         }
     }
 }

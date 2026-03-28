@@ -8,6 +8,7 @@ namespace ExpenseTrackingSystem.Infrastructure.Data.Migrations
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
+        public DbSet<CashBook> CashBooks { get; set; }
         public DbSet<User> Users { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

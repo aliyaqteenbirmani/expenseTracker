@@ -7,6 +7,7 @@ using ExpenseTrackingSystem.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -118,8 +119,9 @@ namespace ExpenseTrackingSystem.API.Controllers
 
             if (!serviceResponse.Success)
             {
-                return BadRequest(new ApiResponse<User>
+                return Unauthorized(new ApiResponse<LoginResponseDto>
                 {
+                    StatusCode = (int)HttpStatusCode.Unauthorized,
                     Success = false,
                     Message = serviceResponse.Message,
                     Data = null
@@ -129,7 +131,7 @@ namespace ExpenseTrackingSystem.API.Controllers
 
             return Ok(new ApiResponse<LoginResponseDto>
             {
-                StatusCode = 200,
+                StatusCode = (int)HttpStatusCode.OK,
                 Success = true,
                 Message = "Login successful",
                 Data = serviceResponse.Data,

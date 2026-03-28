@@ -1,19 +1,19 @@
+using AutoMapper;
 using ExpenseTrackingSystem.Application.Interfaces;
+using ExpenseTrackingSystem.Application.Profiles;
 using ExpenseTrackingSystem.Application.Services.AuthService;
 using ExpenseTrackingSystem.Application.Services.TokenService;
 using ExpenseTrackingSystem.Infrastructure.Data.DbContext;
 using ExpenseTrackingSystem.Infrastructure.Data.Migrations;
 using ExpenseTrackingSystem.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
-using System.Data;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Jwt Authentication middleware
 var jwtSetting = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSetting["Key"] ?? throw new Exception("JWT Key missing");
 var key = Encoding.ASCII.GetBytes(jwtKey);
@@ -48,35 +48,52 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Add services to the container.
-builder.Services.AddScoped<IDapperContext,DapperContext>();
+builder.Services.AddScoped<IDapperContext, DapperContext>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
+    options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnectionStr"),
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnectionStr"))
+        sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorNumbersToAdd: null
+            );
+        }
     ));
+
 builder.Services.AddTransient<IAuthService, AuthService>();
 builder.Services.AddTransient<IAuthRepository, AuthRepository>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
+builder.Services.AddSingleton<AutoMapper.IConfigurationProvider>(_ =>
+{
+    var configExpression = new AutoMapper.MapperConfigurationExpression();
+    configExpression.AddProfile(new MappingProfile());
+    return new AutoMapper.MapperConfiguration(configExpression, NullLoggerFactory.Instance);
+});
+builder.Services.AddSingleton<IMapper>(sp =>
+    new Mapper(sp.GetRequiredService<AutoMapper.IConfigurationProvider>(), sp.GetService));
 builder.Services.AddControllers();
 builder.Services.AddHttpLogging(logging =>
 {
     logging.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.All;
-    logging.RequestBodyLogLimit = 4096; // Adjust as needed
-    logging.ResponseBodyLogLimit = 4096; // Adjust as needed
+    logging.RequestBodyLogLimit = 4096;
+    logging.ResponseBodyLogLimit = 4096;
 });
 
 builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
+
 app.UseHttpLogging();
 app.UseSwagger();
-// Always enable Swagger UI
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "Expense Tracking System API v1");
-    c.RoutePrefix = "swagger"; // Visit /swagger
+    c.RoutePrefix = "swagger";
 });
+
 app.UseCors("AllowFlutterApp");
 app.UseHttpsRedirection();
 app.UseRouting();

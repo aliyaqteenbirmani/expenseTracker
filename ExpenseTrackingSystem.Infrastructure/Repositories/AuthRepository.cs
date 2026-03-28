@@ -1,8 +1,8 @@
-﻿using ExpenseTrackingSystem.Application.Interfaces;
+using ExpenseTrackingSystem.Application.Interfaces;
+using ExpenseTrackingSystem.Domain.DBOs;
 using ExpenseTrackingSystem.Domain.DTOs;
 using ExpenseTrackingSystem.Domain.Entities;
 using ExpenseTrackingSystem.Infrastructure.Data.DbContext;
-using Microsoft.AspNetCore.Mvc;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -17,32 +17,24 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
             _dapperContext = dbContext;
         }
 
-
-        public async Task<ApiResponse<User>> Login(LoginDto loginDto)
+        public async Task<ApiResponse<LoginResponseDbo>> Login(LoginDto loginDto)
         {
-            var userFromDb = await _dapperContext.GetSingleAsync<User>("SP_GetUserByEmail", new 
-            {   Email = loginDto.UserName
-            });
-           
-            if (userFromDb is null)
+            var userFromDb = await _dapperContext.GetSingleAsync<LoginResponseDbo>(
+                "SP_GetUserByEmail",
+                new { Email = loginDto.UserName });
+
+            if (!userFromDb.Success)
             {
-                return new ApiResponse<User>
+                return new ApiResponse<LoginResponseDbo>
                 {
                     Success = false,
                     Message = "Invalid UserName",
                 };
             }
+
             using var hmac = new HMACSHA256(userFromDb.PasswordSalt);
             var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(loginDto.Password));
-            if (!userFromDb.PasswordHash.SequenceEqual(computedHash))
-            {
-                return new ApiResponse<User>
-                {
-                    Success = false,
-                    Message = "Invalid Email or Password",
-                };
-            }
-            return new ApiResponse<User>
+            return new ApiResponse<LoginResponseDbo>
             {
                 Success = true,
                 Message = "Login successful",
@@ -63,6 +55,7 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
                 CreatedBy = user.CreatedBy,
                 Gender = (int)user.Gender
             };
+
             try
             {
                 var resultFromDb = await _dapperContext.GetSingleAsync<ApiResponse<User>>("SP_AddUser", parameters);
@@ -70,7 +63,6 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
             }
             catch (Exception ex)
             {
-                // Log the exception (you can use a logging framework like Serilog, NLog, etc.)
                 Console.WriteLine($"An error occurred while registering the user: {ex.Message}");
                 return new ApiResponse<User>
                 {
@@ -79,7 +71,5 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
                 };
             }
         }
-
-        
     }
 }
