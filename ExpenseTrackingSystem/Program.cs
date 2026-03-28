@@ -5,9 +5,13 @@ using ExpenseTrackingSystem.Infrastructure.Data.DbContext;
 using ExpenseTrackingSystem.Infrastructure.Data.Migrations;
 using ExpenseTrackingSystem.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.Data;
 using System.Text;
 
@@ -52,9 +56,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IDapperContext,DapperContext>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnectionStr"),
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnectionStr"))
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnectionStr")
     ));
 builder.Services.AddTransient<IAuthService, AuthService>();
 builder.Services.AddTransient<IAuthRepository, AuthRepository>();

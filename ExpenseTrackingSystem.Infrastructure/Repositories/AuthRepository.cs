@@ -65,7 +65,7 @@ namespace ExpenseTrackingSystem.Infrastructure.Repositories
             };
             try
             {
-                var resultFromDb = await _dapperContext.GetSingleAsync<ApiResponse<User>>("SP_AddUser", parameters);
+                var resultFromDb = await _dapperContext.GetSingleAsync<ApiResponse<User>>("SP_RegisterUser", parameters);
                 return resultFromDb;
             }
             catch (Exception ex)
