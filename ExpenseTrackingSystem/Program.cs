@@ -2,6 +2,7 @@ using AutoMapper;
 using ExpenseTrackingSystem.Application.Interfaces;
 using ExpenseTrackingSystem.Application.Profiles;
 using ExpenseTrackingSystem.Application.Services.AuthService;
+using ExpenseTrackingSystem.Application.Services.CashBookService;
 using ExpenseTrackingSystem.Application.Services.TokenService;
 using ExpenseTrackingSystem.Infrastructure.Data.DbContext;
 using ExpenseTrackingSystem.Infrastructure.Data.Migrations;
@@ -65,6 +66,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddTransient<IAuthService, AuthService>();
 builder.Services.AddTransient<IAuthRepository, AuthRepository>();
+builder.Services.AddTransient<ICashBookService, CashBookService>();
+builder.Services.AddTransient<ICashBookRepository, CashBookRepository>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddSingleton<AutoMapper.IConfigurationProvider>(_ =>
 {
