@@ -1,6 +1,5 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using MySqlConnector;
 using System.Data;
 using System.Data.Common;
 using static Dapper.SqlMapper;
