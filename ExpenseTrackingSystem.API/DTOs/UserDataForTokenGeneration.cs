@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ExpenseTrackingSystem.Domain.DTOs
+namespace SpendwiseSystem.Domain.DTOs
 {
     public class UserDataForTokenGeneration
     {
@@ -15,3 +15,5 @@ namespace ExpenseTrackingSystem.Domain.DTOs
         public string Email { get; set; }
     }
 }
+
+

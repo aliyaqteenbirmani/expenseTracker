@@ -1,4 +1,4 @@
-﻿namespace ExpenseTrackingSystem.Domain.Entities
+namespace SpendwiseSystem.Domain.Entities
 {
     public class UserRole
     {
@@ -10,3 +10,5 @@
         public User User { get; set; }
     }
 }
+
+

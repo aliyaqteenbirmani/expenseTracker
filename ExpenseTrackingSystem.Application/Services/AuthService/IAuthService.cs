@@ -1,11 +1,15 @@
-﻿using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
 
-namespace ExpenseTrackingSystem.Application.Services.AuthService
+namespace SpendwiseSystem.Application.Services.AuthService
 {
     public interface IAuthService
     {
         public Task<ApiResponse<User>> RegisterUser(UserDto userDto);
         public Task<ApiResponse<LoginResponseDto>> LoginUser(LoginDto loginDto);
+        public Task<ApiResponse<AccessAndRefreshToken>> RefreshToken(RefreshTokenModel refreshToken);
+
     }
 }
+
+

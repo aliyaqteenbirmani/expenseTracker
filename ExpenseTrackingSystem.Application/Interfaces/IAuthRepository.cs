@@ -1,13 +1,17 @@
-﻿using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
-using Microsoft.AspNetCore.Mvc;
+using SpendwiseSystem.Domain.DBOs;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
 
-namespace ExpenseTrackingSystem.Application.Interfaces
+namespace SpendwiseSystem.Application.Interfaces
 {
     public interface IAuthRepository
     {
         Task<ApiResponse<User>> RegisterUser(User user);
-        Task<ApiResponse<User>> Login(LoginDto loginDto);
-
+        Task<ApiResponse<LoginResponseDbo>> Login(LoginDto loginDto);
+        Task SaveRefreshToken(RefreshToken refreshToken);
+        Task<ApiResponse<RefreshTokenWithUserDataDto>> RefreshTokenWithUser(RefreshTokenModel refreshToken);
+        Task<List<string>> GetUserRoles(Guid userId);
     }
 }
+
+

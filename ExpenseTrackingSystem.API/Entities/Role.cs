@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ExpenseTrackingSystem.Domain.Entities
+namespace SpendwiseSystem.Domain.Entities
 {
     public class Role
     {
@@ -14,3 +14,5 @@ namespace ExpenseTrackingSystem.Domain.Entities
         public ICollection<UserRole> UserRoles { get; set; }
     }
 }
+
+

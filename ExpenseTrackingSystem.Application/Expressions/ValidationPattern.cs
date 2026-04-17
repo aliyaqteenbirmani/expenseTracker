@@ -1,6 +1,6 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 
-namespace ExpenseTrackingSystem.Application.Expressions
+namespace SpendwiseSystem.Application.Expressions
 {
     public static class ValidationPattern
     {
@@ -24,3 +24,5 @@ namespace ExpenseTrackingSystem.Application.Expressions
         }
     }
 }
+
+

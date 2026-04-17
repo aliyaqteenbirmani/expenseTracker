@@ -21,4 +21,6 @@
 #NUGet
 packages/
 *.nupkg
-/ExpenseTrackingSystem/ExpenseTrackingSystem.API.csproj
+/ExpenseTrackingSystem/SpendwiseSystem.API.csproj
+
+

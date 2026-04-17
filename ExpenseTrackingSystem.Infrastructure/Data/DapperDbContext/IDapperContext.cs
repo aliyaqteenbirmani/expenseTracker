@@ -1,7 +1,7 @@
-﻿using static Dapper.SqlMapper;
+using static Dapper.SqlMapper;
 using System.Data;
 
-namespace ExpenseTrackingSystem.Infrastructure.Data.DbContext
+namespace SpendwiseSystem.Infrastructure.Data.DbContext
 {
     public interface IDapperContext
     {
@@ -16,3 +16,5 @@ namespace ExpenseTrackingSystem.Infrastructure.Data.DbContext
         IEnumerable<T> GetEnumerable<T>(string sp, object? parms = null, CommandType commandType = CommandType.StoredProcedure);
     }
 }
+
+

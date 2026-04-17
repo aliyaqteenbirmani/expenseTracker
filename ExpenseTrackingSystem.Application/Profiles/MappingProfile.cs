@@ -1,19 +1,24 @@
-﻿using AutoMapper;
-using ExpenseTrackingSystem.Domain.DTOs;
-using ExpenseTrackingSystem.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using AutoMapper;
+using SpendwiseSystem.Domain.DBOs;
+using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.DTOs.CashTransactionDtos;
+using SpendwiseSystem.Domain.Entities;
 
-namespace ExpenseTrackingSystem.Application.Profiles
+namespace SpendwiseSystem.Application.Profiles
 {
     public class MappingProfile : Profile
     {
-        public MappingProfile() 
+        public MappingProfile()
         {
             CreateMap<UserDto, User>();
+            CreateMap<LoginResponseDbo, LoginResponseDto>();
+            CreateMap<LoginResponseDto,LoginResponseDbo>();
+            CreateMap<LoginResponseDbo, UserDataForTokenGeneration>();
+            CreateMap<UserDataForTokenGeneration, RefreshTokenWithUserDataDto>();
+            CreateMap<CashTransactionDto, CashTransaction>();
+            CreateMap<CashTransaction, CashTransactionDto>();
         }
     }
 }
+
+
