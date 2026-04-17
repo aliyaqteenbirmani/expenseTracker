@@ -28,33 +28,33 @@ namespace SpendwiseSystem.API.Controllers
         [HttpPost("Registration")]
         public async Task<ActionResult> Register(UserDto userDto)
         {
+            if(!ModelState.IsValid)
+            {
+                return BadRequest(ApiResponses.BadRequest("Invalid user data", "INVALID_USER_DATA"));
+            }
+
             try
             {
                 var response = await _authService.RegisterUser(userDto);
 
-                // If registration failed for some reason (e.g., email conflict)
                 if (!response.Success)
                 {
                     return BadRequest(
                         ApiResponses.Conflict("Unable to process request. Please try again or use a different email.")
                     );
                 }
-
-                // Registration successful
+                userDto.Password = null;
                 return Created(
-                    "", // or the URL of the newly created resource
+                    "",
                     ApiResponses.Created(userDto, "Registration successful")
                 );
             }
-            catch (SqlException ex) when (ex.Number == 50001) // Custom SQL error for duplicate email
+            catch (SqlException ex) when (ex.Number == 50001) 
             {
-                return Conflict(
-                    ApiResponses.Conflict("Unable to process request. Please try again or use a different email.")
-                );
+                return Conflict(ApiResponses.Conflict("Unable to process request. Please try again or use a different email."));
             }
             catch (Exception ex)
             {
-                // Generic internal server error
                 return StatusCode(
                     500,
                     ApiResponses.InternalServerError("An unexpected error occurred. Please try again later.")
@@ -127,7 +127,6 @@ namespace SpendwiseSystem.API.Controllers
                     Data = null
                 });
             }
-                //return NotFound(new { message = "Invalid UserName or Password" });
 
             return Ok(new ApiResponse<LoginResponseDto>
             {
@@ -138,23 +137,36 @@ namespace SpendwiseSystem.API.Controllers
             });
         }
 
-
-        /*[HttpPost("assign")]
-        public async Task<IActionResult> AssignRoleToUser(Guid userId, string roleName)
+        [HttpPost("refresh")]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenModel refreshToken)
         {
-            try
+            if(!ModelState.IsValid)
+                return BadRequest(refreshToken);
+
+            var serviceResponse = await _authService.RefreshToken(refreshToken);
+            if(serviceResponse.Success)
             {
-                await _roleService.AssignRoleToUser(userId, roleName);
-                return Ok(new { message = "Role assigned successfully!" });
+                return Ok(new ApiResponse<AccessAndRefreshToken>
+                {
+                    StatusCode = (int)HttpStatusCode.OK,
+                    Success = true,
+                    Message = "Token refreshed successfully",
+                    Data = serviceResponse.Data
+                }); 
             }
-            catch (Exception ex)
+
+            return Unauthorized(new ApiResponse<AccessAndRefreshToken>
             {
-                return BadRequest(new { message = ex.Message });
-            }
+                StatusCode = (int)HttpStatusCode.Unauthorized,
+                Success = false,
+                Message = serviceResponse.Message,
+                Data = null
+            });
 
         }
 
-        [HttpPost("forgot-password")]
+
+        /*[HttpPost("forgot-password")]
         [AllowAnonymous]
         public async Task<IActionResult> ForgotPassword([Required] ForgotPasswordDto email)
         {

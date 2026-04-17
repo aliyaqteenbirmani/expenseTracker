@@ -8,6 +8,9 @@ namespace SpendwiseSystem.Application.Interfaces
     {
         Task<ApiResponse<User>> RegisterUser(User user);
         Task<ApiResponse<LoginResponseDbo>> Login(LoginDto loginDto);
+        Task SaveRefreshToken(RefreshToken refreshToken);
+        Task<ApiResponse<RefreshTokenWithUserDataDto>> RefreshTokenWithUser(RefreshTokenModel refreshToken);
+        Task<List<string>> GetUserRoles(Guid userId);
     }
 }
 

@@ -7,6 +7,8 @@ namespace SpendwiseSystem.Application.Services.AuthService
     {
         public Task<ApiResponse<User>> RegisterUser(UserDto userDto);
         public Task<ApiResponse<LoginResponseDto>> LoginUser(LoginDto loginDto);
+        public Task<ApiResponse<AccessAndRefreshToken>> RefreshToken(RefreshTokenModel refreshToken);
+
     }
 }
 

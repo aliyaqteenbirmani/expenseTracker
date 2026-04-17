@@ -1,3 +1,4 @@
+using SpendwiseSystem.Domain.Entities;
 using SpendwiseSystem.Domain.Enums;
 
 namespace SpendwiseSystem.Domain.DTOs
@@ -9,10 +10,13 @@ namespace SpendwiseSystem.Domain.DTOs
         public string LastName { get; set; }
         public string Phone { get; set; }
         public string Email { get; set; }
-        public Gender Gender { get; set; }
-        public string ResetToken { get; set; }
-        public DateTime? ResetTokenExpiry { get; set; }
-        public string Token { get; set; }
+        public string Gender { get; set; }
+        public string AccessToken { get; set; }
+        public DateTime AccessTokenExpire { get; set; }
+        public string RefreshToken { get; set; }
+        public DateTime RefreshTokenExpire { get; set; }
+        //public string UserId { get; set; }
+
 
     }
 }

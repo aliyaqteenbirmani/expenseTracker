@@ -2,19 +2,24 @@ using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs;
 using SpendwiseSystem.Domain.Entities;
+using SpendwiseSystem.Domain.Enums;
 using SpendwiseSystem.Infrastructure.Data.DbContext;
+using SpendwiseSystem.Infrastructure.Data.Migrations;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace SpendwiseSystem.Infrastructure.Repositories
 {
     public class AuthRepository : IAuthRepository
     {
         private readonly IDapperContext _dapperContext;
+        private readonly AppDbContext _context;
 
-        public AuthRepository(IDapperContext dbContext)
+        public AuthRepository(IDapperContext dbContext, AppDbContext context)
         {
             _dapperContext = dbContext;
+            _context = context;
         }
 
         public async Task<ApiResponse<LoginResponseDbo>> Login(LoginDto loginDto)
@@ -32,13 +37,37 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 };
             }
 
-            using var hmac = new HMACSHA256(userFromDb.PasswordSalt);
-            var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(loginDto.Password));
             return new ApiResponse<LoginResponseDbo>
             {
                 Success = true,
                 Message = "Login successful",
                 Data = userFromDb
+            };
+
+        }
+
+        public async Task<ApiResponse<RefreshTokenWithUserDataDto>> RefreshTokenWithUser(RefreshTokenModel refreshToken)
+        {
+            var raw = await _dapperContext.GetSingleAsync<ApiResponseRaw>("SP_GetRefreshTokenWithUser", refreshToken);
+            if (!raw.Success)
+            {
+                return new ApiResponse<RefreshTokenWithUserDataDto>
+                {
+                    Success = raw.Success,
+                    Message = raw?.Message ?? "Invalid Refresh Token",
+                    Data = null
+                };
+            }
+
+            var data = string.IsNullOrWhiteSpace(raw.Data)
+                ? null
+                : JsonSerializer.Deserialize<RefreshTokenWithUserDataDto>(raw.Data, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            return new ApiResponse<RefreshTokenWithUserDataDto>
+            {
+                Success = true,
+                Message = raw.Message,
+                Data = data
             };
         }
 
@@ -53,17 +82,16 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 PasswordHash = user.PasswordHash,
                 PasswordSalt = user.PasswordSalt,
                 CreatedBy = user.CreatedBy,
-                Gender = (int)user.Gender
+                Gender = user.Gender
             };
 
             try
             {
-                var resultFromDb = await _dapperContext.GetSingleAsync<ApiResponse<User>>("SP_AddUser", parameters);
+                var resultFromDb = await _dapperContext.GetSingleAsync<ApiResponse<User>>("SP_RegisterUserAndUserRole", parameters);
                 return resultFromDb;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred while registering the user: {ex.Message}");
                 return new ApiResponse<User>
                 {
                     Success = false,
@@ -71,7 +99,26 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 };
             }
         }
+
+        public async Task SaveRefreshToken(RefreshToken refreshToken)
+        {
+            await _context.RefreshTokens.AddAsync(refreshToken);
+            await _context.SaveChangesAsync();
+
+        }
+
+        public async Task<List<string>> GetUserRoles(Guid userId)
+        {
+            var roles = await _dapperContext.GetListAsync<string>(
+                "SP_GetUserRolesByUserId",
+                new { UserId = userId }
+            );
+
+            return roles;
+        }
+
     }
 }
+
 
 
