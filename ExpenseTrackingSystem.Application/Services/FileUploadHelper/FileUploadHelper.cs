@@ -47,6 +47,45 @@ namespace SpendwiseSystem.Application.Services.FileUploadHelper
 
             return uniqueFileName;
         }
+        /* public static async Task<string?> UploadFileAsync(IFormFile? file, string webRootPath)
+         {
+             if (file == null || file.Length == 0)
+                 return null;
+
+             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+             var imageExtensions = new[] { ".jpg", ".jpeg", ".png" };
+             var pdfExtensions = new[] { ".pdf" };
+
+             string folderName;
+
+             if (imageExtensions.Contains(extension))
+             {
+                 folderName = "images";
+             }
+             else if (pdfExtensions.Contains(extension))
+             {
+                 folderName = "pdf";
+             }
+             else
+             {
+                 throw new Exception("Only image and pdf files are allowed.");
+             }
+
+             var uploadsRoot = Path.Combine(webRootPath, "uploads", folderName);
+
+             if (!Directory.Exists(uploadsRoot))
+                 Directory.CreateDirectory(uploadsRoot);
+
+             var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+             var fullPath = Path.Combine(uploadsRoot, uniqueFileName);
+
+             using var stream = new FileStream(fullPath, FileMode.Create);
+             await file.CopyToAsync(stream);
+
+             return uniqueFileName;
+         }*/
+
 
         public static bool DeleteUploadedFile(string fileName)
         {

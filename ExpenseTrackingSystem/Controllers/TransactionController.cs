@@ -54,13 +54,13 @@ namespace SpendwiseSystem.API.Controllers
 
                 if (resultFromService.Success)
                 {
-                    return new ApiResponse<CashTransaction>
+                    return Ok(new ApiResponse<CashTransaction>
                     {
                         StatusCode = (int)HttpStatusCode.Created,
                         Success = true,
                         Message = resultFromService.Message,
                         Data = resultFromService.Data
-                    };
+                    });
                 }
 
                 if (!string.IsNullOrWhiteSpace(resultFromService.Data?.FileName))
@@ -68,14 +68,14 @@ namespace SpendwiseSystem.API.Controllers
                     FileUploadHelper.DeleteUploadedFile(resultFromService.Data.FileName);
                 }
 
-                return new ApiResponse<CashTransaction>
+                return BadRequest(new ApiResponse<CashTransaction>
                 {
                     StatusCode = resultFromService.StatusCode,
                     Success = resultFromService.Success,
                     Message = resultFromService.Message,
                     ErrorCode = resultFromService.ErrorCode,
                     Data = null
-                };
+                });
             }
             catch (Exception ex)
             {
@@ -103,30 +103,46 @@ namespace SpendwiseSystem.API.Controllers
             {
                 return Unauthorized(ApiResponses.Unauthorized());
             }
-            var responseFromService = await _transactionService.GetAllTransactionsOfCashBook(CashBookId);
-            if (responseFromService.Success)
+
+            try
             {
-                List<string> fileNames = responseFromService.Data.Select(x => x.FileName).ToList();
-                var filesPath = FileUploadHelper.GetFileUrl(fileNames, Request);
-                for (int i = 0; i < responseFromService.Data.Count; i++)
+                var responseFromService = await _transactionService.GetAllTransactionsOfCashBook(CashBookId);
+
+                if (responseFromService.Success)
                 {
-                    responseFromService.Data[i].FilePath = filesPath[i];
+                    List<string> fileNames = responseFromService.Data.Select(x => x.FileName).ToList();
+                    var filesPath = FileUploadHelper.GetFileUrl(fileNames, Request);
+                    for (int i = 0; i < responseFromService.Data.Count; i++)
+                    {
+                        responseFromService.Data[i].FilePath = filesPath[i];
+                    }
+                    return Ok(new ApiResponse<List<AllCashTransactionDto>>
+                    {
+                        StatusCode = ApiResponses.Success().StatusCode,
+                        Success = true,
+                        Message = responseFromService.Message,
+                        Data = responseFromService.Data
+                    });
                 }
-                return new ApiResponse<List<AllCashTransactionDto>>
+                return BadRequest(new ApiResponse<List<AllCashTransactionDto>>
                 {
-                    StatusCode = ApiResponses.Success().StatusCode,
-                    Success = true,
+                    StatusCode = ApiResponses.BadRequest().StatusCode,
+                    Success = false,
                     Message = responseFromService.Message,
-                    Data = responseFromService.Data
-                };
+                    Data = null
+                });
             }
-            return new ApiResponse<List<AllCashTransactionDto>>
+            catch (Exception ex)
             {
-                StatusCode = ApiResponses.BadRequest().StatusCode,
-                Success = false,
-                Message = responseFromService.Message,
-                Data = null
-            };
+                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<List<AllCashTransactionDto>>
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Message = $"Internal error occurred: {ex.Message}",
+                    Success = false,
+                    Data = null
+                });
+            }
+            
         }
 
         [HttpDelete("{id:guid}")]
@@ -139,30 +155,30 @@ namespace SpendwiseSystem.API.Controllers
 
                 if (responseFromService.Success)
                 {
-                    return new ApiResponse<ApiResponseRaw>
+                    return Ok(new ApiResponse<ApiResponseRaw>
                     {
                         StatusCode = ApiResponses.Success().StatusCode,
                         Success = true,
                         Message = responseFromService.Message
-                    };
+                    });
                 }
 
-                return new ApiResponse<ApiResponseRaw>
+                return BadRequest(new ApiResponse<ApiResponseRaw>
                 {
                     StatusCode = ApiResponses.BadRequest().StatusCode,
                     Success = false,
                     Message = responseFromService.Message,
                     Data = null
-                };
+                });
             }
             catch (Exception ex)
             {
-                return new ApiResponse<ApiResponseRaw>
+                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<ApiResponseRaw>
                 {
                     StatusCode = ApiResponses.InternalServerError().StatusCode,
                     Success = false,
                     Message = ex.Message
-                };
+                });
             }
         }
 
@@ -175,24 +191,38 @@ namespace SpendwiseSystem.API.Controllers
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
-            var responseFromService = await _transactionService.GetTransactionById(id);
-            if (responseFromService.Success)
+            try
             {
-                return new ApiResponse<CashTransactionDto>
+                var responseFromService = await _transactionService.GetTransactionById(id);
+
+                if (responseFromService.Success)
                 {
-                    StatusCode = ApiResponses.Success().StatusCode,
-                    Success = true,
+                    return Ok(new ApiResponse<CashTransactionDto>
+                    {
+                        StatusCode = ApiResponses.Success().StatusCode,
+                        Success = true,
+                        Message = responseFromService.Message,
+                        Data = responseFromService.Data
+                    });
+                }
+                return BadRequest(new ApiResponse<CashTransactionDto>
+                {
+                    StatusCode = ApiResponses.BadRequest().StatusCode,
+                    Success = false,
                     Message = responseFromService.Message,
-                    Data = responseFromService.Data
-                };
+                    Data = null
+                });
             }
-            return new ApiResponse<CashTransactionDto>
+            catch (Exception ex)
             {
-                StatusCode = ApiResponses.BadRequest().StatusCode,
-                Success = false,
-                Message = responseFromService.Message,
-                Data = null
-            };
+                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<CashTransactionDto>
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Message = $"Internal error occurred: {ex.Message}",
+                    Success = false,
+                    Data = null
+                });
+            }
         }
 
         [HttpPut("update")]
@@ -223,28 +253,31 @@ namespace SpendwiseSystem.API.Controllers
 
                 var modifiedBy = GetCurrentUserName();
                 var resultFromService = await _transactionService.UpdateCashTransaction(transactionUpdateDto, modifiedBy);
+
                 if (resultFromService.Success)
                 {
-                    return new ApiResponse<CTUpdateResponseDto>
+                    return Ok(new ApiResponse<CTUpdateResponseDto>
                     {
                         StatusCode = ApiResponses.Success().StatusCode,
                         Success = true,
                         Message = resultFromService.Message,
                         Data = resultFromService.Data
-                    };
+                    });
                 }
+
                 if (!string.IsNullOrWhiteSpace(resultFromService.Data?.FileName))
                 {
                     FileUploadHelper.DeleteUploadedFile(resultFromService.Data.FileName);
                 }
-                return new ApiResponse<CTUpdateResponseDto>
+
+                return BadRequest(new ApiResponse<CTUpdateResponseDto>
                 {
                     StatusCode = resultFromService.StatusCode,
                     Success = resultFromService.Success,
                     Message = resultFromService.Message,
                     ErrorCode = resultFromService.ErrorCode,
                     Data = null
-                };
+                });
             }
             catch (Exception ex)
             {
@@ -264,27 +297,42 @@ namespace SpendwiseSystem.API.Controllers
 
 
         [HttpGet("getfile")]
-        public async Task<ApiResponse<CashTransactionFileDto>> GetCashTransactionFile(string id)
+        public async Task<ActionResult<ApiResponse<CashTransactionFileDto>>> GetCashTransactionFile(string id)
         {
-            var responseFromService = await _transactionService.GetCashTransactionFile(id);
-            if (!responseFromService.Success)
-                return new ApiResponse<CashTransactionFileDto>
-                {
-                    Success = false,
-                    StatusCode = ApiResponses.BadRequest().StatusCode,
-                    Message = responseFromService.Message,
-                    Data = null
-                };
-            var filePath = FileUploadHelper.GetFileUrl(new List<string?> { responseFromService.Data.FileName }, Request).FirstOrDefault();
-            responseFromService.Data.FilePath = filePath;
-
-            return new ApiResponse<CashTransactionFileDto>
+            try
             {
-                Success = true,
-                StatusCode = ApiResponses.Success().StatusCode,
-                Message = responseFromService.Message,
-                Data = responseFromService.Data
-            };
+                var responseFromService = await _transactionService.GetCashTransactionFile(id);
+
+                if (!responseFromService.Success)
+                    return BadRequest(new ApiResponse<CashTransactionFileDto>
+                    {
+                        Success = false,
+                        StatusCode = ApiResponses.BadRequest().StatusCode,
+                        Message = responseFromService.Message,
+                        Data = null
+                    });
+
+                var filePath = FileUploadHelper.GetFileUrl(new List<string?> { responseFromService.Data.FileName }, Request).FirstOrDefault();
+                responseFromService.Data.FilePath = filePath;
+
+                return Ok(new ApiResponse<CashTransactionFileDto>
+                {
+                    Success = true,
+                    StatusCode = ApiResponses.Success().StatusCode,
+                    Message = responseFromService.Message,
+                    Data = responseFromService.Data
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<CashTransactionFileDto>
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Message = $"Internal error occurred: {ex.Message}",
+                    Success = false,
+                    Data = null
+                });
+            }
 
         }
 

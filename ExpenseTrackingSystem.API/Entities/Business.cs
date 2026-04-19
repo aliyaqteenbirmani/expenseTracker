@@ -14,6 +14,7 @@ namespace SpendwiseSystem.Domain.Entities
         public string Description { get; set; } = null;
         public string FileName { get; set; } = null;
         public Guid UserId { get; set; }
+        public Guid OwnerUserId { get; set; }
 
         public DateTime CreatedOn { get; set; }
         public DateTime UpdatedOn { get; set; }

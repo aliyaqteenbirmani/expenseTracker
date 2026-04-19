@@ -20,7 +20,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             _context = context;
         }
 
-        public async Task<SPResponseFromDb> CreateBusiness(BusinessDto business, string CreatedBy)
+        public async Task<SPResponseFromDb> CreateBusiness(BusinessDto business, string CreatedBy,string UserId)
         {
             return await _context.GetSingleAsync<SPResponseFromDb>("SP_CreateBusiness",
                new
@@ -30,6 +30,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                    Description = business.Description,
                    FileName = business.FileName,
                    CreatedBy = CreatedBy,
+                   UserId = Guid.Parse(UserId)
                },
                commandType: System.Data.CommandType.StoredProcedure);
         }
@@ -64,6 +65,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                        Description = business.Description,
                        FileName = business.FileName,
                        ModifiedBy = CreatedBy,
+                       
                    },
                     commandType: System.Data.CommandType.StoredProcedure);
         }
