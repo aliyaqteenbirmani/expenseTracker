@@ -17,7 +17,7 @@ namespace SpendwiseSystem.Application.Services.BusinessService
             _businessRepository = businessRepository;
         }
 
-        public async Task<ApiResponse<BusinessDto>> CreateBusiness(BusinessDto business, string CreatedBy)
+        public async Task<ApiResponse<BusinessResponseDto>> CreateBusiness(BusinessDto business, string CreatedBy, string UserId)
         {
             var uploadedFileName = await FileUploadHelper.FileUploadHelper.UploadFileAsync(business.File);
             business.FileName = uploadedFileName;
@@ -25,11 +25,11 @@ namespace SpendwiseSystem.Application.Services.BusinessService
             try
             {
 
-                var dbResult = await _businessRepository.CreateBusiness(business, CreatedBy);
+                var dbResult = await _businessRepository.CreateBusiness(business, CreatedBy, UserId);
 
                 if (dbResult == null)
                 {
-                    return new ApiResponse<BusinessDto>
+                    return new ApiResponse<BusinessResponseDto>
                     {
                         Success = false,
                         StatusCode = (int)HttpStatusCode.InternalServerError,
@@ -40,7 +40,7 @@ namespace SpendwiseSystem.Application.Services.BusinessService
 
                 if (!dbResult.Success)
                 {
-                    return new ApiResponse<BusinessDto>
+                    return new ApiResponse<BusinessResponseDto>
                     {
                         Success = false,
                         StatusCode = (int)HttpStatusCode.BadRequest,
@@ -49,13 +49,12 @@ namespace SpendwiseSystem.Application.Services.BusinessService
                     };
                 }
 
-                BusinessDto data = null;
+                BusinessResponseDto data = null;
                 if (!string.IsNullOrWhiteSpace(dbResult.Data))
                 {
-                    data = JsonSerializer.Deserialize<BusinessDto>(dbResult.Data);
+                    data = JsonSerializer.Deserialize<BusinessResponseDto>(dbResult.Data);
                 }
-
-                return new ApiResponse<BusinessDto>
+                return new ApiResponse<BusinessResponseDto>
                 {
                     Success = true,
                     StatusCode = (int)HttpStatusCode.Created,
@@ -65,7 +64,7 @@ namespace SpendwiseSystem.Application.Services.BusinessService
             }
             catch (Exception ex)
             {
-                return new ApiResponse<BusinessDto>
+                return new ApiResponse<BusinessResponseDto>
                 {
                     Success = false,
                     StatusCode = (int)HttpStatusCode.Conflict,
@@ -74,19 +73,19 @@ namespace SpendwiseSystem.Application.Services.BusinessService
                 };
             }
         }
-        public async Task<ApiResponse<BusinessDto>> DeleteBusiness(string id, string userName)
+        public async Task<ApiResponse<BusinessResponseDto>> DeleteBusiness(string id, string userName)
         {
             var responseFromRepo = await _businessRepository.DeleteBusiness(id, userName);
 
             if (responseFromRepo.Success)
-                return new ApiResponse<BusinessDto>
+                return new ApiResponse<BusinessResponseDto>
                 {
                     Success = true,
                     Message = responseFromRepo.Message,
                     StatusCode = (int)ApiResponses.Success().StatusCode,
                     Data = null
                 };
-            return new ApiResponse<BusinessDto>
+            return new ApiResponse<BusinessResponseDto>
             {
                 Success = false,
                 Message = responseFromRepo.Message,
@@ -95,12 +94,12 @@ namespace SpendwiseSystem.Application.Services.BusinessService
             };
         }
 
-        public async Task<ApiResponse<List<BusinessDto>>> GetAllBusiness(string UserId)
+        public async Task<ApiResponse<List<BusinessResponseDto>>> GetAllBusiness(string UserId)
         {
             var responseFromRepo = await _businessRepository.GetAllBusiness(UserId);
             if (responseFromRepo == null)
             {
-                return new ApiResponse<List<BusinessDto>>
+                return new ApiResponse<List<BusinessResponseDto>>
                 {
                     Success = false,
                     StatusCode = (int)HttpStatusCode.InternalServerError,
@@ -111,7 +110,7 @@ namespace SpendwiseSystem.Application.Services.BusinessService
 
             if (!responseFromRepo.Success)
             {
-                return new ApiResponse<List<BusinessDto>>
+                return new ApiResponse<List<BusinessResponseDto>>
                 {
                     Success = false,
                     StatusCode = (int)HttpStatusCode.BadRequest,
@@ -120,14 +119,14 @@ namespace SpendwiseSystem.Application.Services.BusinessService
                 };
             }
 
-            List<BusinessDto> data = null;
+            List<BusinessResponseDto> data = null;
             if (!string.IsNullOrWhiteSpace(responseFromRepo.Data))
             {
-                data = JsonSerializer.Deserialize<List<BusinessDto>>(responseFromRepo.Data);
+                data = JsonSerializer.Deserialize<List<BusinessResponseDto>>(responseFromRepo.Data);
             }
             var fileNames = data.Select(b => b.FileName).ToList();
             //var filePath = FileUploadHelper.FileUploadHelper.GetFileUrl(fileNames, )
-            return new ApiResponse<List<BusinessDto>>
+            return new ApiResponse<List<BusinessResponseDto>>
             {
                 Success = true,
                 StatusCode = (int)HttpStatusCode.OK,
@@ -135,12 +134,12 @@ namespace SpendwiseSystem.Application.Services.BusinessService
                 Data = data
             };
         }
-        public async Task<ApiResponse<BusinessDto>> GetBusiness(string id)
+        public async Task<ApiResponse<BusinessResponseDto>> GetBusiness(string id)
         {
             var responseFromRepo = await _businessRepository.GetBusiness(id);
 
             if (!responseFromRepo.Success)
-                return new ApiResponse<BusinessDto>
+                return new ApiResponse<BusinessResponseDto>
                 {
                     Success = false,
                     Message = responseFromRepo.Message,
@@ -148,21 +147,21 @@ namespace SpendwiseSystem.Application.Services.BusinessService
                     Data = null
                 };
 
-            return new ApiResponse<BusinessDto>
+            return new ApiResponse<BusinessResponseDto>
             {
                 Success = true,
                 Message = responseFromRepo.Message,
                 StatusCode = (int)ApiResponses.Success().StatusCode,
-                Data = JsonSerializer.Deserialize<BusinessDto>( responseFromRepo.Data)
+                Data = JsonSerializer.Deserialize<BusinessResponseDto>( responseFromRepo.Data)
             };
 
         }
-        public async Task<ApiResponse<BusinessDto>> UpdateBusiness(BusinessDto business, string CreatedBy)
+        public async Task<ApiResponse<BusinessResponseDto>> UpdateBusiness(BusinessDto business, string CreatedBy)
         {
             var responseFromRepo = await _businessRepository.UpdateBusiness(business, CreatedBy);
 
             if(!responseFromRepo.Success)
-                return new ApiResponse<BusinessDto>
+                return new ApiResponse<BusinessResponseDto>
                 {
                     Success = false,
                     Message = responseFromRepo.Message,
@@ -170,12 +169,12 @@ namespace SpendwiseSystem.Application.Services.BusinessService
                     Data = null
                 };
 
-            return new ApiResponse<BusinessDto>
+            return new ApiResponse<BusinessResponseDto>
             {
                 Success = true,
                 Message = responseFromRepo.Message,
                 StatusCode = (int)ApiResponses.Success().StatusCode,
-                Data = JsonSerializer.Deserialize<BusinessDto>(responseFromRepo.Data)
+                Data = JsonSerializer.Deserialize<BusinessResponseDto>(responseFromRepo.Data)
             };
         }
     }

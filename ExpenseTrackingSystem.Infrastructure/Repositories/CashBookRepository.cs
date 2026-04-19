@@ -24,8 +24,8 @@ namespace CashBookSystem.Infrastructure.Repositories
                 new
                 {
                     Name = dto.CashBookName,
-                    BusinessId = dto.BusinessId,
-                    UserId = userId,
+                    BusinessId = Guid.Parse(dto.BusinessId),
+                    UserId = Guid.Parse(userId),
                     CreatedBy = createdBy
                 });
         }

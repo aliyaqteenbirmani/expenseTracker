@@ -26,7 +26,7 @@ namespace SpendwiseSystem.API.Controllers
         }
 
         [HttpPost("Registration")]
-        public async Task<ActionResult> Register(UserDto userDto)
+        public async Task<ActionResult<ApiResponse<object>>> Register(UserDto userDto)
         {
             if(!ModelState.IsValid)
             {
@@ -39,14 +39,27 @@ namespace SpendwiseSystem.API.Controllers
 
                 if (!response.Success)
                 {
-                    return BadRequest(
-                        ApiResponses.Conflict("Unable to process request. Please try again or use a different email.")
+                    return Conflict(
+                        new ApiResponse<object>
+                        {
+                            StatusCode = (int)HttpStatusCode.Conflict,
+                            Success = false,
+                            Message = response.Message,
+                            ErrorCode = "REGISTRATION_FAILED",
+                            Data = null
+                        }
                     );
                 }
                 userDto.Password = null;
-                return Created(
-                    "",
-                    ApiResponses.Created(userDto, "Registration successful")
+                return CreatedAtAction(nameof(Register),
+                    new ApiResponse<object>
+                    {
+                        StatusCode = (int)HttpStatusCode.Created,
+                        Success = true,
+                        Message = response.Message,
+                        ErrorCode = "REGISTRATION_SUCCESS",
+                        Data = response
+                    }
                 );
             }
             catch (SqlException ex) when (ex.Number == 50001) 

@@ -8,7 +8,7 @@ namespace SpendwiseSystem.Domain.DTOs
         [MaxLength(200)]
         public string CashBookName { get; set; }
         [Required]
-        public Guid BusinessId { get; set; }
+        public string BusinessId { get; set; }
     }
 }
 

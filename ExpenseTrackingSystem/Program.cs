@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
+using SpendwiseSystem.API.Extensions;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Application.Profiles;
 using SpendwiseSystem.Application.Services.AuthService;
@@ -12,6 +13,7 @@ using SpendwiseSystem.Application.Services.BusinessService;
 using SpendwiseSystem.Application.Services.SpendwiseService;
 using SpendwiseSystem.Application.Services.TokenService;
 using SpendwiseSystem.Application.Services.TransactionService;
+using SpendwiseSystem.Domain.DTOs;
 using SpendwiseSystem.Infrastructure.Data.DbContext;
 using SpendwiseSystem.Infrastructure.Data.Migrations;
 using SpendwiseSystem.Infrastructure.Repositories;
@@ -54,37 +56,9 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();
     });
 });
-
-builder.Services.AddScoped<IDapperContext, DapperContext>();
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnectionStr"),
-        sqlOptions =>
-        {
-            sqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
-                maxRetryDelay: TimeSpan.FromSeconds(10),
-                errorNumbersToAdd: null
-            );
-        }));
-
-builder.Services.AddTransient<IAuthService, AuthService>();
-builder.Services.AddTransient<IAuthRepository, AuthRepository>();
-builder.Services.AddTransient<ICashBookService, CashBookService>();
-builder.Services.AddTransient<ICashBookRepository, CashBookRepository>();
-builder.Services.AddTransient<ITransactionService, TransactionService>();
-builder.Services.AddTransient<ITransactionRepository, TransactionRepository>();
-builder.Services.AddSingleton<ITokenService, TokenService>();
-builder.Services.AddTransient<IBusinessService, BusinessService>();
-builder.Services.AddTransient<IBusinessRepository, BusinessRepository>();
-builder.Services.AddSingleton<AutoMapper.IConfigurationProvider>(_ =>
-{
-    var configExpression = new AutoMapper.MapperConfigurationExpression();
-    configExpression.AddProfile(new MappingProfile());
-    return new AutoMapper.MapperConfiguration(configExpression, NullLoggerFactory.Instance);
-});
-builder.Services.AddSingleton<IMapper>(sp =>
-    new Mapper(sp.GetRequiredService<AutoMapper.IConfigurationProvider>(), sp.GetService));
-
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddApplicationServices(builder.Configuration);
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.AddControllers();
 builder.Services.AddHttpLogging(logging =>
 {
