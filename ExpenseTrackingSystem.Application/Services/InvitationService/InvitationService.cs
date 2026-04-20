@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
+using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Application.Services.InvitationEmailService;
+using SpendwiseSystem.Application.Services.InvitationLinkBuilder;
 using SpendwiseSystem.Domain.DTOs.InvitationRequestDto;
 using SpendwiseSystem.Domain.Entities;
 using System;
@@ -15,13 +17,15 @@ namespace SpendwiseSystem.Application.Services.InvitationService
     {
         private readonly IInvitationRepository _invitationRepository;
         private readonly IInvitationEmailService _invitationEmailService;
+        private readonly IInvitationLinkBuilder _invitationLinkBuilder;
         private readonly ILogger<InvitationService> _logger;
 
-        public InvitationService(IInvitationRepository invitationRepository, IInvitationEmailService invitationEmailService, ILogger<InvitationService> logger)
+        public InvitationService(IInvitationRepository invitationRepository, IInvitationEmailService invitationEmailService, ILogger<InvitationService> logger, IInvitationLinkBuilder invitationLinkBuilder)
         {
             _invitationRepository = invitationRepository;
             _invitationEmailService = invitationEmailService;
             _logger = logger;
+            _invitationLinkBuilder = invitationLinkBuilder;
         }
 
         public async Task<ApiResponse<Guid>> CreateBusinessInvitationAsync(
@@ -55,11 +59,16 @@ namespace SpendwiseSystem.Application.Services.InvitationService
             if (!PermissionValidationHelper.AreValidBusinessPermissions(request.Permissions))
                 return ApiResponse<Guid>.FailureResponse("One or more invalid business permissions provided.");
 
+            var inviteToken = InviteTokenHelper.GenerateSecureToken();
+            var tokenExpiresOn = request.ExpiresOn ?? DateTime.UtcNow.AddDays(7); 
+
             var result = await _invitationRepository.CreateBusinessInvitationAsync(
                 businessId,
                 request.InvitedEmail,
                 currentUserId,
                 request.ExpiresOn,
+                tokenExpiresOn,
+                inviteToken,
                 request.Remarks?.Trim(),
                 request.Permissions);
 
@@ -71,8 +80,10 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                     request.InvitedEmail,
                     request.Permissions,
                     request.ExpiresOn,
-                    request.Remarks?.Trim());
+                    request.Remarks?.Trim(),
+                    inviteToken);
             }
+            result.Message = result.Message + "and Email is sent successfully.";
             return result;
         }
 
@@ -111,12 +122,17 @@ namespace SpendwiseSystem.Application.Services.InvitationService
             if (!PermissionValidationHelper.AreValidCashbookPermissions(request.Permissions))
                 return ApiResponse<Guid>.FailureResponse("One or more invalid cashbook permissions provided.");
 
+            var inviteToken = InviteTokenHelper.GenerateSecureToken();
+            var tokenExpiresOn = request.ExpiresOn ?? DateTime.UtcNow.AddDays(7);
+
             var result = await _invitationRepository.CreateCashbookInvitationAsync(
                 businessId,
                 cashbookId,
                 request.InvitedEmail,
                 currentUserId,
                 request.ExpiresOn,
+                tokenExpiresOn,
+                inviteToken,
                 request.Remarks?.Trim(),
                 request.Permissions);
 
@@ -129,8 +145,10 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                     request.InvitedEmail,
                     request.Permissions,
                     request.ExpiresOn,
-                    request.Remarks?.Trim());
+                    request.Remarks?.Trim(),
+                    inviteToken);
             }
+            result.Message = result.Message + "and email is sent successfully.";
             return result;
         }
 
@@ -222,33 +240,39 @@ namespace SpendwiseSystem.Application.Services.InvitationService
             return result;
         }
 
-        private async Task SendBusinessInvitationEmailIfPossibleAsync(
+        private async Task<object> SendBusinessInvitationEmailIfPossibleAsync(
             Guid businessId,
             Guid currentUserId,
             string invitedEmail,
             List<string> permissions,
             DateTime? expiresOn,
-            string? remarks)
+            string? remarks,
+            string inviteToken)
         {
             try
             {
                 var businessInfo = await _invitationRepository.GetBusinessEmailInfoAsync(businessId);
                 var inviterInfo = await _invitationRepository.GetUserEmailInfoAsync(currentUserId);
+
                 if (businessInfo != null && inviterInfo != null)
                 {
-                    await _invitationEmailService.SendBusinessInvitationEmailAsync(
+                    var invitationLink = _invitationLinkBuilder.BuildInvitationLink(inviteToken);
+                    var emailInfo = await _invitationEmailService.SendBusinessInvitationEmailAsync(
                         invitedEmail,
                         inviterInfo.FullName,
                         businessInfo.BusinessName,
                         permissions,
                         expiresOn,
-                        remarks);
+                        remarks,
+                        invitationLink);
+                    return emailInfo;
                 }
+                return null;
             }
             catch(Exception ex) 
             {
                 _logger.LogError(ex, "Failed to send business invitation email to {InvitedEmail} for business {BusinessId}", invitedEmail, businessId);
-
+                return null;
             }
         }
 
@@ -259,7 +283,8 @@ namespace SpendwiseSystem.Application.Services.InvitationService
             string invitedEmail,
             List<string> permissions,
             DateTime? expiresOn,
-            string? remarks)
+            string? remarks,
+            string inviteToken)
         {
             try
             {
@@ -269,6 +294,8 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                 if (cashbookInfo == null || inviterInfo == null)
                     return;
 
+                var invitationLink = _invitationLinkBuilder.BuildInvitationLink(inviteToken);
+
                 await _invitationEmailService.SendCashbookInvitationEmailAsync(
                     invitedEmail,
                     inviterInfo.FullName,
@@ -276,7 +303,8 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                     cashbookInfo.CashbookName,
                     permissions,
                     expiresOn,
-                    remarks);
+                    remarks,
+                    invitationLink);
             }
             catch (Exception ex)
             {

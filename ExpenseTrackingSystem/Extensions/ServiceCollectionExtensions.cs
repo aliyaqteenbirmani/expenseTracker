@@ -10,11 +10,13 @@ using SpendwiseSystem.Application.Services.BusinessService;
 using SpendwiseSystem.Application.Services.CurrentUserService;
 using SpendwiseSystem.Application.Services.EmailService;
 using SpendwiseSystem.Application.Services.InvitationEmailService;
+using SpendwiseSystem.Application.Services.InvitationLinkBuilder;
 using SpendwiseSystem.Application.Services.InvitationService;
 using SpendwiseSystem.Application.Services.SpendwiseService;
 using SpendwiseSystem.Application.Services.TokenService;
 using SpendwiseSystem.Application.Services.TransactionService;
 using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities.ConfigModel;
 using SpendwiseSystem.Infrastructure.Data.DbContext;
 using SpendwiseSystem.Infrastructure.Data.Migrations;
 using SpendwiseSystem.Infrastructure.Repositories;
@@ -38,7 +40,6 @@ namespace SpendwiseSystem.API.Extensions
                             errorNumbersToAdd: null
                         );
                     }));
-
             services.AddTransient<IAuthService, AuthService>();
             services.AddTransient<IAuthRepository, AuthRepository>();
 
@@ -56,6 +57,8 @@ namespace SpendwiseSystem.API.Extensions
             services.AddTransient<IInvitationEmailService, InvitationEmailService>();
             services.AddSingleton<ITokenService, TokenService>();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddSingleton(configuration.GetSection("AppLinkSettings").Get<AppLinkSettings>());
+            services.AddTransient<IInvitationLinkBuilder, InvitationLinkBuilder>();
 
             services.AddSingleton<AutoMapper.IConfigurationProvider>(_ =>
             {
