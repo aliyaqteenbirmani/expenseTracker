@@ -30,11 +30,11 @@ namespace CashBookSystem.Infrastructure.Repositories
                 });
         }
 
-        public async Task<ApiResponseRaw> GetAllCashBooks(string userId)
+        public async Task<ApiResponseRaw> GetAllCashBooks(string businessId)
         {
             return await _dapperContext.GetSingleAsync<ApiResponseRaw>(
-                "SP_GetCashBooksByUserId",
-                new { UserId = Guid.Parse(userId) });
+                "SP_GetCashBooksByBusinessId",
+                new { BusinessId = Guid.Parse(businessId) });
         }
 
         public async Task<ApiResponseRaw> GetCashBookById(Guid id, string userId)

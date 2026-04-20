@@ -36,13 +36,15 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 : new ApiResponse<Guid> { Success = false, Data = Guid.Empty, Message = result.Message };
         }
 
-        public async Task<ApiResponse<Guid>> CreateBusinessInvitationAsync(Guid businessId, string invitedEmail, Guid invitedByUserId, DateTime? expiresOn, string remarks, List<string> permissionCodes)
+        public async Task<ApiResponse<Guid>> CreateBusinessInvitationAsync(Guid businessId, string invitedEmail, Guid invitedByUserId, DateTime? expiresOn, DateTime? tokenExpiresOn, string inviteToken, string remarks, List<string> permissionCodes)
         {
             var parameters = new DynamicParameters();
             parameters.Add("@BusinessId", businessId);
             parameters.Add("@InvitedEmail", invitedEmail);
             parameters.Add("@InvitedByUserId", invitedByUserId);
             parameters.Add("@ExpiresOn", expiresOn);
+            parameters.Add("@TokenExpiresOn", tokenExpiresOn);
+            parameters.Add("@InviteToken", inviteToken);
             parameters.Add("@Remarks", remarks);
             parameters.Add(
                         "@PermissionCodes",
@@ -57,7 +59,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 : new ApiResponse<Guid> { Success = false, Data = Guid.Empty, Message = result.Message };
         }
 
-        public async Task<ApiResponse<Guid>> CreateCashbookInvitationAsync(Guid businessId, Guid cashbookId, string invitedEmail, Guid invitedByUserId, DateTime? expiresOn, string remarks, List<string> permissionCodes)
+        public async Task<ApiResponse<Guid>> CreateCashbookInvitationAsync(Guid businessId, Guid cashbookId, string invitedEmail, Guid invitedByUserId, DateTime? expiresOn, DateTime? tokenExpiresOn, string inviteToken, string remarks, List<string> permissionCodes )
         {
             var parameters = new DynamicParameters();
             parameters.Add("@BusinessId", businessId);
@@ -65,6 +67,8 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             parameters.Add("@InvitedEmail", invitedEmail);
             parameters.Add("@InvitedByUserId", invitedByUserId);
             parameters.Add("@ExpiresOn", expiresOn);
+            parameters.Add("@TokenExpiresOn", tokenExpiresOn);
+            parameters.Add("@InviteToken", inviteToken);
             parameters.Add("@Remarks", remarks);
 
             parameters.Add(
@@ -166,5 +170,27 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 new { UserId = userId });
         }
 
+        public async Task<InvitationByTokenDto?> GetInvitationByTokenAsync(string inviteToken)
+        {
+            var results = await _dapper.GetMultipleSelectsAsync(
+                "SP_GetInvitationByToken",
+                new { InviteToken = inviteToken },
+                x => x.Read<InvitationByTokenDto>().FirstOrDefault(),
+                x => x.Read<InvitationPermissionRow>().ToList()
+            );
+
+            var invitation = (InvitationByTokenDto?)results[0];
+            var permissions = (List<InvitationPermissionRow>)results[1];
+
+            if (invitation == null)
+                return null;
+
+            invitation.Permissions = permissions
+                .Select(x => x.Code)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return invitation;
+        }
     }
 }

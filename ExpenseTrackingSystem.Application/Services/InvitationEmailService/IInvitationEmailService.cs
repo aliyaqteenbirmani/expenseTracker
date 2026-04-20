@@ -14,8 +14,9 @@ namespace SpendwiseSystem.Application.Services.InvitationEmailService
             string invitedByName,
             string businessName,
             List<string> permissions,
-            DateTime? expiresOn, 
-            string remarks
+            DateTime? expiresOn,
+            string remarks,
+            string invlteationLink
             );
 
         Task<ApiResponse<bool>> SendCashbookInvitationEmailAsync(
@@ -25,7 +26,8 @@ namespace SpendwiseSystem.Application.Services.InvitationEmailService
             string cashbookName,
             List<string> permissions,
             DateTime? expiresOn,
-            string remarks
+            string remarks,
+            string invitationLink
             );
     }
 }

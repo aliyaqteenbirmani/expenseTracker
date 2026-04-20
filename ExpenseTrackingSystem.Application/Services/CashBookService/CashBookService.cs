@@ -62,9 +62,9 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
             };
         }
 
-        public async Task<ApiResponse<List<CashBook>>> GetAllCashBook(string userId)
+        public async Task<ApiResponse<List<CashBook>>> GetAllCashBook(string businessId)
         {
-            var spendwiseItems = await _cashbookRepository.GetAllCashBooks(userId);
+            var spendwiseItems = await _cashbookRepository.GetAllCashBooks(businessId);
 
             if(spendwiseItems == null || string.IsNullOrWhiteSpace(spendwiseItems.Data))
             {

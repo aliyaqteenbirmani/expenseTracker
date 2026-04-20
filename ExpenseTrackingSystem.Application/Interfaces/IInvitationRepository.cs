@@ -15,6 +15,8 @@ namespace SpendwiseSystem.Application.Interfaces
             string invitedEmail,
             Guid invitedByUserId,
             DateTime? expiresOn,
+            DateTime? tokenExpiresOn,
+            string inviteToken,
             string? remarks,
             List<string> permissionCodes);
 
@@ -24,6 +26,8 @@ namespace SpendwiseSystem.Application.Interfaces
             string invitedEmail,
             Guid invitedByUserId,
             DateTime? expiresOn,
+            DateTime? tokenExpiresOn,
+            string inviteToken,
             string? remarks,
             List<string> permissionCodes);
 
@@ -40,5 +44,7 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<CashbookEmailInfoDto?> GetCashbookEmailInfoAsync(Guid businessId, Guid cashbookId);
 
         Task<UserEmailInfoDto?> GetUserEmailInfoAsync(Guid userId);
+
+        Task<InvitationByTokenDto?> GetInvitationByTokenAsync(string inviteToken);
     }
 }

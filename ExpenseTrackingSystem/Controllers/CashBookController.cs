@@ -65,8 +65,8 @@ namespace SpendwiseSystem.API.Controllers
 
 
 
-            [HttpGet]
-        public async Task<ActionResult<ApiResponse<List<CreateCashBookDto>>>> GetAllCashBooks()
+        [HttpGet("getall")]
+        public async Task<ActionResult<ApiResponse<List<CreateCashBookDto>>>> GetAllCashBooks(string id)
         {
             var userId = GetCurrentUserId();
             if (userId is null)
@@ -74,7 +74,7 @@ namespace SpendwiseSystem.API.Controllers
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
-            var response = await _cashBookService.GetAllCashBook(userId);
+            var response = await _cashBookService.GetAllCashBook(id);
             return StatusCode(response.StatusCode, response);
         }
 
