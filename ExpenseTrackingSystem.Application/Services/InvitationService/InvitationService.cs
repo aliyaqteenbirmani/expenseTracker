@@ -5,8 +5,10 @@ using SpendwiseSystem.Application.Services.InvitationEmailService;
 using SpendwiseSystem.Application.Services.InvitationLinkBuilder;
 using SpendwiseSystem.Domain.DTOs.InvitationRequestDto;
 using SpendwiseSystem.Domain.Entities;
+using SpendwiseSystem.Domain.Enums;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -51,15 +53,18 @@ namespace SpendwiseSystem.Application.Services.InvitationService
             request.InvitedEmail = request.InvitedEmail.Trim().ToLower();
 
             request.Permissions = request.Permissions
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(x => x >= 0)
+                .Distinct()
                 .ToList();
 
-            if (!PermissionValidationHelper.AreValidBusinessPermissions(request.Permissions))
+            var businessPermissions = request.Permissions
+                .Select(x => (BusinessPermission)x)
+                .ToList();
+
+            if (!PermissionValidationHelper.AreValidBusinessPermissions(businessPermissions))
                 return ApiResponse<Guid>.FailureResponse("One or more invalid business permissions provided.");
 
-            var inviteToken = InviteTokenHelper.GenerateSecureToken();
+            var inviteToken = TokenUtils.GenerateSecureToken();
             var tokenExpiresOn = request.ExpiresOn ?? DateTime.UtcNow.AddDays(7); 
 
             var result = await _invitationRepository.CreateBusinessInvitationAsync(
@@ -70,7 +75,7 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                 tokenExpiresOn,
                 inviteToken,
                 request.Remarks?.Trim(),
-                request.Permissions);
+                businessPermissions.Select(p => p.ToString()).ToList()); // <-- Fix: convert to List<string>
 
             if (result.Success)
             {
@@ -78,7 +83,7 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                     businessId,
                     currentUserId,
                     request.InvitedEmail,
-                    request.Permissions,
+                    request.Permissions.Select(p => ((BusinessPermission)p).ToString()).ToList(), // <-- Fix: convert to List<string>
                     request.ExpiresOn,
                     request.Remarks?.Trim(),
                     inviteToken);
@@ -114,15 +119,18 @@ namespace SpendwiseSystem.Application.Services.InvitationService
             request.InvitedEmail = request.InvitedEmail.Trim().ToLower();
 
             request.Permissions = request.Permissions
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(x => x >= 0)
+                .Distinct()
                 .ToList();
 
-            if (!PermissionValidationHelper.AreValidCashbookPermissions(request.Permissions))
+            var cashbookPermissions = request.Permissions
+    .Select(x => (CashbookPermission)x)
+    .ToList();
+
+            if (!PermissionValidationHelper.AreValidCashbookPermissions(cashbookPermissions))
                 return ApiResponse<Guid>.FailureResponse("One or more invalid cashbook permissions provided.");
 
-            var inviteToken = InviteTokenHelper.GenerateSecureToken();
+            var inviteToken = TokenUtils.GenerateSecureToken();
             var tokenExpiresOn = request.ExpiresOn ?? DateTime.UtcNow.AddDays(7);
 
             var result = await _invitationRepository.CreateCashbookInvitationAsync(
@@ -134,7 +142,7 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                 tokenExpiresOn,
                 inviteToken,
                 request.Remarks?.Trim(),
-                request.Permissions);
+                cashbookPermissions.Select(p => p.ToString()).ToList());
 
             if (result.Success)
             {
@@ -143,7 +151,7 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                     cashbookId,
                     currentUserId,
                     request.InvitedEmail,
-                    request.Permissions,
+                    cashbookPermissions.Select(p => p.ToString()).ToList(),
                     request.ExpiresOn,
                     request.Remarks?.Trim(),
                     inviteToken);
@@ -173,6 +181,17 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                 result);
         }
 
+        public async Task<ApiResponse<List<InvitationListItem>>> GetSentInvitationsAsync(
+            Guid currentUserId, string status)
+        {
+            var textInfo = CultureInfo.InvariantCulture.TextInfo;
+            string formattedStatus = textInfo.ToTitleCase(status.ToLowerInvariant());
+
+            var result = await _invitationRepository.GetSentInvitationsAsync(currentUserId, formattedStatus);
+            return ApiResponse<List<InvitationListItem>>.SuccessResponse(
+                "Sent invitations fetched successfully.",
+                result);
+        }
         public async Task<ApiResponse<Guid>> AcceptInvitationAsync(
             Guid invitationId,
             Guid currentUserId,
@@ -311,6 +330,35 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                 _logger.LogError(ex, "Failed to send business invitation email to {InvitedEmail} for business {BusinessId}", invitedEmail, businessId);
 
             }
+        }
+
+
+        public async Task<ApiResponse<List<InvitationByTokenDto>>> GetInvitationByTokenAsync(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation token is required.");
+
+            token = token.Trim();
+
+            var invitation = await _invitationRepository.GetInvitationByTokenAsync(token);
+
+            if (invitation == null)
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation not found.");
+
+            if (!string.Equals(invitation.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse(
+                    $"Invitation is already {invitation.Status.ToLower()}.");
+
+            if (invitation.TokenExpiresOn.HasValue && invitation.TokenExpiresOn.Value <= DateTime.UtcNow)
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation link has expired.");
+
+            if (invitation.IsTokenConsumed)
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation link is no longer valid.");
+            var data = new List<InvitationByTokenDto> { invitation };
+
+            return ApiResponse<List<InvitationByTokenDto>>.SuccessResponse(
+                "Invitation fetched successfully.",
+                data);
         }
     }
 }

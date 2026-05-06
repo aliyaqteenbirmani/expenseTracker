@@ -1,14 +1,10 @@
-using Azure;
-using Humanizer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SpendwiseSystem.Application.Helper;
+using SpendwiseSystem.Application.Services.CurrentUserService;
 using SpendwiseSystem.Application.Services.SpendwiseService;
-using SpendwiseSystem.Domain.DTOs;
-using SpendwiseSystem.Domain.DTOs.BusinessDtos;
+using SpendwiseSystem.Domain.DTOs.CashBookDtos;
 using SpendwiseSystem.Domain.Entities;
-using System.Net;
-using System.Security.Claims;
 
 namespace SpendwiseSystem.API.Controllers
 {
@@ -18,153 +14,102 @@ namespace SpendwiseSystem.API.Controllers
     public class CashBookController : ControllerBase
     {
         private readonly ICashBookService _cashBookService;
+        private readonly ICurrentUserService _currentUserService;
 
-        public CashBookController(ICashBookService cashBookService)
+        public CashBookController(ICashBookService cashBookService, ICurrentUserService currentUserService)
         {
             _cashBookService = cashBookService;
+            _currentUserService = currentUserService;
         }
 
         [HttpPost]
-        public async Task<ActionResult<ApiResponse<CreateCashBookDto>>> CreateCashBook([FromBody] CreateCashBookDto dto)
+        public async Task<ActionResult<CreateCashBookDto>> CreateCashBook([FromBody] CreateCashBookDto dto)
         {
-            var userId = GetCurrentUserId();
-            if (userId is null)
+            var userId = _currentUserService.UserId.ToString();
+            if (string.IsNullOrEmpty(userId))
             {
-                return Unauthorized(new ApiResponse<CreateCashBookDto>
-                {
-                    Success = false,
-                    StatusCode = ApiResponses.Unauthorized().StatusCode,
-                    Message = ApiResponses.Unauthorized().Message,
-                    ErrorCode = ApiResponses.Unauthorized().ErrorCode,
-                    Data = null
-                });
+                return Unauthorized(ApiResponses.Unauthorized());
             }
 
-            var createdBy = GetCurrentUserName();
+            var createdBy = _currentUserService.UserName;
             var response = await _cashBookService.AddCashBook(dto, userId, createdBy);
 
             if (!response.Success)
-                return Conflict(new ApiResponse<CreateCashBookDto>
-                {
-                    Success = false,
-                    StatusCode = ApiResponses.Conflict().StatusCode,
-                    Message = ApiResponses.Conflict().Message,
-                    ErrorCode = ApiResponses.Conflict().ErrorCode,
-                    Data = null
-                });
+                return Conflict(ApiResponses.Conflict());
 
-            return Ok(new ApiResponse<CreateCashBookDto>
-            {
-                Success = true,
-                StatusCode = ApiResponses.Success().StatusCode,
-                Message = ApiResponses.Success().Message,
-                ErrorCode = ApiResponses.Success().ErrorCode,
-                Data = null
-            });
+            // Fix: Cast or extract the correct type for SuccessWithData<T>
+            return Ok(ApiResponses.SuccessWithData(response.Data, "Cash book created successfully"));
         }
 
 
 
         [HttpGet("getall")]
-        public async Task<ActionResult<ApiResponse<List<CreateCashBookDto>>>> GetAllCashBooks(string id)
+        public async Task<ActionResult<List<CreateCashBookDto>>> GetAllCashBooks(string id)
         {
-            var userId = GetCurrentUserId();
-            if (userId is null)
+            var userId = _currentUserService.UserId.ToString();
+            if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
-            var response = await _cashBookService.GetAllCashBook(id);
-            return StatusCode(response.StatusCode, response);
+            var response = await _cashBookService.GetAllCashBook(id, userId);
+
+            return Ok(ApiResponses.SuccessWithData(response.Data, response.Message));
         }
 
         [HttpGet("{id:guid}")]
-        public async Task<ActionResult<ApiResponse<CreateCashBookDto>>> GetCashBookById(Guid id)
+        public async Task<ActionResult<CreateCashBookDto>> GetCashBookById(Guid id)
         {
-            var userId = GetCurrentUserId();
-            if (userId is null)
+            var userId = _currentUserService.UserId.ToString();
+            if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
             var response = await _cashBookService.GetCashBookById(id, userId);
-            return StatusCode(response.StatusCode, response);
+
+            return response.StatusCode switch
+            {
+                404 => NotFound(ApiResponses.NotFound()),
+                400 => BadRequest(ApiResponses.BadRequest(response.Message)),
+                401 => Unauthorized(ApiResponses.Unauthorized(response.Message)),
+                200 => Ok(ApiResponses.SuccessWithData(response.Data, response.Message)),
+                _ => StatusCode(response.StatusCode, ApiResponses.InternalServerError(response.Message))
+            };
         }
 
         [HttpPut("{id:guid}")]
-        public async Task<ActionResult<ApiResponse<object>>> UpdateCashBook(Guid id, [FromBody] UpdateCashBookDto dto)
+        public async Task<ActionResult<object>> UpdateCashBook(Guid id, [FromBody] UpdateCashBookDto dto)
         {
-            var userId = GetCurrentUserId();
-            if (userId is null)
-                return Unauthorized(new ApiResponse<UpdateCashBookDto>
-                {
-                    Success = true,
-                    StatusCode = ApiResponses.Unauthorized().StatusCode,
-                    Message = ApiResponses.Unauthorized().Message,
-                    ErrorCode = ApiResponses.Unauthorized().ErrorCode,
-                    Data = null
-                });
+            var userId = _currentUserService.UserId.ToString();
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(ApiResponses.Unauthorized());
 
-            var modifiedBy = GetCurrentUserName();
+            var modifiedBy = _currentUserService.UserName;
             var response = await _cashBookService.UpdateCashBook(id, dto, userId, modifiedBy);
-            if(!response.Success)
-                return BadRequest(new ApiResponse<UpdateCashBookDto>
-                {
-                    Success = false,
-                    StatusCode = ApiResponses.BadRequest().StatusCode,
-                    Message = ApiResponses.BadRequest().Message,
-                    ErrorCode = ApiResponses.BadRequest().ErrorCode,
-                    Data = dto
-                });
 
-            return Ok(new ApiResponse<object>
-            {
-                Success = true,
-                StatusCode = ApiResponses.Success().StatusCode,
-                Message = ApiResponses.Success().Message,
-                ErrorCode = ApiResponses.Success().ErrorCode,
-                Data = response
-            });
+            if(!response.Success)
+                return BadRequest(ApiResponses.BadRequest(response.Message));
+
+            return Ok(ApiResponses.SuccessWithData(response.Data, response.Message));
         }
 
         [HttpDelete("{id=guid}")]
-        public async Task<ActionResult<ApiResponse<CreateCashBookDto>>> DelteCashBook(Guid id)
+        public async Task<ActionResult<CreateCashBookDto>> DelteCashBook(string id)
         {
-            var responseFromService = await _cashBookService.DeleteCashBook(id);
+            var userId = _currentUserService.UserId.ToString();
+            if(string.IsNullOrEmpty(userId))
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var responseFromService = await _cashBookService.DeleteCashBook(id, userId);
 
             if (!responseFromService.Success)
-                return BadRequest(new ApiResponse<UpdateCashBookDto>
-                {
-                    Success = false,
-                    StatusCode = ApiResponses.BadRequest().StatusCode,
-                    Message = ApiResponses.BadRequest().Message,
-                    ErrorCode = ApiResponses.BadRequest().ErrorCode,
-                    Data = null
-                });
+                return BadRequest(ApiResponses.BadRequest());
 
-            return Ok(new ApiResponse<object>
-            {
-                Success = true,
-                StatusCode = ApiResponses.Success().StatusCode,
-                Message = ApiResponses.Success().Message,
-                ErrorCode = ApiResponses.Success().ErrorCode,
-                Data = responseFromService.Data
-            });
-        }
-
-        private string GetCurrentUserId()
-        {
-            return User.FindFirstValue(ClaimTypes.NameIdentifier);
-        }
-
-        private string GetCurrentUserName()
-        {
-            return User.FindFirstValue(ClaimTypes.Name) ?? "System";
+            return Ok(ApiResponses.Success(responseFromService.Message));
         }
     }
 }
-
-
 
 
 

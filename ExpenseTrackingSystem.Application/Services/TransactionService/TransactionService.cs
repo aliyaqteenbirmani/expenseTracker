@@ -2,9 +2,12 @@
 using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Application.Services.FileUploadHelper;
+using SpendwiseSystem.Application.Services.PermissionAccessService;
 using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs.CashTransactionDtos;
+using SpendwiseSystem.Domain.DTOs.InvitationRequestDto;
 using SpendwiseSystem.Domain.Entities;
+using SpendwiseSystem.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,16 +22,23 @@ namespace SpendwiseSystem.Application.Services.TransactionService
     public class TransactionService : ITransactionService
     {
         private readonly ITransactionRepository _transactionRepository;
+        private readonly IPermissionAccessService _permissionAccessService;
         private readonly IMapper _mapper;
 
-        public TransactionService(ITransactionRepository transactionRepository, IMapper mapper)
+        public TransactionService(ITransactionRepository transactionRepository, IMapper mapper, IPermissionAccessService permissionAccessService)
         {
             _transactionRepository = transactionRepository;
             _mapper = mapper;
+            _permissionAccessService = permissionAccessService;
         }
 
-        public async Task<ApiResponse<CashTransaction>> AddCashTransaction(CashTransactionDto transactionDto, string createdBy)
+        public async Task<ApiResponse<CashTransaction>> AddCashTransaction(CashTransactionDto transactionDto, string createdBy, Guid userId)
         {
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(transactionDto.CashBookId, Guid.Parse(createdBy), CashbookPermission.TRANSACTION_CREATE.ToString());
+
+            if(!hasAccess)
+                return ApiResponse<CashTransaction>.FailureResponse("You do not have permission to add a transaction to this cashbook.");
+
             var resultFromRepo = await _transactionRepository.AddCashTransaction(transactionDto, createdBy);
 
             if (resultFromRepo.Success)
@@ -58,30 +68,35 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             };
         }
 
-        public async Task<ApiResponseRaw> DeleteTransaction(Guid id, string modifiedBy)
+        public async Task<ApiResponse<Guid>> DeleteTransaction(Guid id, string modifiedBy, Guid userId)
         {
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(id, userId, CashbookPermission.TRANSACTION_DELETE.ToString());
+
+            if(!hasAccess)
+                return ApiResponse<Guid>.FailureResponse("You do not have permission to delete this transaction.");
+
             var responseFromRepo = await _transactionRepository.DeleteTransactionAsync(id, modifiedBy);
             if (!responseFromRepo.Success)
             {
-                return new ApiResponseRaw
+                return new ApiResponse<Guid>
                 {
                     Success = false,
                     Message = responseFromRepo.Message,
-                    ResponseCode = responseFromRepo.ResponseCode
+                   StatusCode = responseFromRepo.ResponseCode
                 };
                
             }
             FileUploadHelper.FileUploadHelper.DeleteUploadedFile(responseFromRepo.Data);
-            return new ApiResponseRaw
+            return new ApiResponse<Guid>
             {
                 Success = true,
-                ResponseCode = responseFromRepo.ResponseCode,
+                StatusCode = responseFromRepo.ResponseCode,
                 Message = responseFromRepo.Message
             };
 
         }
 
-        public async Task<ApiResponse<CashTransactionDto>> GetTransactionById(Guid id)
+        public async Task<ApiResponse<CashTransactionDto>> GetTransactionById(Guid id, Guid userId)
         {
             var responseFromRepo = await _transactionRepository.GetTransactionAsync(id);
             if(responseFromRepo.Success)
@@ -106,7 +121,7 @@ namespace SpendwiseSystem.Application.Services.TransactionService
         }
 
 
-        public async Task<ApiResponse<CashTransactionFileDto>> GetCashTransactionFile(string id)
+        public async Task<ApiResponse<CashTransactionFileDto>> GetCashTransactionFile(string id, Guid userId)
         {
             var responseFromRepo = await _transactionRepository.GetTransactionFileName(id);
             if (responseFromRepo.Success)
@@ -132,8 +147,13 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             };
         }
 
-        public async Task<ApiResponse<CTUpdateResponseDto>> UpdateCashTransaction(CashTransactionUpdateDto transactionUpdateDto, string modifiedBy)
+        public async Task<ApiResponse<CTUpdateResponseDto>> UpdateCashTransaction(CashTransactionUpdateDto transactionUpdateDto, string modifiedBy, Guid userId)
         {
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(transactionUpdateDto.Id, userId, CashbookPermission.TRANSACTION_UPDATE.ToString());
+
+            if(!hasAccess)
+                return ApiResponse<CTUpdateResponseDto>.FailureResponse("You do not have permission to edit this transaction.");
+
             var responseFromRepo = await  _transactionRepository.UpdateCashTransaction(transactionUpdateDto, modifiedBy);
 
             if (!responseFromRepo.Success)
@@ -163,8 +183,12 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             };
         }
 
-        public async Task<ApiResponse<List<AllCashTransactionDto>>> GetAllTransactionsOfCashBook(string CashBookId)
+        public async Task<ApiResponse<List<AllCashTransactionDto>>> GetAllTransactionsOfCashBook(string CashBookId,Guid userId)
         {
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(Guid.Parse(CashBookId), userId, CashbookPermission.TRANSACTION_VIEW.ToString());
+
+            if(!hasAccess)
+                return ApiResponse<List<AllCashTransactionDto>>.FailureResponse("You do not have permission to view transactions of this cashbook.");
             var responseFromRepo = await _transactionRepository.GetAllTransactionsOfCashBook(CashBookId);
             if (responseFromRepo.Success)
             {

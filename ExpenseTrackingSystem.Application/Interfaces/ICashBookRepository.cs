@@ -1,6 +1,6 @@
 
 using SpendwiseSystem.Domain.DBOs;
-using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.DTOs.CashBookDtos;
 using SpendwiseSystem.Domain.Entities;
 
 namespace CashBookSystem.Application.Interfaces

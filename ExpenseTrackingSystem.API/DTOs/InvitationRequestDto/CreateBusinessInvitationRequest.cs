@@ -9,7 +9,7 @@ namespace SpendwiseSystem.Domain.DTOs.InvitationRequestDto
     public class CreateBusinessInvitationRequest
     {
         public string InvitedEmail { get; set; } = string.Empty;
-        public List<string> Permissions { get; set; } = new();
+        public List<int> Permissions { get; set; } = new();
         public DateTime? ExpiresOn { get; set; }
         public string? Remarks { get; set; }
     }
@@ -17,7 +17,7 @@ namespace SpendwiseSystem.Domain.DTOs.InvitationRequestDto
     public class CreateCashbookInvitationRequest
     {
         public string InvitedEmail { get; set; } = string.Empty;
-        public List<string> Permissions { get; set; } = new();
+        public List<int> Permissions { get; set; } = new();
         public DateTime? ExpiresOn { get; set; }
         public string? Remarks { get; set; }
     }
@@ -29,11 +29,11 @@ namespace SpendwiseSystem.Domain.DTOs.InvitationRequestDto
 
     public class UpdateBusinessMemberPermissionsRequest
     {
-        public List<string> Permissions { get; set; } = new();
+        public List<int> Permissions { get; set; } = new();
     }
 
     public class UpdateCashbookMemberPermissionsRequest
     {
-        public List<string> Permissions { get; set; } = new();
+        public List<int> Permissions { get; set; } = new();
     }
 }

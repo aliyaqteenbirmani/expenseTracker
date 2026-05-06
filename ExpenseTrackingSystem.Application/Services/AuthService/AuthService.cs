@@ -1,7 +1,12 @@
 using AutoMapper;
+using Microsoft.Extensions.Options;
+using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Services.EmailService;
 using SpendwiseSystem.Application.Services.TokenService;
+using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.DTOs.AuthDtos;
 using SpendwiseSystem.Domain.Entities;
 using SpendwiseSystem.Domain.Enums;
 using System;
@@ -14,13 +19,58 @@ namespace SpendwiseSystem.Application.Services.AuthService
     {
         private readonly IAuthRepository _authRepository;
         private readonly ITokenService _tokenService;
+        private readonly IEmailService _emailService;
+        private readonly AppLinkSettings _appLinkSettings;
         private readonly IMapper _mapper;
 
-        public AuthService(IAuthRepository authRepository, ITokenService tokenService, IMapper mapper)
+        public AuthService(IAuthRepository authRepository, ITokenService tokenService, IMapper mapper, IEmailService emailService, IOptions<AppLinkSettings> appLinkSettings)
         {
             _authRepository = authRepository;
             _tokenService = tokenService;
             _mapper = mapper;
+            _emailService = emailService;
+            _appLinkSettings = appLinkSettings.Value;
+        }
+
+        public async Task<ApiResponse<bool>> GenerateResetLink(string email, string userName)
+        {
+            var token = TokenUtils.GenerateSecureToken();
+            var hashedToken = TokenUtils.HashToken(token);
+            var resetUrl = $"{_appLinkSettings.PasswordResetBaseUrl}?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(email)}";
+
+            EmailMessage emailMessage = new EmailMessage
+            {
+                ToEmail = email,
+                Subject = "Password Reset Request",
+                Body = TokenUtils.BuildPasswordResetHtml(userName, DateTime.UtcNow.AddHours(1), resetUrl),
+                IsBodyHtml = true
+            };
+            var sendEmailTask = await _emailService.SendEmailAsync(emailMessage);
+
+            if(sendEmailTask.Success)
+            {
+                await _authRepository.SavePasswordResetToken(email, hashedToken, DateTime.UtcNow.AddHours(1));
+                return new ApiResponse<bool>
+                {
+                    Success = true,
+                    Message = "Password reset link sent successfully.",
+                    Data = true
+                };
+            }
+            else
+            {
+                return new ApiResponse<bool>
+                {
+                    Success = false,
+                    Message = "Failed to send password reset link.",
+                    Data = false
+                };
+            }
+        }
+
+        public async Task<bool> IsUserExist(string email)
+        {
+            return await _authRepository.IsUserExist(email);
         }
 
         public async Task<ApiResponse<LoginResponseDto>> LoginUser(LoginDto loginDto)
@@ -159,6 +209,15 @@ namespace SpendwiseSystem.Application.Services.AuthService
             return result;
         }
 
+        public async Task<ApiResponseRaw> ResetPassword(ResetPasswordDto resetPasswordDto)
+        {
+            var hmac = new HMACSHA256();
+            byte[] hashedToken = Encoding.UTF8.GetBytes(TokenUtils.HashToken(resetPasswordDto.Token));
+            var passwordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(resetPasswordDto.Password));
+            var saltKey = hmac.Key;
+
+            return await _authRepository.ResetPassword(resetPasswordDto.Email, hashedToken, passwordHash, saltKey);
+        }
     }
 }
 

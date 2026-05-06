@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SpendwiseSystem.Application.Helper;
+using SpendwiseSystem.Application.Services.CurrentUserService;
 using SpendwiseSystem.Application.Services.FileUploadHelper;
 using SpendwiseSystem.Application.Services.TransactionService;
 using SpendwiseSystem.Domain.DBOs;
@@ -19,25 +20,21 @@ namespace SpendwiseSystem.API.Controllers
     public class TransactionController : ControllerBase
     {
         private readonly ITransactionService _transactionService;
-        public TransactionController(ITransactionService transactionService)
+        private readonly ICurrentUserService _currentUserService;
+        public TransactionController(ITransactionService transactionService, ICurrentUserService currentUserService)
         {
             _transactionService = transactionService;
+            _currentUserService = currentUserService;
         }
 
         [HttpPost("AddCashTransaction")]
         [Consumes("multipart/form-data")]
-        public async Task<ActionResult<ApiResponse<CashTransaction>>> AddCashTransaction([FromForm] CashTransactionDto transactionDto)
+        public async Task<ActionResult<CashTransaction>> AddCashTransaction([FromForm] CashTransactionDto transactionDto)
         {
             if (!ModelState.IsValid)
             {
                 {
-                    return BadRequest(new ApiResponse<CashTransactionDto>
-                    {
-                        StatusCode = StatusCodes.Status400BadRequest,
-                        Success = false,
-                        Message = "Invalid transaction data.",
-                        Data = null
-                    });
+                    return BadRequest(ApiResponses.BadRequest());
                 }
             }
 
@@ -49,18 +46,17 @@ namespace SpendwiseSystem.API.Controllers
                     transactionDto.FileName = uploadedFileName;
                 }
 
-                var createdBy = GetCurrentUserName();
-                var resultFromService = await _transactionService.AddCashTransaction(transactionDto, createdBy);
+                var createdBy = _currentUserService.UserName;
+                var userId = _currentUserService.UserId;
+
+                if(userId == Guid.Empty)
+                    return Unauthorized(ApiResponses.Unauthorized());
+
+                var resultFromService = await _transactionService.AddCashTransaction(transactionDto, createdBy, userId ?? Guid.Empty);
 
                 if (resultFromService.Success)
                 {
-                    return Ok(new ApiResponse<CashTransaction>
-                    {
-                        StatusCode = (int)HttpStatusCode.Created,
-                        Success = true,
-                        Message = resultFromService.Message,
-                        Data = resultFromService.Data
-                    });
+                    return Ok(ApiResponses.Success(resultFromService.Message));
                 }
 
                 if (!string.IsNullOrWhiteSpace(resultFromService.Data?.FileName))
@@ -68,14 +64,7 @@ namespace SpendwiseSystem.API.Controllers
                     FileUploadHelper.DeleteUploadedFile(resultFromService.Data.FileName);
                 }
 
-                return BadRequest(new ApiResponse<CashTransaction>
-                {
-                    StatusCode = resultFromService.StatusCode,
-                    Success = resultFromService.Success,
-                    Message = resultFromService.Message,
-                    ErrorCode = resultFromService.ErrorCode,
-                    Data = null
-                });
+                return BadRequest(ApiResponses.BadRequest());
             }
             catch (Exception ex)
             {
@@ -84,29 +73,23 @@ namespace SpendwiseSystem.API.Controllers
                     FileUploadHelper.DeleteUploadedFile(transactionDto.FileName);
                 }
 
-                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<CashTransactionDto>
-                {
-                    StatusCode = StatusCodes.Status500InternalServerError,
-                    Message = $"Internal error occurred: {ex.Message}",
-                    Success = false,
-                    Data = null
-                });
+                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
             }
 
         }
 
         [HttpGet("getall")]
-        public async Task<ActionResult<ApiResponse<List<AllCashTransactionDto>>>> GetAllCashTransactions(string CashBookId)
+        public async Task<ActionResult<List<AllCashTransactionDto>>> GetAllCashTransactions(string CashBookId)
         {
-            var userId = GetCurrentUserId();
-            if (userId is null)
+            var userId = _currentUserService.UserId;
+            if (userId == Guid.Empty)
             {
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
             try
             {
-                var responseFromService = await _transactionService.GetAllTransactionsOfCashBook(CashBookId);
+                var responseFromService = await _transactionService.GetAllTransactionsOfCashBook(CashBookId, userId ?? Guid.Empty);
 
                 if (responseFromService.Success)
                 {
@@ -116,128 +99,77 @@ namespace SpendwiseSystem.API.Controllers
                     {
                         responseFromService.Data[i].FilePath = filesPath[i];
                     }
-                    return Ok(new ApiResponse<List<AllCashTransactionDto>>
-                    {
-                        StatusCode = ApiResponses.Success().StatusCode,
-                        Success = true,
-                        Message = responseFromService.Message,
-                        Data = responseFromService.Data
-                    });
+                    return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
                 }
-                return BadRequest(new ApiResponse<List<AllCashTransactionDto>>
-                {
-                    StatusCode = ApiResponses.BadRequest().StatusCode,
-                    Success = false,
-                    Message = responseFromService.Message,
-                    Data = null
-                });
+
+                return BadRequest(ApiResponses.BadRequest());
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<List<AllCashTransactionDto>>
-                {
-                    StatusCode = StatusCodes.Status500InternalServerError,
-                    Message = $"Internal error occurred: {ex.Message}",
-                    Success = false,
-                    Data = null
-                });
+                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
             }
             
         }
 
         [HttpDelete("{id:guid}")]
-        public async Task<ActionResult<ApiResponse<ApiResponseRaw>>> DeleteCashTransaction(Guid id)
+        public async Task<ActionResult<ApiResponseRaw>> DeleteCashTransaction(Guid id)
         {
-            var modifiedBy = GetCurrentUserName();
-            try
-            {
-                var responseFromService = await _transactionService.DeleteTransaction(id, modifiedBy);
-
-                if (responseFromService.Success)
-                {
-                    return Ok(new ApiResponse<ApiResponseRaw>
-                    {
-                        StatusCode = ApiResponses.Success().StatusCode,
-                        Success = true,
-                        Message = responseFromService.Message
-                    });
-                }
-
-                return BadRequest(new ApiResponse<ApiResponseRaw>
-                {
-                    StatusCode = ApiResponses.BadRequest().StatusCode,
-                    Success = false,
-                    Message = responseFromService.Message,
-                    Data = null
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<ApiResponseRaw>
-                {
-                    StatusCode = ApiResponses.InternalServerError().StatusCode,
-                    Success = false,
-                    Message = ex.Message
-                });
-            }
-        }
-
-        [HttpGet("{id:guid}")]
-        public async Task<ActionResult<ApiResponse<CashTransactionDto>>> GetCashTransactionById(Guid id)
-        {
-            var userId = GetCurrentUserId();
-            if (userId is null)
+            var modifiedBy = _currentUserService.UserName;
+            var userId = _currentUserService.UserId;
+            if(userId == Guid.Empty)
             {
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
             try
             {
-                var responseFromService = await _transactionService.GetTransactionById(id);
+                var responseFromService = await _transactionService.DeleteTransaction(id, modifiedBy, userId ?? Guid.Empty);
 
                 if (responseFromService.Success)
                 {
-                    return Ok(new ApiResponse<CashTransactionDto>
-                    {
-                        StatusCode = ApiResponses.Success().StatusCode,
-                        Success = true,
-                        Message = responseFromService.Message,
-                        Data = responseFromService.Data
-                    });
+                    return Ok(ApiResponses.Success(responseFromService.Message));
                 }
-                return BadRequest(new ApiResponse<CashTransactionDto>
-                {
-                    StatusCode = ApiResponses.BadRequest().StatusCode,
-                    Success = false,
-                    Message = responseFromService.Message,
-                    Data = null
-                });
+
+                return BadRequest(ApiResponses.BadRequest());
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<CashTransactionDto>
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpGet("{id:guid}")]
+        public async Task<ActionResult<CashTransactionDto>> GetCashTransactionById(Guid id)
+        {
+            var userId = _currentUserService.UserId;
+            if (userId == Guid.Empty)
+            {
+                return Unauthorized(ApiResponses.Unauthorized());
+            }
+
+            try
+            {
+                var responseFromService = await _transactionService.GetTransactionById(id,userId ?? Guid.Empty);
+
+                if (responseFromService.Success)
                 {
-                    StatusCode = StatusCodes.Status500InternalServerError,
-                    Message = $"Internal error occurred: {ex.Message}",
-                    Success = false,
-                    Data = null
-                });
+                    return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
+                }
+                return BadRequest(ApiResponses.BadRequest());
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
             }
         }
 
         [HttpPut("update")]
-        public async Task<ActionResult<ApiResponse<CTUpdateResponseDto>>> UpdateCashTransaction([FromForm] CashTransactionUpdateDto transactionUpdateDto)
+        public async Task<ActionResult<CTUpdateResponseDto>> UpdateCashTransaction([FromForm] CashTransactionUpdateDto transactionUpdateDto)
         {
-            /*if (!ModelState.IsValid)
-            {
-                return BadRequest(new ApiResponse<CashTransactionDto>
-                {
-                    StatusCode = StatusCodes.Status400BadRequest,
-                    Success = false,
-                    Message = "Invalid transaction data.",
-                    Data = null
-                });
-            }*/
+            var userId = _currentUserService.UserId;
+            var userName = _currentUserService.UserName;
+            if (userId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
 
             try
             {
@@ -251,18 +183,11 @@ namespace SpendwiseSystem.API.Controllers
                     }
                 }
 
-                var modifiedBy = GetCurrentUserName();
-                var resultFromService = await _transactionService.UpdateCashTransaction(transactionUpdateDto, modifiedBy);
+                var resultFromService = await _transactionService.UpdateCashTransaction(transactionUpdateDto, userName, userId ?? Guid.Empty);
 
                 if (resultFromService.Success)
                 {
-                    return Ok(new ApiResponse<CTUpdateResponseDto>
-                    {
-                        StatusCode = ApiResponses.Success().StatusCode,
-                        Success = true,
-                        Message = resultFromService.Message,
-                        Data = resultFromService.Data
-                    });
+                    return Ok(ApiResponses.SuccessWithData(resultFromService.Data, resultFromService.Message));
                 }
 
                 if (!string.IsNullOrWhiteSpace(resultFromService.Data?.FileName))
@@ -270,14 +195,7 @@ namespace SpendwiseSystem.API.Controllers
                     FileUploadHelper.DeleteUploadedFile(resultFromService.Data.FileName);
                 }
 
-                return BadRequest(new ApiResponse<CTUpdateResponseDto>
-                {
-                    StatusCode = resultFromService.StatusCode,
-                    Success = resultFromService.Success,
-                    Message = resultFromService.Message,
-                    ErrorCode = resultFromService.ErrorCode,
-                    Data = null
-                });
+                return BadRequest(ApiResponses.BadRequest());
             }
             catch (Exception ex)
             {
@@ -285,13 +203,7 @@ namespace SpendwiseSystem.API.Controllers
                 {
                     FileUploadHelper.DeleteUploadedFile(transactionUpdateDto.FileName);
                 }
-                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<CashTransactionDto>
-                {
-                    StatusCode = StatusCodes.Status500InternalServerError,
-                    Message = $"Internal error occurred: {ex.Message}",
-                    Success = false,
-                    Data = null
-                });
+                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
             }
         }
 
@@ -301,51 +213,22 @@ namespace SpendwiseSystem.API.Controllers
         {
             try
             {
-                var responseFromService = await _transactionService.GetCashTransactionFile(id);
+                var userId = _currentUserService.UserId;
+                var responseFromService = await _transactionService.GetCashTransactionFile(id, userId ?? Guid.Empty);
 
                 if (!responseFromService.Success)
-                    return BadRequest(new ApiResponse<CashTransactionFileDto>
-                    {
-                        Success = false,
-                        StatusCode = ApiResponses.BadRequest().StatusCode,
-                        Message = responseFromService.Message,
-                        Data = null
-                    });
+                    return BadRequest(ApiResponses.BadRequest());
 
                 var filePath = FileUploadHelper.GetFileUrl(new List<string?> { responseFromService.Data.FileName }, Request).FirstOrDefault();
                 responseFromService.Data.FilePath = filePath;
 
-                return Ok(new ApiResponse<CashTransactionFileDto>
-                {
-                    Success = true,
-                    StatusCode = ApiResponses.Success().StatusCode,
-                    Message = responseFromService.Message,
-                    Data = responseFromService.Data
-                });
+                return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<CashTransactionFileDto>
-                {
-                    StatusCode = StatusCodes.Status500InternalServerError,
-                    Message = $"Internal error occurred: {ex.Message}",
-                    Success = false,
-                    Data = null
-                });
+                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
             }
 
         }
-
-        private string GetCurrentUserId()
-        {
-            return User.FindFirstValue(ClaimTypes.NameIdentifier);
-        }
-
-        private string GetCurrentUserName()
-        {
-            return User.FindFirstValue(ClaimTypes.Name) ?? "System";
-        }
-
-
     }
 }

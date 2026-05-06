@@ -1,6 +1,7 @@
 using AutoMapper;
 using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.DTOs.AuthDtos;
 using SpendwiseSystem.Domain.DTOs.CashTransactionDtos;
 using SpendwiseSystem.Domain.Entities;
 
