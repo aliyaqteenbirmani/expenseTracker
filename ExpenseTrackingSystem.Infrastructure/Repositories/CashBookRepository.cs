@@ -2,7 +2,7 @@
 
 using CashBookSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.DBOs;
-using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.DTOs.CashBookDtos;
 using SpendwiseSystem.Domain.Entities;
 using SpendwiseSystem.Infrastructure.Data.DbContext;
 

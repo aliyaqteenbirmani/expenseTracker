@@ -25,6 +25,10 @@ namespace SpendwiseSystem.Application.Services.InvitationService
             Guid currentUserId,
             string currentUserEmail);
 
+        Task<ApiResponse<List<InvitationListItem>>> GetSentInvitationsAsync(
+            Guid userId,
+            string userEmail);
+
         Task<ApiResponse<Guid>> AcceptInvitationAsync(
             Guid invitationId,
             Guid currentUserId,
@@ -39,5 +43,7 @@ namespace SpendwiseSystem.Application.Services.InvitationService
         Task<ApiResponse<Guid>> RevokeInvitationAsync(
             Guid invitationId,
             Guid currentUserId);
+
+        Task<ApiResponse<List<InvitationByTokenDto>>> GetInvitationByTokenAsync(string token);
     }
 }

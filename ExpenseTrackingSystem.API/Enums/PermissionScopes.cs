@@ -1,50 +1,42 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SpendwiseSystem.Domain.Enums
+﻿namespace SpendwiseSystem.Domain.Enums
 {
-    public static class PermissionScopes
+    public enum InvitationType
     {
-        public const string Business = "BUSINESS";
-        public const string Cashbook = "CASHBOOK";
+        BUSINESS = 1,
+        CASHBOOK = 2
     }
 
-    public static class InvitationTypes
+    public enum InvitationStatus
     {
-        public const string Business = "BUSINESS";
-        public const string Cashbook = "CASHBOOK";
+        Pending = 1,
+        Accepted = 2,
+        Rejected = 3,
+        Revoked = 4,
+        Expired = 5
     }
 
-    public static class InvitationStatuses
+    public enum MembershipStatus
     {
-        public const string Pending = "Pending";
-        public const string Accepted = "Accepted";
-        public const string Rejected = "Rejected";
-        public const string Revoked = "Revoked";
-        public const string Expired = "Expired";
+        Active = 1,
+        Revoked = 2
     }
 
-    public static class MembershipStatuses
+    public enum BusinessPermission
     {
-        public const string Active = "Active";
-        public const string Revoked = "Revoked";
+        BUSINESS_VIEW = 1,
+        CASHBOOK_LIST_VIEW = 2,
+        BUSINESS_UPDATE = 3,
+        CASHBOOK_CREATE = 4,
+        CASHBOOK_UPDATE = 5,
+        CASHBOOK_DELETE = 6
     }
 
-    public static class AppPermissions
+    public enum CashbookPermission
     {
-        public const string BusinessView = "BUSINESS_VIEW";
-        public const string CashbookListView = "CASHBOOK_LIST_VIEW";
-        public const string CashbookCreate = "CASHBOOK_CREATE";
-        public const string CashbookUpdate = "CASHBOOK_UPDATE";
-        public const string CashbookDelete = "CASHBOOK_DELETE";
-
-        public const string CashbookView = "CASHBOOK_VIEW";
-        public const string TransactionView = "TRANSACTION_VIEW";
-        public const string TransactionAdd = "TRANSACTION_ADD";
-        public const string TransactionEdit = "TRANSACTION_EDIT";
-        public const string TransactionDelete = "TRANSACTION_DELETE";
+        CASHBOOK_VIEW = 1,
+        TRANSACTION_VIEW = 2,
+        TRANSACTION_CREATE = 3,
+        TRANSACTION_UPDATE = 4,
+        TRANSACTION_DELETE = 5
     }
 }

@@ -117,6 +117,30 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             return invitations;
         }
 
+        public async Task<List<InvitationListItem>> GetSentInvitationsAsync(Guid userId, string status)
+        {
+            var parameters = new DynamicParameters();
+            parameters.Add("@UserId", userId);
+            parameters.Add("@Status", status);
+            var results = await _dapper.GetMultipleSelectsAsync(
+                "SP_GetMySentInvitations",
+                parameters,
+                x => x.Read<InvitationListItem>().ToList(),
+                x => x.Read<InvitationPermissionRow>().ToList()
+            );
+            var invitations = (List<InvitationListItem>)results[0];
+            var permissions = (List<InvitationPermissionRow>)results[1];
+            var lookup = permissions
+                .GroupBy(x => x.InvitationId)
+                .ToDictionary(g => g.Key, g => g.Select(p => p.Code).ToList());
+            foreach (var item in invitations)
+            {
+                item.Permissions = lookup.TryGetValue(item.Id, out var list)
+                    ? list
+                    : new List<string>();
+            }
+            return invitations;
+        }
         public async Task<ApiResponse<Guid>> RejectInvitationAsync(Guid invitationId, Guid currentUserId, string currentUserEmail, string remarks)
         {
             var result = await _dapper.GetSingleAsync<SpResult<Guid>>(

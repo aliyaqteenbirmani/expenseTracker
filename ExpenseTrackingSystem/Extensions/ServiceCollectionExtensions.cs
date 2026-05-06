@@ -12,6 +12,8 @@ using SpendwiseSystem.Application.Services.EmailService;
 using SpendwiseSystem.Application.Services.InvitationEmailService;
 using SpendwiseSystem.Application.Services.InvitationLinkBuilder;
 using SpendwiseSystem.Application.Services.InvitationService;
+using SpendwiseSystem.Application.Services.MemberManagementService;
+using SpendwiseSystem.Application.Services.PermissionAccessService;
 using SpendwiseSystem.Application.Services.SpendwiseService;
 using SpendwiseSystem.Application.Services.TokenService;
 using SpendwiseSystem.Application.Services.TransactionService;
@@ -51,14 +53,23 @@ namespace SpendwiseSystem.API.Extensions
 
             services.AddTransient<IBusinessService, BusinessService>();
             services.AddTransient<IBusinessRepository, BusinessRepository>();
+
             services.AddTransient<IInvitationService, InvitationService>();
             services.AddTransient<IInvitationRepository, InvitationRepository>();
+
             services.AddTransient<IEmailService, EmailService>();
             services.AddTransient<IInvitationEmailService, InvitationEmailService>();
+
             services.AddSingleton<ITokenService, TokenService>();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
             services.AddSingleton(configuration.GetSection("AppLinkSettings").Get<AppLinkSettings>());
             services.AddTransient<IInvitationLinkBuilder, InvitationLinkBuilder>();
+
+            services.AddTransient<IMemberManagementRepository, MemberManagementRepository>();
+            services.AddTransient<IMemberManagementService, MemberManagementService>();
+
+            services.AddTransient<IPermissionAccessRepository, PermissionAccessRepository>();
+            services.AddTransient<IPermissionAccessService, PermissionAccessService>();
 
             services.AddSingleton<AutoMapper.IConfigurationProvider>(_ =>
             {

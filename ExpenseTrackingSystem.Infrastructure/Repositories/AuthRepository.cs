@@ -1,6 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.DBOs;
-using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.DTOs.AuthDtos;
 using SpendwiseSystem.Domain.Entities;
 using SpendwiseSystem.Domain.Enums;
 using SpendwiseSystem.Infrastructure.Data.DbContext;
@@ -117,6 +118,36 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             return roles;
         }
 
+        public async Task<bool> IsUserExist(string email)
+        {
+            return await _context.Users.AnyAsync(u => u.Email == email);
+        }
+
+        public async Task<ApiResponse<bool>> SavePasswordResetToken(string email, string hashedToken, DateTime expiresOn)
+        {
+            await _context.Users.Where(u => u.Email == email)
+                  .ExecuteUpdateAsync(setters => setters
+                  .SetProperty(u => u.ResetToken, hashedToken)
+                  .SetProperty(u => u.ResetTokenExpiry, expiresOn));
+
+            return new ApiResponse<bool>
+            {
+                Success = true,
+                Message = "Password reset token saved successfully",
+                Data = true
+            };
+        }
+
+        public async Task<ApiResponseRaw> ResetPassword(string email, byte[] hashedToken, byte[] passwordHash, byte[] saltKey)
+        {
+            var fromDb = await _dapperContext.GetSingleAsync<ApiResponseRaw>(
+                "SP_ResetUserPassword",
+                new { Email = email,
+                      PasswordHash = passwordHash,
+                      PasswordSalt = saltKey,
+                      ResetToken = hashedToken});
+            return fromDb;
+        }
     }
 }
 

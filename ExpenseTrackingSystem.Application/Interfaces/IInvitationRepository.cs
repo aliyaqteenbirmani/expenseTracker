@@ -32,6 +32,7 @@ namespace SpendwiseSystem.Application.Interfaces
             List<string> permissionCodes);
 
         Task<List<InvitationListItem>> GetMyPendingInvitationsAsync(Guid userId,string email);
+        Task<List<InvitationListItem>> GetSentInvitationsAsync(Guid userId,string status);
 
         Task<ApiResponse<Guid>> AcceptInvitationAsync(Guid invitationId, Guid currentUserId, string currentUserEmail);
 
@@ -46,5 +47,6 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<UserEmailInfoDto?> GetUserEmailInfoAsync(Guid userId);
 
         Task<InvitationByTokenDto?> GetInvitationByTokenAsync(string inviteToken);
+
     }
 }

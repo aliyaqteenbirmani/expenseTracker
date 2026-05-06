@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Services.CurrentUserService;
 using SpendwiseSystem.Application.Services.InvitationService;
 using SpendwiseSystem.Domain.DTOs.InvitationRequestDto;
@@ -76,7 +77,7 @@ namespace SpendwiseSystem.API.Controllers
         }
 
         [HttpGet("mypendingInvitations")]
-        public async Task<IActionResult> GetMyPendingInvitations()
+        public async Task<IActionResult> GetMyPendingInvitationsOfSender()
         {
             var currentUserId = _currentUserService.UserId ?? Guid.Empty;
             var currentUserEmail = _currentUserService.Email;
@@ -102,6 +103,45 @@ namespace SpendwiseSystem.API.Controllers
               StatusCode = StatusCodes.Status200OK,
               Data = result.Data
             });
+        }
+
+        [HttpGet("mysentInvitations")]
+        public async Task<IActionResult> GetSentInvitations(string status)
+        {
+            var currentUserId = _currentUserService.UserId ?? Guid.Empty;
+
+            if (currentUserId == Guid.Empty)
+                return Unauthorized("Unauthorized or Invalid");
+
+            var result = await _invitationService.GetSentInvitationsAsync(currentUserId, status);
+
+            if (!result.Success)
+                return BadRequest( ApiResponses.BadRequest(result.Message, result.ErrorCode));
+
+            return Ok(ApiResponses.SuccessWithData(result.Data));
+        }
+
+        [HttpGet("by-token")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetInvitationByToken([FromQuery] string token)
+        {
+            var result = await _invitationService.GetInvitationByTokenAsync(token);
+            if (!result.Success)
+                return BadRequest( new ApiResponse<object> 
+                { 
+                  Success = false, 
+                  Message = result.Message,
+                  StatusCode = StatusCodes.Status400BadRequest ,
+                  ErrorCode = result.ErrorCode
+                });
+
+            return Ok( new ApiResponse<object> 
+            { 
+              Success = true, 
+              Message = result.Message,
+              StatusCode = StatusCodes.Status200OK,
+              Data = result.Data
+            }); 
         }
 
         [HttpPost("{invitationId:guid}/accept")]

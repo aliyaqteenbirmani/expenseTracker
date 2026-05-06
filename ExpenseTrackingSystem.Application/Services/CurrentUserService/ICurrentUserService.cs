@@ -8,7 +8,7 @@ namespace SpendwiseSystem.Application.Services.CurrentUserService
 {
     public interface ICurrentUserService
     {
-        Guid? UserId { get; }
+        Guid? UserId { get; } 
         string Email { get; }
         string UserName { get; }
         bool IsAuthenticated { get; }

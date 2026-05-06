@@ -14,6 +14,7 @@ using SpendwiseSystem.Application.Services.SpendwiseService;
 using SpendwiseSystem.Application.Services.TokenService;
 using SpendwiseSystem.Application.Services.TransactionService;
 using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities.ConfigModel;
 using SpendwiseSystem.Infrastructure.Data.DbContext;
 using SpendwiseSystem.Infrastructure.Data.Migrations;
 using SpendwiseSystem.Infrastructure.Repositories;
@@ -59,6 +60,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddApplicationServices(builder.Configuration);
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
+builder.Services.Configure<AppLinkSettings>(builder.Configuration.GetSection("PasswordResetBaseUrl"));
 builder.Services.AddControllers();
 builder.Services.AddHttpLogging(logging =>
 {
