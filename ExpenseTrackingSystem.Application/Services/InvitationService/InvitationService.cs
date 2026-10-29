@@ -77,9 +77,10 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                 request.Remarks?.Trim(),
                 businessPermissions.Select(p => p.ToString()).ToList()); // <-- Fix: convert to List<string>
 
-            if (result.Success)
-            {
-                await SendBusinessInvitationEmailIfPossibleAsync(
+            if (!result.Success)
+                return result;
+
+            var emailResult = await SendBusinessInvitationEmailIfPossibleAsync(
                     businessId,
                     currentUserId,
                     request.InvitedEmail,
@@ -87,8 +88,7 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                     request.ExpiresOn,
                     request.Remarks?.Trim(),
                     inviteToken);
-            }
-            result.Message = result.Message + "and Email is sent successfully.";
+            result.Message = AppendEmailStatus(result.Message, emailResult);
             return result;
         }
 
@@ -144,9 +144,10 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                 request.Remarks?.Trim(),
                 cashbookPermissions.Select(p => p.ToString()).ToList());
 
-            if (result.Success)
-            {
-                await SendCashbookInvitationEmailIfPossibleAsync(
+            if (!result.Success)
+                return result;
+
+            var emailResult = await SendCashbookInvitationEmailIfPossibleAsync(
                     businessId,
                     cashbookId,
                     currentUserId,
@@ -155,8 +156,7 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                     request.ExpiresOn,
                     request.Remarks?.Trim(),
                     inviteToken);
-            }
-            result.Message = result.Message + "and email is sent successfully.";
+            result.Message = AppendEmailStatus(result.Message, emailResult);
             return result;
         }
 
@@ -259,7 +259,7 @@ namespace SpendwiseSystem.Application.Services.InvitationService
             return result;
         }
 
-        private async Task<object> SendBusinessInvitationEmailIfPossibleAsync(
+        private async Task<ApiResponse<bool>> SendBusinessInvitationEmailIfPossibleAsync(
             Guid businessId,
             Guid currentUserId,
             string invitedEmail,
@@ -284,18 +284,22 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                         expiresOn,
                         remarks,
                         invitationLink);
+                    if (!emailInfo.Success)
+                        _logger.LogWarning("Business invitation email delivery failed for {InvitedEmail}, business {BusinessId}: {ErrorCode}", invitedEmail, businessId, emailInfo.ErrorCode);
+
                     return emailInfo;
                 }
-                return null;
+                _logger.LogWarning("Could not load business invitation email details for {InvitedEmail}, business {BusinessId}", invitedEmail, businessId);
+                return ApiResponse<bool>.FailureResponse("Invitation email could not be prepared.");
             }
             catch(Exception ex) 
             {
                 _logger.LogError(ex, "Failed to send business invitation email to {InvitedEmail} for business {BusinessId}", invitedEmail, businessId);
-                return null;
+                return ApiResponse<bool>.FailureResponse("Invitation email could not be sent.");
             }
         }
 
-        private async Task SendCashbookInvitationEmailIfPossibleAsync(
+        private async Task<ApiResponse<bool>> SendCashbookInvitationEmailIfPossibleAsync(
             Guid businessId,
             Guid cashbookId,
             Guid currentUserId,
@@ -311,11 +315,14 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                 var inviterInfo = await _invitationRepository.GetUserEmailInfoAsync(currentUserId);
 
                 if (cashbookInfo == null || inviterInfo == null)
-                    return;
+                {
+                    _logger.LogWarning("Could not load cashbook invitation email details for {InvitedEmail}, cashbook {CashbookId}", invitedEmail, cashbookId);
+                    return ApiResponse<bool>.FailureResponse("Invitation email could not be prepared.");
+                }
 
                 var invitationLink = _invitationLinkBuilder.BuildInvitationLink(inviteToken);
 
-                await _invitationEmailService.SendCashbookInvitationEmailAsync(
+                var emailResult = await _invitationEmailService.SendCashbookInvitationEmailAsync(
                     invitedEmail,
                     inviterInfo.FullName,
                     cashbookInfo.BusinessName,
@@ -324,12 +331,28 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                     expiresOn,
                     remarks,
                     invitationLink);
+
+                if (!emailResult.Success)
+                    _logger.LogWarning("Cashbook invitation email delivery failed for {InvitedEmail}, cashbook {CashbookId}: {ErrorCode}", invitedEmail, cashbookId, emailResult.ErrorCode);
+
+                return emailResult;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send business invitation email to {InvitedEmail} for business {BusinessId}", invitedEmail, businessId);
-
+                _logger.LogError(ex, "Failed to send cashbook invitation email to {InvitedEmail} for cashbook {CashbookId} in business {BusinessId}", invitedEmail, cashbookId, businessId);
+                return ApiResponse<bool>.FailureResponse("Invitation email could not be sent.");
             }
+        }
+
+        private static string AppendEmailStatus(string invitationMessage, ApiResponse<bool> emailResult)
+        {
+            var status = emailResult?.Success == true && emailResult.Data
+                ? "Invitation email sent successfully."
+                : "Invitation was created, but the email could not be sent. You can retry sending it later.";
+
+            return string.IsNullOrWhiteSpace(invitationMessage)
+                ? status
+                : $"{invitationMessage.TrimEnd()} {status}";
         }
 
 
