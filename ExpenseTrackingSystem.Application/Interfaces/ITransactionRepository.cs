@@ -10,6 +10,7 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<SPResponseFromDb> UpdateCashTransaction(CashTransactionUpdateDto dto, string modifiedBy);
         Task<ApiResponseRaw> DeleteTransactionAsync(Guid id, string modifiedBy);
         Task<ApiResponse<CashTransaction>> GetTransactionAsync(Guid id);
+        Task<Guid?> GetCashBookIdByTransactionIdAsync(Guid id);
         Task<ApiResponseRaw> GetAllTransactionsOfCashBook(string CashBookId);
         Task<SPResponseFromDb> GetTransactionFileName(string id);
 

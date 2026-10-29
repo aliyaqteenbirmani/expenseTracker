@@ -75,6 +75,14 @@ namespace SpendwiseSystem.Infrastructure.Repositories
 
         }
 
+        public async Task<Guid?> GetCashBookIdByTransactionIdAsync(Guid id)
+        {
+            return await _dapperContext.GetSingleAsync<Guid?>(
+                "SELECT CashBookId FROM dbo.CashTransactions WHERE Id = @TransactionId AND IsDeleted = 0",
+                new { TransactionId = id },
+                commandType: System.Data.CommandType.Text);
+        }
+
         public async Task<SPResponseFromDb> GetTransactionFileName(string id)
         {
             return await _dapperContext.GetSingleAsync<SPResponseFromDb>("SP_GetCashTransactionFileNameById",

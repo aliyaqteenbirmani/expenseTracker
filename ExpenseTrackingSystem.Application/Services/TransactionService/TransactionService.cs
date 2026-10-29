@@ -34,7 +34,10 @@ namespace SpendwiseSystem.Application.Services.TransactionService
 
         public async Task<ApiResponse<CashTransaction>> AddCashTransaction(CashTransactionDto transactionDto, string createdBy, Guid userId)
         {
-            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(transactionDto.CashBookId, Guid.Parse(createdBy), CashbookPermission.TRANSACTION_CREATE.ToString());
+            if (transactionDto.CashBookId == Guid.Empty || userId == Guid.Empty)
+                return ApiResponse<CashTransaction>.FailureResponse("A valid cashbook and authenticated user are required.");
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(transactionDto.CashBookId, userId, CashbookPermission.TRANSACTION_CREATE.ToString());
 
             if(!hasAccess)
                 return ApiResponse<CashTransaction>.FailureResponse("You do not have permission to add a transaction to this cashbook.");
@@ -70,7 +73,11 @@ namespace SpendwiseSystem.Application.Services.TransactionService
 
         public async Task<ApiResponse<Guid>> DeleteTransaction(Guid id, string modifiedBy, Guid userId)
         {
-            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(id, userId, CashbookPermission.TRANSACTION_DELETE.ToString());
+            var cashbookId = await _transactionRepository.GetCashBookIdByTransactionIdAsync(id);
+            if (!cashbookId.HasValue || cashbookId.Value == Guid.Empty || userId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Transaction not found.");
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(cashbookId.Value, userId, CashbookPermission.TRANSACTION_DELETE.ToString());
 
             if(!hasAccess)
                 return ApiResponse<Guid>.FailureResponse("You do not have permission to delete this transaction.");
@@ -101,6 +108,10 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             var responseFromRepo = await _transactionRepository.GetTransactionAsync(id);
             if(responseFromRepo.Success)
             {
+                var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(responseFromRepo.Data.CashBookId, userId, CashbookPermission.TRANSACTION_VIEW.ToString());
+                if (!hasAccess)
+                    return ApiResponse<CashTransactionDto>.FailureResponse("You do not have permission to view this transaction.");
+
                 var mappedTransaction = _mapper.Map<CashTransactionDto>(responseFromRepo.Data);
                 return new ApiResponse<CashTransactionDto>
                 {
@@ -123,6 +134,17 @@ namespace SpendwiseSystem.Application.Services.TransactionService
 
         public async Task<ApiResponse<CashTransactionFileDto>> GetCashTransactionFile(string id, Guid userId)
         {
+            if (!Guid.TryParse(id, out var transactionId) || transactionId == Guid.Empty || userId == Guid.Empty)
+                return ApiResponse<CashTransactionFileDto>.FailureResponse("Transaction not found.");
+
+            var cashbookId = await _transactionRepository.GetCashBookIdByTransactionIdAsync(transactionId);
+            if (!cashbookId.HasValue || cashbookId.Value == Guid.Empty)
+                return ApiResponse<CashTransactionFileDto>.FailureResponse("Transaction not found.");
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(cashbookId.Value, userId, CashbookPermission.TRANSACTION_VIEW.ToString());
+            if (!hasAccess)
+                return ApiResponse<CashTransactionFileDto>.FailureResponse("You do not have permission to view this transaction.");
+
             var responseFromRepo = await _transactionRepository.GetTransactionFileName(id);
             if (responseFromRepo.Success)
             {
@@ -149,7 +171,11 @@ namespace SpendwiseSystem.Application.Services.TransactionService
 
         public async Task<ApiResponse<CTUpdateResponseDto>> UpdateCashTransaction(CashTransactionUpdateDto transactionUpdateDto, string modifiedBy, Guid userId)
         {
-            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(transactionUpdateDto.Id, userId, CashbookPermission.TRANSACTION_UPDATE.ToString());
+            var cashbookId = await _transactionRepository.GetCashBookIdByTransactionIdAsync(transactionUpdateDto.Id);
+            if (!cashbookId.HasValue || cashbookId.Value == Guid.Empty || userId == Guid.Empty)
+                return ApiResponse<CTUpdateResponseDto>.FailureResponse("Transaction not found.");
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(cashbookId.Value, userId, CashbookPermission.TRANSACTION_UPDATE.ToString());
 
             if(!hasAccess)
                 return ApiResponse<CTUpdateResponseDto>.FailureResponse("You do not have permission to edit this transaction.");
