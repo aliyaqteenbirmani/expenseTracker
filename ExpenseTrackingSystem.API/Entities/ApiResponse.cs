@@ -13,6 +13,7 @@ namespace SpendwiseSystem.Domain.Entities
         {
             return new ApiResponse<T>
             {
+                StatusCode = 200,
                 Success = true,
                 Message = message,
                 Data = data
@@ -23,8 +24,10 @@ namespace SpendwiseSystem.Domain.Entities
         {
             return new ApiResponse<T>
             {
+                StatusCode = 400,
                 Success = false,
                 Message = message,
+                ErrorCode = "REQUEST_FAILED",
                 Data = default
             };
         }

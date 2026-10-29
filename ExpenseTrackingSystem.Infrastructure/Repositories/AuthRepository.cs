@@ -86,19 +86,9 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 Gender = user.Gender
             };
 
-            try
-            {
-                var resultFromDb = await _dapperContext.GetSingleAsync<ApiResponse<User>>("SP_RegisterUserAndUserRole", parameters);
-                return resultFromDb;
-            }
-            catch (Exception ex)
-            {
-                return new ApiResponse<User>
-                {
-                    Success = false,
-                    Message = $"{ex.Message} {(ex.InnerException != null ? ex.InnerException.Message : string.Empty)}"
-                };
-            }
+            return await _dapperContext.GetSingleAsync<ApiResponse<User>>(
+                "SP_RegisterUserAndUserRole",
+                parameters);
         }
 
         public async Task SaveRefreshToken(RefreshToken refreshToken)

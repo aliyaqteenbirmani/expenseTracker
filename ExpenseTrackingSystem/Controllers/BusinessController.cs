@@ -72,35 +72,27 @@ namespace SpendwiseSystem.API.Controllers
             if (UserId == Guid.Empty.ToString())
                 return Unauthorized( ApiResponses.Unauthorized());
 
-            try
-            {
-                var result = await _businessService.GetAllBusiness(UserId);
-                if (result.StatusCode == 400)
-                    return NotFound(ApiResponses.NotFound("There are no businesses of this User"));
+            var result = await _businessService.GetAllBusiness(UserId);
+            if (result.StatusCode == 400)
+                return NotFound(ApiResponses.NotFound("There are no businesses of this User"));
 
-                for (int i = 0; i < result.Data.Count; i++)
+            if (!result.Success || result.Data == null)
+                return BadRequest(ApiResponses.BadRequest(result.Message));
+
+            for (int i = 0; i < result.Data.Count; i++)
+            {
+                var fileName = result.Data[i].FileName;
+
+                if (!string.IsNullOrEmpty(fileName))
                 {
-                    var fileName = result.Data[i].FileName;
-
-                    if (!string.IsNullOrEmpty(fileName))
-                    {
-                        result.Data[i].FileUrl = FileUploadHelper.GetFileUrl(new List<string> { fileName }, Request).FirstOrDefault();
-                    }
-                    else
-                    {
-                        result.Data[i].FileUrl = null;
-                    }
+                    result.Data[i].FileUrl = FileUploadHelper.GetFileUrl(new List<string> { fileName }, Request).FirstOrDefault();
                 }
-                if (!result.Success)
-                    return BadRequest( ApiResponses.BadRequest(result.Message));
-
-
-                return Ok( ApiResponses.SuccessWithData(result.Data, result.Message));
+                else
+                {
+                    result.Data[i].FileUrl = null;
+                }
             }
-            catch (Exception ex)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, ApiResponses.InternalServerError(ex.Message));
-            }
+            return Ok(ApiResponses.SuccessWithData(result.Data, result.Message));
         }
 
         [HttpPatch]

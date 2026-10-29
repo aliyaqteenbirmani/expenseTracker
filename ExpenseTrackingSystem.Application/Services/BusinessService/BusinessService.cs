@@ -22,56 +22,42 @@ namespace SpendwiseSystem.Application.Services.BusinessService
             var uploadedFileName = await FileUploadHelper.FileUploadHelper.UploadFileAsync(business.File);
             business.FileName = uploadedFileName;
 
-            try
-            {
+            var dbResult = await _businessRepository.CreateBusiness(business, CreatedBy, UserId);
 
-                var dbResult = await _businessRepository.CreateBusiness(business, CreatedBy, UserId);
-
-                if (dbResult == null)
-                {
-                    return new ApiResponse<BusinessResponseDto>
-                    {
-                        Success = false,
-                        StatusCode = (int)HttpStatusCode.InternalServerError,
-                        Message = "No response from database.",
-                        Data = null
-                    };
-                }
-
-                if (!dbResult.Success)
-                {
-                    return new ApiResponse<BusinessResponseDto>
-                    {
-                        Success = false,
-                        StatusCode = (int)HttpStatusCode.BadRequest,
-                        Message = dbResult.Message,
-                        Data = null
-                    };
-                }
-
-                BusinessResponseDto data = null;
-                if (!string.IsNullOrWhiteSpace(dbResult.Data))
-                {
-                    data = JsonSerializer.Deserialize<BusinessResponseDto>(dbResult.Data);
-                }
-                return new ApiResponse<BusinessResponseDto>
-                {
-                    Success = true,
-                    StatusCode = (int)HttpStatusCode.Created,
-                    Message = dbResult.Message,
-                    Data = data
-                };
-            }
-            catch (Exception ex)
+            if (dbResult == null)
             {
                 return new ApiResponse<BusinessResponseDto>
                 {
                     Success = false,
-                    StatusCode = (int)HttpStatusCode.Conflict,
-                    Message = ex.Message,
+                    StatusCode = (int)HttpStatusCode.InternalServerError,
+                    Message = "No response from database.",
                     Data = null
                 };
             }
+
+            if (!dbResult.Success)
+            {
+                return new ApiResponse<BusinessResponseDto>
+                {
+                    Success = false,
+                    StatusCode = (int)HttpStatusCode.BadRequest,
+                    Message = dbResult.Message,
+                    Data = null
+                };
+            }
+
+            BusinessResponseDto data = null;
+            if (!string.IsNullOrWhiteSpace(dbResult.Data))
+            {
+                data = JsonSerializer.Deserialize<BusinessResponseDto>(dbResult.Data);
+            }
+            return new ApiResponse<BusinessResponseDto>
+            {
+                Success = true,
+                StatusCode = (int)HttpStatusCode.Created,
+                Message = dbResult.Message,
+                Data = data
+            };
         }
         public async Task<ApiResponse<BusinessResponseDto>> DeleteBusiness(string id, string userName)
         {

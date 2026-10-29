@@ -36,26 +36,15 @@ namespace SpendwiseSystem.API.Controllers
                 return BadRequest(ApiResponses.BadRequest("Invalid user data", "INVALID_USER_DATA"));
             }
 
-            try
+            var response = await _authService.RegisterUser(userDto);
+
+            if (!response.Success)
             {
-                var response = await _authService.RegisterUser(userDto);
-
-                if (!response.Success)
-                {
-                    return Conflict(ApiResponses.Conflict("REGISTRATION_FAILED"));
-                }
-
-                userDto.Password = null;
-                return Created(string.Empty, ApiResponses.Created(response.Data, response.Message));
-
+                return Conflict(ApiResponses.Conflict("REGISTRATION_FAILED"));
             }
-            catch (Exception ex)
-            {
-                return StatusCode(
-                    500,
-                    ApiResponses.InternalServerError(ex.Message)
-                );
-            }
+
+            userDto.Password = null;
+            return Created(string.Empty, ApiResponses.Created(response.Data, response.Message));
         }
 
 
@@ -90,7 +79,7 @@ namespace SpendwiseSystem.API.Controllers
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenModel refreshToken)
         {
             if (!ModelState.IsValid)
-                return BadRequest(refreshToken);
+                return BadRequest(ApiResponses.BadRequest("Invalid refresh token data.", "VALIDATION_ERROR"));
 
             var serviceResponse = await _authService.RefreshToken(refreshToken);
             if (serviceResponse.Success)
@@ -141,11 +130,7 @@ namespace SpendwiseSystem.API.Controllers
             }
             else
             {
-                return StatusCode(500, new
-                {
-                    Success = false,
-                    Message = "Failed to send password reset link."
-                });
+                return StatusCode(StatusCodes.Status500InternalServerError, ApiResponses.InternalServerError());
             }
         }
 
@@ -154,14 +139,14 @@ namespace SpendwiseSystem.API.Controllers
         {
             if ((!ModelState.IsValid))
             {
-                return BadRequest(ModelState);
+                return BadRequest(ApiResponses.BadRequest("Validation failed.", "VALIDATION_ERROR"));
             }
 
             var result = await _authService.ResetPassword(resetPasswordDto);
             if(result.Success)
-                return Ok(new { message = "Password reset successfully. You can now log in." });
+                return Ok(ApiResponses.Success("Password reset successfully. You can now log in."));
 
-            return BadRequest(new { message = result.Message });
+            return BadRequest(ApiResponses.BadRequest(result.Message, "PASSWORD_RESET_FAILED"));
         }
 
 

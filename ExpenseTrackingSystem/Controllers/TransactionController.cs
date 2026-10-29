@@ -66,14 +66,14 @@ namespace SpendwiseSystem.API.Controllers
 
                 return BadRequest(ApiResponses.BadRequest());
             }
-            catch (Exception ex)
+            catch
             {
                 if (!string.IsNullOrWhiteSpace(transactionDto.FileName))
                 {
                     FileUploadHelper.DeleteUploadedFile(transactionDto.FileName);
                 }
 
-                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
+                throw;
             }
 
         }
@@ -87,28 +87,20 @@ namespace SpendwiseSystem.API.Controllers
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
-            try
-            {
-                var responseFromService = await _transactionService.GetAllTransactionsOfCashBook(CashBookId, userId ?? Guid.Empty);
+            var responseFromService = await _transactionService.GetAllTransactionsOfCashBook(CashBookId, userId ?? Guid.Empty);
 
-                if (responseFromService.Success)
+            if (responseFromService.Success)
+            {
+                List<string> fileNames = responseFromService.Data.Select(x => x.FileName).ToList();
+                var filesPath = FileUploadHelper.GetFileUrl(fileNames, Request);
+                for (int i = 0; i < responseFromService.Data.Count; i++)
                 {
-                    List<string> fileNames = responseFromService.Data.Select(x => x.FileName).ToList();
-                    var filesPath = FileUploadHelper.GetFileUrl(fileNames, Request);
-                    for (int i = 0; i < responseFromService.Data.Count; i++)
-                    {
-                        responseFromService.Data[i].FilePath = filesPath[i];
-                    }
-                    return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
+                    responseFromService.Data[i].FilePath = filesPath[i];
                 }
+                return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
+            }
 
-                return BadRequest(ApiResponses.BadRequest());
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
-            }
-            
+            return BadRequest(ApiResponses.BadRequest());
         }
 
         [HttpDelete("{id:guid}")]
@@ -121,21 +113,14 @@ namespace SpendwiseSystem.API.Controllers
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
-            try
-            {
-                var responseFromService = await _transactionService.DeleteTransaction(id, modifiedBy, userId ?? Guid.Empty);
+            var responseFromService = await _transactionService.DeleteTransaction(id, modifiedBy, userId ?? Guid.Empty);
 
-                if (responseFromService.Success)
-                {
-                    return Ok(ApiResponses.Success(responseFromService.Message));
-                }
-
-                return BadRequest(ApiResponses.BadRequest());
-            }
-            catch (Exception ex)
+            if (responseFromService.Success)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+                return Ok(ApiResponses.Success(responseFromService.Message));
             }
+
+            return BadRequest(ApiResponses.BadRequest());
         }
 
         [HttpGet("{id:guid}")]
@@ -147,20 +132,14 @@ namespace SpendwiseSystem.API.Controllers
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
-            try
-            {
-                var responseFromService = await _transactionService.GetTransactionById(id,userId ?? Guid.Empty);
+            var responseFromService = await _transactionService.GetTransactionById(id,userId ?? Guid.Empty);
 
-                if (responseFromService.Success)
-                {
-                    return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
-                }
-                return BadRequest(ApiResponses.BadRequest());
-            }
-            catch (Exception ex)
+            if (responseFromService.Success)
             {
-                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
+                return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
             }
+
+            return BadRequest(ApiResponses.BadRequest());
         }
 
         [HttpPut("update")]
@@ -197,13 +176,13 @@ namespace SpendwiseSystem.API.Controllers
 
                 return BadRequest(ApiResponses.BadRequest());
             }
-            catch (Exception ex)
+            catch
             {
                 if (!string.IsNullOrWhiteSpace(transactionUpdateDto.FileName))
                 {
                     FileUploadHelper.DeleteUploadedFile(transactionUpdateDto.FileName);
                 }
-                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
+                throw;
             }
         }
 
@@ -211,23 +190,16 @@ namespace SpendwiseSystem.API.Controllers
         [HttpGet("getfile")]
         public async Task<ActionResult<ApiResponse<CashTransactionFileDto>>> GetCashTransactionFile(string id)
         {
-            try
-            {
-                var userId = _currentUserService.UserId;
-                var responseFromService = await _transactionService.GetCashTransactionFile(id, userId ?? Guid.Empty);
+            var userId = _currentUserService.UserId;
+            var responseFromService = await _transactionService.GetCashTransactionFile(id, userId ?? Guid.Empty);
 
-                if (!responseFromService.Success)
-                    return BadRequest(ApiResponses.BadRequest());
+            if (!responseFromService.Success)
+                return BadRequest(ApiResponses.BadRequest());
 
-                var filePath = FileUploadHelper.GetFileUrl(new List<string?> { responseFromService.Data.FileName }, Request).FirstOrDefault();
-                responseFromService.Data.FilePath = filePath;
+            var filePath = FileUploadHelper.GetFileUrl(new List<string?> { responseFromService.Data.FileName }, Request).FirstOrDefault();
+            responseFromService.Data.FilePath = filePath;
 
-                return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(ApiResponses.InternalServerError().StatusCode, ex.Message);
-            }
+            return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
 
         }
     }

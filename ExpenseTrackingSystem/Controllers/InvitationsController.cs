@@ -30,7 +30,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentUserService.UserId ?? Guid.Empty;
 
             if(currentUserId == Guid.Empty)
-                return Unauthorized("Unauthorized or Invalid");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _invitationService.CreateBusinessInvitationAsync(businessId, request, currentUserId);
             if (!result.Success)
@@ -56,7 +56,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentUserService.UserId ?? Guid.Empty;
 
             if(currentUserId == Guid.Empty)
-                return Unauthorized("Unauthorized or Invalid");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _invitationService.CreateCashbookInvitationAsync(businessId, cashbookId, request, currentUserId);
             if (!result.Success)
@@ -83,7 +83,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserEmail = _currentUserService.Email;
 
             if (currentUserId == Guid.Empty || string.IsNullOrEmpty(currentUserEmail))
-                return Unauthorized("Unauthorized or Invalid");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _invitationService.GetMyPendingInvitationsAsync(currentUserId, currentUserEmail);
 
@@ -111,7 +111,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentUserService.UserId ?? Guid.Empty;
 
             if (currentUserId == Guid.Empty)
-                return Unauthorized("Unauthorized or Invalid");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _invitationService.GetSentInvitationsAsync(currentUserId, status);
 
@@ -151,7 +151,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserEmail = _currentUserService.Email;
 
             if (currentUserId == Guid.Empty || string.IsNullOrWhiteSpace(currentUserEmail))
-                return Unauthorized("Invalid user.");
+                return Unauthorized(ApiResponses.Unauthorized());
         
             var result = await _invitationService.AcceptInvitationAsync(invitationId, currentUserId, currentUserEmail);
 
@@ -181,7 +181,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserEmail = _currentUserService.Email;
 
             if (currentUserId == Guid.Empty || string.IsNullOrWhiteSpace(currentUserEmail))
-                return Unauthorized("Invalid user.");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _invitationService.RejectInvitationAsync(
                 invitationId,
@@ -213,7 +213,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentUserService.UserId ?? Guid.Empty;
 
             if (currentUserId == Guid.Empty)
-                return Unauthorized("Invalid user.");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _invitationService.RevokeInvitationAsync(
                 invitationId,

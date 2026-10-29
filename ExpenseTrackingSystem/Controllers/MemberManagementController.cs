@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Services.CurrentUserService;
 using SpendwiseSystem.Application.Services.MemberManagementService;
 using SpendwiseSystem.Domain.DTOs.InvitationRequestDto;
@@ -28,7 +29,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentService.UserId ?? Guid.Empty;
 
             if (currentUserId == Guid.Empty)
-                return Unauthorized("Invalid user.");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _memberManagementService.GetBusinessMembersAsync(
                 businessId,
@@ -46,7 +47,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentService.UserId ?? Guid.Empty;
 
             if (currentUserId == Guid.Empty)
-                return Unauthorized("Invalid user.");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _memberManagementService.GetCashbookMembersAsync(
                 businessId,
@@ -68,7 +69,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentService.UserId ?? Guid.Empty;
 
             if (currentUserId == Guid.Empty)
-                return Unauthorized("Invalid user.");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _memberManagementService.UpdateBusinessMemberPermissionsAsync(
                 businessId,
@@ -92,7 +93,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentService.UserId ?? Guid.Empty;
 
             if (currentUserId == Guid.Empty)
-                return Unauthorized("Invalid user.");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _memberManagementService.UpdateCashbookMemberPermissionsAsync(
                 businessId,
@@ -113,7 +114,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentService.UserId ?? Guid.Empty;
 
             if (currentUserId == Guid.Empty)
-                return Unauthorized("Invalid user.");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _memberManagementService.RemoveBusinessMemberAsync(
                 businessId,
@@ -135,7 +136,7 @@ namespace SpendwiseSystem.API.Controllers
             var currentUserId = _currentService.UserId ?? Guid.Empty;
 
             if (currentUserId == Guid.Empty)
-                return Unauthorized("Invalid user.");
+                return Unauthorized(ApiResponses.Unauthorized());
 
             var result = await _memberManagementService.RemoveCashbookMemberAsync(
                 businessId,

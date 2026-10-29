@@ -2,10 +2,13 @@ using AutoMapper;
 using CashBookSystem.Application.Interfaces;
 using CashBookSystem.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 using SpendwiseSystem.API.Extensions;
+using SpendwiseSystem.API.Exceptions;
+using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Application.Profiles;
 using SpendwiseSystem.Application.Services.AuthService;
@@ -14,6 +17,7 @@ using SpendwiseSystem.Application.Services.SpendwiseService;
 using SpendwiseSystem.Application.Services.TokenService;
 using SpendwiseSystem.Application.Services.TransactionService;
 using SpendwiseSystem.Domain.DTOs;
+using SpendwiseSystem.Domain.Entities;
 using SpendwiseSystem.Domain.Entities.ConfigModel;
 using SpendwiseSystem.Infrastructure.Data.DbContext;
 using SpendwiseSystem.Infrastructure.Data.Migrations;
@@ -34,6 +38,21 @@ builder.Services.AddAuthentication(options =>
 })
     .AddJwtBearer(options =>
     {
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsJsonAsync(ApiResponses.Unauthorized());
+            },
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsJsonAsync(ApiResponses.Forbidden());
+            }
+        };
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -48,6 +67,8 @@ builder.Services.AddAuthentication(options =>
 
 // Add services to the container.
 builder.Services.AddAuthorization();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFlutterApp", policy =>
@@ -62,6 +83,30 @@ builder.Services.AddApplicationServices(builder.Configuration);
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.Configure<AppLinkSettings>(builder.Configuration.GetSection("PasswordResetBaseUrl"));
 builder.Services.AddControllers();
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var errors = context.ModelState
+            .Where(entry => entry.Value?.Errors.Count > 0)
+            .ToDictionary(
+                entry => entry.Key,
+                entry => entry.Value!.Errors
+                    .Select(error => string.IsNullOrWhiteSpace(error.ErrorMessage)
+                        ? "The supplied value is invalid."
+                        : error.ErrorMessage)
+                    .ToArray());
+
+        return new BadRequestObjectResult(new ApiResponse<object>
+        {
+            StatusCode = StatusCodes.Status400BadRequest,
+            Success = false,
+            Message = "Validation failed.",
+            ErrorCode = "VALIDATION_ERROR",
+            Data = errors
+        });
+    };
+});
 builder.Services.AddHttpLogging(logging =>
 {
     logging.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.All;
@@ -109,6 +154,7 @@ builder.Services.AddSwaggerGen(c =>
 }); 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseHttpLogging();
 app.UseSwagger();
 // Always enable Swagger UI
