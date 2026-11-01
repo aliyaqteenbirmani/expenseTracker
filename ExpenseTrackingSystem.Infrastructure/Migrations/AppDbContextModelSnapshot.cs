@@ -209,6 +209,26 @@ namespace SpendwiseSystem.Infrastructure.Migrations
                     b.Property<string>("OcrText")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<double?>("ParsingConfidence")
+                        .HasColumnType("float");
+
+                    b.Property<decimal?>("SuggestedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("SuggestedCategory")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SuggestedMerchant")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SuggestedTransactionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SuggestedTransactionType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)

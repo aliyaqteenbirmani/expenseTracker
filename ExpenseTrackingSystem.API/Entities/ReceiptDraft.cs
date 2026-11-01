@@ -16,6 +16,14 @@ namespace SpendwiseSystem.Domain.Entities
         public string Status { get; set; }
         public string OcrText { get; set; }
         public double? OcrConfidence { get; set; }
+        public string SuggestedMerchant { get; set; }
+        public decimal? SuggestedAmount { get; set; }
+        public DateTime? SuggestedTransactionDate { get; set; }
+        [MaxLength(50)]
+        public string SuggestedTransactionType { get; set; }
+        [MaxLength(50)]
+        public string SuggestedCategory { get; set; }
+        public double? ParsingConfidence { get; set; }
         public DateTime CreatedOn { get; set; }
         public DateTime ExpiresOn { get; set; }
     }

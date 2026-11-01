@@ -2,6 +2,7 @@ using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.Entities;
 using SpendwiseSystem.Infrastructure.Data.Migrations;
 using Microsoft.EntityFrameworkCore;
+using SpendwiseSystem.Application.Services.ReceiptParsingService;
 
 namespace SpendwiseSystem.Infrastructure.Repositories
 {
@@ -37,6 +38,22 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             draft.OcrText = text;
             draft.OcrConfidence = confidence;
             draft.Status = "OcrComplete";
+            await _dbContext.SaveChangesAsync();
+        }
+
+        public async Task UpdateParsedSuggestionAsync(Guid draftId, ReceiptDraftSuggestion suggestion)
+        {
+            var draft = await _dbContext.ReceiptDrafts.FirstOrDefaultAsync(item => item.Id == draftId);
+            if (draft == null)
+                throw new InvalidOperationException("Receipt draft was not found.");
+
+            draft.SuggestedMerchant = suggestion.Merchant;
+            draft.SuggestedAmount = suggestion.Amount;
+            draft.SuggestedTransactionDate = suggestion.TransactionDate;
+            draft.SuggestedTransactionType = suggestion.TransactionType;
+            draft.SuggestedCategory = suggestion.Category;
+            draft.ParsingConfidence = suggestion.Confidence;
+            draft.Status = "ReadyForReview";
             await _dbContext.SaveChangesAsync();
         }
     }

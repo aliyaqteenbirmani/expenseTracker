@@ -18,12 +18,14 @@ using SpendwiseSystem.Application.Services.SpendwiseService;
 using SpendwiseSystem.Application.Services.TokenService;
 using SpendwiseSystem.Application.Services.TransactionService;
 using SpendwiseSystem.Application.Services.ReceiptOcrService;
+using SpendwiseSystem.Application.Services.ReceiptParsingService;
 using SpendwiseSystem.Domain.DTOs;
 using SpendwiseSystem.Domain.Entities.ConfigModel;
 using SpendwiseSystem.Infrastructure.Data.DbContext;
 using SpendwiseSystem.Infrastructure.Data.Migrations;
 using SpendwiseSystem.Infrastructure.Repositories;
 using SpendwiseSystem.Infrastructure.Services.ReceiptOcrService;
+using SpendwiseSystem.Infrastructure.Services.ReceiptParsingService;
 
 namespace SpendwiseSystem.API.Extensions
 {
@@ -54,6 +56,7 @@ namespace SpendwiseSystem.API.Extensions
             services.AddTransient<ITransactionRepository, TransactionRepository>();
             services.AddScoped<IReceiptDraftRepository, ReceiptDraftRepository>();
             services.AddScoped<IReceiptOcrService, TesseractReceiptOcrService>();
+            services.AddScoped<IReceiptParsingService, RuleBasedReceiptParsingService>();
 
             services.AddTransient<IBusinessService, BusinessService>();
             services.AddTransient<IBusinessRepository, BusinessRepository>();

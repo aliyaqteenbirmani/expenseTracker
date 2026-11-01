@@ -9,6 +9,7 @@ using SpendwiseSystem.Application.Services.PermissionAccessService;
 using SpendwiseSystem.Application.Services.TransactionService;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Application.Services.ReceiptOcrService;
+using SpendwiseSystem.Application.Services.ReceiptParsingService;
 using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs.CashTransactionDtos;
 using SpendwiseSystem.Domain.Entities;
@@ -28,6 +29,7 @@ namespace SpendwiseSystem.API.Controllers
         private readonly IReceiptDraftRepository _receiptDraftRepository;
         private readonly IWebHostEnvironment _environment;
         private readonly IReceiptOcrService _receiptOcrService;
+        private readonly IReceiptParsingService _receiptParsingService;
 
         public TransactionController(
             ITransactionService transactionService,
@@ -35,7 +37,8 @@ namespace SpendwiseSystem.API.Controllers
             IPermissionAccessService permissionAccessService,
             IReceiptDraftRepository receiptDraftRepository,
             IWebHostEnvironment environment,
-            IReceiptOcrService receiptOcrService)
+            IReceiptOcrService receiptOcrService,
+            IReceiptParsingService receiptParsingService)
         {
             _transactionService = transactionService;
             _currentUserService = currentUserService;
@@ -43,6 +46,7 @@ namespace SpendwiseSystem.API.Controllers
             _receiptDraftRepository = receiptDraftRepository;
             _environment = environment;
             _receiptOcrService = receiptOcrService;
+            _receiptParsingService = receiptParsingService;
         }
 
         [HttpPost("receipts/drafts")]
@@ -193,6 +197,46 @@ namespace SpendwiseSystem.API.Controllers
                     Confidence = ocrResult.Confidence
                 },
                 "Receipt text extracted. Review it before continuing."));
+        }
+
+        [HttpPost("receipts/drafts/{draftId:guid}/suggest")]
+        public async Task<IActionResult> SuggestReceiptDraft(Guid draftId)
+        {
+            var userId = _currentUserService.UserId;
+            if (!userId.HasValue || userId.Value == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var draft = await _receiptDraftRepository.GetOwnedAsync(draftId, userId.Value, DateTime.UtcNow);
+            if (draft == null)
+                return NotFound(ApiResponses.NotFound("Receipt draft was not found or has expired."));
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(
+                draft.CashBookId,
+                userId.Value,
+                SpendwiseSystem.Domain.Enums.CashbookPermission.TRANSACTION_CREATE.ToString());
+            if (!hasAccess)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden());
+
+            if (string.IsNullOrWhiteSpace(draft.OcrText))
+                return Conflict(ApiResponses.Conflict("Analyze the receipt before requesting transaction suggestions."));
+
+            var suggestion = _receiptParsingService.Parse(draft.OcrText);
+            await _receiptDraftRepository.UpdateParsedSuggestionAsync(draftId, suggestion);
+
+            return Ok(ApiResponses.SuccessWithData(
+                new ReceiptDraftSuggestionDto
+                {
+                    DraftId = draft.Id,
+                    Status = "ReadyForReview",
+                    Merchant = suggestion.Merchant,
+                    Amount = suggestion.Amount,
+                    TransactionDate = suggestion.TransactionDate,
+                    TransactionType = suggestion.TransactionType,
+                    SuggestedCategory = suggestion.Category,
+                    Confidence = suggestion.Confidence,
+                    RecognizedText = draft.OcrText
+                },
+                "Receipt fields were extracted as suggestions. Review and correct them before saving."));
         }
 
         [HttpPost("AddCashTransaction")]
