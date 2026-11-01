@@ -57,5 +57,25 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             await _dbContext.SaveChangesAsync();
         }
 
+        public Task<List<ReceiptDraft>> GetExpiredAsync(DateTime utcNow)
+        {
+            return _dbContext.ReceiptDrafts.AsNoTracking()
+                .Where(draft => draft.ExpiresOn <= utcNow)
+                .OrderBy(draft => draft.ExpiresOn)
+                .ToListAsync();
+        }
+
+        public async Task<bool> DeleteExpiredAsync(Guid draftId, DateTime utcNow)
+        {
+            var draft = await _dbContext.ReceiptDrafts
+                .FirstOrDefaultAsync(item => item.Id == draftId && item.ExpiresOn <= utcNow);
+            if (draft == null)
+                return false;
+
+            _dbContext.ReceiptDrafts.Remove(draft);
+            await _dbContext.SaveChangesAsync();
+            return true;
+        }
+
     }
 }

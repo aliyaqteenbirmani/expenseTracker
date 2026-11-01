@@ -26,6 +26,7 @@ using SpendwiseSystem.Infrastructure.Data.Migrations;
 using SpendwiseSystem.Infrastructure.Repositories;
 using SpendwiseSystem.Infrastructure.Services.ReceiptOcrService;
 using SpendwiseSystem.Infrastructure.Services.ReceiptParsingService;
+using SpendwiseSystem.API.Services;
 
 namespace SpendwiseSystem.API.Extensions
 {
@@ -57,6 +58,7 @@ namespace SpendwiseSystem.API.Extensions
             services.AddScoped<IReceiptDraftRepository, ReceiptDraftRepository>();
             services.AddScoped<IReceiptOcrService, TesseractReceiptOcrService>();
             services.AddScoped<IReceiptParsingService, RuleBasedReceiptParsingService>();
+            services.AddHostedService<ReceiptDraftCleanupService>();
 
             services.AddTransient<IBusinessService, BusinessService>();
             services.AddTransient<IBusinessRepository, BusinessRepository>();

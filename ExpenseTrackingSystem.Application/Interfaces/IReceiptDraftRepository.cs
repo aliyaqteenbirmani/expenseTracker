@@ -9,5 +9,7 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<ReceiptDraft> GetOwnedAsync(Guid draftId, Guid userId, DateTime utcNow);
         Task UpdateOcrResultAsync(Guid draftId, string text, double confidence);
         Task UpdateParsedSuggestionAsync(Guid draftId, ReceiptDraftSuggestion suggestion);
+        Task<List<ReceiptDraft>> GetExpiredAsync(DateTime utcNow);
+        Task<bool> DeleteExpiredAsync(Guid draftId, DateTime utcNow);
     }
 }
