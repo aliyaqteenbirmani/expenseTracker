@@ -203,6 +203,12 @@ namespace SpendwiseSystem.Infrastructure.Migrations
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint");
 
+                    b.Property<double?>("OcrConfidence")
+                        .HasColumnType("float");
+
+                    b.Property<string>("OcrText")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)

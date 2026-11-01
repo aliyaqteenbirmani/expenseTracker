@@ -8,6 +8,7 @@ using SpendwiseSystem.Application.Services.FileUploadHelper;
 using SpendwiseSystem.Application.Services.PermissionAccessService;
 using SpendwiseSystem.Application.Services.TransactionService;
 using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Services.ReceiptOcrService;
 using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs.CashTransactionDtos;
 using SpendwiseSystem.Domain.Entities;
@@ -26,19 +27,22 @@ namespace SpendwiseSystem.API.Controllers
         private readonly IPermissionAccessService _permissionAccessService;
         private readonly IReceiptDraftRepository _receiptDraftRepository;
         private readonly IWebHostEnvironment _environment;
+        private readonly IReceiptOcrService _receiptOcrService;
 
         public TransactionController(
             ITransactionService transactionService,
             ICurrentUserService currentUserService,
             IPermissionAccessService permissionAccessService,
             IReceiptDraftRepository receiptDraftRepository,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IReceiptOcrService receiptOcrService)
         {
             _transactionService = transactionService;
             _currentUserService = currentUserService;
             _permissionAccessService = permissionAccessService;
             _receiptDraftRepository = receiptDraftRepository;
             _environment = environment;
+            _receiptOcrService = receiptOcrService;
         }
 
         [HttpPost("receipts/drafts")]
@@ -134,6 +138,61 @@ namespace SpendwiseSystem.API.Controllers
                 ".pdf" => bytesRead >= 5 && header[0] == 0x25 && header[1] == 0x50 && header[2] == 0x44 && header[3] == 0x46 && header[4] == 0x2D,
                 _ => false
             };
+        }
+
+        [HttpPost("receipts/drafts/{draftId:guid}/analyze")]
+        public async Task<IActionResult> AnalyzeReceiptDraft(Guid draftId)
+        {
+            var userId = _currentUserService.UserId;
+            if (!userId.HasValue || userId.Value == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var draft = await _receiptDraftRepository.GetOwnedAsync(draftId, userId.Value, DateTime.UtcNow);
+            if (draft == null)
+                return NotFound(ApiResponses.NotFound("Receipt draft was not found or has expired."));
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(
+                draft.CashBookId,
+                userId.Value,
+                SpendwiseSystem.Domain.Enums.CashbookPermission.TRANSACTION_CREATE.ToString());
+            if (!hasAccess)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden());
+
+            var storedFileName = Path.GetFileName(draft.StoredFileName);
+            if (!string.Equals(storedFileName, draft.StoredFileName, StringComparison.Ordinal))
+                return NotFound(ApiResponses.NotFound("Receipt draft was not found."));
+
+            var receiptPath = Path.Combine(_environment.ContentRootPath, "App_Data", "receipt-drafts", storedFileName);
+            if (!System.IO.File.Exists(receiptPath))
+                return NotFound(ApiResponses.NotFound("Receipt file was not found."));
+
+            SpendwiseSystem.Application.Services.ReceiptOcrService.ReceiptOcrResult ocrResult;
+            try
+            {
+                ocrResult = await _receiptOcrService.ExtractTextAsync(receiptPath, draft.ContentType);
+            }
+            catch (InvalidOperationException)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    ApiResponses.ServiceUnavailable("Receipt text extraction is currently unavailable."));
+            }
+
+            if (string.IsNullOrWhiteSpace(ocrResult.Text))
+                return UnprocessableEntity(ApiResponses.ValidationError(
+                    new { receipt = "No readable text was found. Try a clearer, well-lit image." },
+                    "Receipt text could not be recognized."));
+
+            await _receiptDraftRepository.UpdateOcrResultAsync(draftId, ocrResult.Text, ocrResult.Confidence);
+
+            return Ok(ApiResponses.SuccessWithData(
+                new ReceiptOcrAnalysisDto
+                {
+                    DraftId = draft.Id,
+                    Status = "OcrComplete",
+                    RecognizedText = ocrResult.Text,
+                    Confidence = ocrResult.Confidence
+                },
+                "Receipt text extracted. Review it before continuing."));
         }
 
         [HttpPost("AddCashTransaction")]

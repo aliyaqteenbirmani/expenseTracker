@@ -14,6 +14,8 @@ namespace SpendwiseSystem.Domain.Entities
         public long FileSize { get; set; }
         [MaxLength(30)]
         public string Status { get; set; }
+        public string OcrText { get; set; }
+        public double? OcrConfidence { get; set; }
         public DateTime CreatedOn { get; set; }
         public DateTime ExpiresOn { get; set; }
     }
