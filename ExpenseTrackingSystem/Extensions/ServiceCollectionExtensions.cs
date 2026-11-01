@@ -50,6 +50,7 @@ namespace SpendwiseSystem.API.Extensions
 
             services.AddTransient<ITransactionService, TransactionService>();
             services.AddTransient<ITransactionRepository, TransactionRepository>();
+            services.AddScoped<IReceiptDraftRepository, ReceiptDraftRepository>();
 
             services.AddTransient<IBusinessService, BusinessService>();
             services.AddTransient<IBusinessRepository, BusinessRepository>();

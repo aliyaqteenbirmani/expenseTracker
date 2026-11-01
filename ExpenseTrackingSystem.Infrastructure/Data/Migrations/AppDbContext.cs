@@ -15,6 +15,7 @@ namespace SpendwiseSystem.Infrastructure.Data.Migrations
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<Business> Businesses { get; set; }
+        public DbSet<ReceiptDraft> ReceiptDrafts { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

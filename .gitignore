@@ -23,5 +23,6 @@ packages/
 *.nupkg
 /DatabaseScripts/
 /ExpenseTrackingSystem/SpendwiseSystem.API.csproj
+/ExpenseTrackingSystem/App_Data/
 
 

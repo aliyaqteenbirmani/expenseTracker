@@ -81,7 +81,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddApplicationServices(builder.Configuration);
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
-builder.Services.Configure<AppLinkSettings>(builder.Configuration.GetSection("PasswordResetBaseUrl"));
+builder.Services.Configure<SpendwiseSystem.Application.Helper.AppLinkSettings>(
+    builder.Configuration.GetSection("AppLinkSettings"));
 builder.Services.AddControllers();
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {

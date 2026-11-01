@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Services.CurrentUserService;
 using SpendwiseSystem.Application.Services.FileUploadHelper;
+using SpendwiseSystem.Application.Services.PermissionAccessService;
 using SpendwiseSystem.Application.Services.TransactionService;
+using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs.CashTransactionDtos;
 using SpendwiseSystem.Domain.Entities;
@@ -21,10 +23,117 @@ namespace SpendwiseSystem.API.Controllers
     {
         private readonly ITransactionService _transactionService;
         private readonly ICurrentUserService _currentUserService;
-        public TransactionController(ITransactionService transactionService, ICurrentUserService currentUserService)
+        private readonly IPermissionAccessService _permissionAccessService;
+        private readonly IReceiptDraftRepository _receiptDraftRepository;
+        private readonly IWebHostEnvironment _environment;
+
+        public TransactionController(
+            ITransactionService transactionService,
+            ICurrentUserService currentUserService,
+            IPermissionAccessService permissionAccessService,
+            IReceiptDraftRepository receiptDraftRepository,
+            IWebHostEnvironment environment)
         {
             _transactionService = transactionService;
             _currentUserService = currentUserService;
+            _permissionAccessService = permissionAccessService;
+            _receiptDraftRepository = receiptDraftRepository;
+            _environment = environment;
+        }
+
+        [HttpPost("receipts/drafts")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        public async Task<IActionResult> UploadReceiptDraft([FromForm] ReceiptDraftUploadDto request)
+        {
+            var userId = _currentUserService.UserId;
+            if (!userId.HasValue || userId.Value == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            if (request?.CashBookId == Guid.Empty || request?.File == null || request.File.Length == 0)
+                return BadRequest(ApiResponses.BadRequest("A cashbook and non-empty receipt file are required."));
+
+            if (request.File.Length > 10 * 1024 * 1024)
+                return BadRequest(ApiResponses.BadRequest("Receipt files must be 10 MB or smaller."));
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(
+                request.CashBookId,
+                userId.Value,
+                SpendwiseSystem.Domain.Enums.CashbookPermission.TRANSACTION_CREATE.ToString());
+
+            if (!hasAccess)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden("You do not have permission to add transactions to this cashbook."));
+
+            var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
+            var contentType = GetReceiptContentType(extension);
+            if (contentType == null || !await HasValidReceiptSignatureAsync(request.File, extension))
+                return BadRequest(ApiResponses.BadRequest("Upload a valid JPG, PNG, or PDF receipt."));
+
+            var now = DateTime.UtcNow;
+            var draftId = Guid.NewGuid();
+            var storedFileName = $"{draftId:N}{extension}";
+            var storageDirectory = Path.Combine(_environment.ContentRootPath, "App_Data", "receipt-drafts");
+            Directory.CreateDirectory(storageDirectory);
+            var storedPath = Path.Combine(storageDirectory, storedFileName);
+
+            try
+            {
+                await using (var output = new FileStream(storedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    await request.File.CopyToAsync(output);
+
+                var expiresOn = now.AddDays(1);
+                await _receiptDraftRepository.AddAsync(new SpendwiseSystem.Domain.Entities.ReceiptDraft
+                {
+                    Id = draftId,
+                    CashBookId = request.CashBookId,
+                    UserId = userId.Value,
+                    StoredFileName = storedFileName,
+                    ContentType = contentType,
+                    FileSize = request.File.Length,
+                    Status = "Uploaded",
+                    CreatedOn = now,
+                    ExpiresOn = expiresOn
+                });
+
+                return StatusCode(StatusCodes.Status201Created, ApiResponses.Created(
+                    new ReceiptDraftUploadResponseDto
+                    {
+                        DraftId = draftId,
+                        CashBookId = request.CashBookId,
+                        Status = "Uploaded",
+                        ExpiresOn = expiresOn
+                    },
+                    "Receipt uploaded. It has not been analyzed or added as a transaction yet."));
+            }
+            catch
+            {
+                if (System.IO.File.Exists(storedPath))
+                    System.IO.File.Delete(storedPath);
+                throw;
+            }
+        }
+
+        private static string GetReceiptContentType(string extension) => extension switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".pdf" => "application/pdf",
+            _ => null
+        };
+
+        private static async Task<bool> HasValidReceiptSignatureAsync(IFormFile file, string extension)
+        {
+            var header = new byte[8];
+            await using var stream = file.OpenReadStream();
+            var bytesRead = await stream.ReadAsync(header.AsMemory());
+
+            return extension switch
+            {
+                ".jpg" or ".jpeg" => bytesRead >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF,
+                ".png" => bytesRead >= 8 && header.AsSpan(0, 8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
+                ".pdf" => bytesRead >= 5 && header[0] == 0x25 && header[1] == 0x50 && header[2] == 0x44 && header[3] == 0x46 && header[4] == 0x2D,
+                _ => false
+            };
         }
 
         [HttpPost("AddCashTransaction")]
