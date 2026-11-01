@@ -234,6 +234,9 @@ namespace SpendwiseSystem.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<Guid?>("CreatedTransactionId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("StoredFileName")
                         .IsRequired()
                         .HasMaxLength(260)

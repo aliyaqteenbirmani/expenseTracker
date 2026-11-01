@@ -12,6 +12,7 @@ namespace SpendwiseSystem.Application.Services.TransactionService
     public interface ITransactionService
     {
         Task<ApiResponse<CashTransaction>> AddCashTransaction(CashTransactionDto transactionDto, string createdBy, Guid userId);
+        Task<ApiResponse<CashTransaction>> AddCashTransactionFromReceipt(CashTransactionDto transactionDto, string createdBy, Guid userId, Guid receiptDraftId, string merchant, string category);
 
         Task<ApiResponse<List<AllCashTransactionDto>>> GetAllTransactionsOfCashBook(string CashBookId, Guid userId);
         Task<ApiResponse<Guid>> DeleteTransaction(Guid id, string modifiedBy, Guid userId);

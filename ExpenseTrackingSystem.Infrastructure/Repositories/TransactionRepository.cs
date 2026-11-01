@@ -32,8 +32,28 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                             TransactionType = transactionDto.TransactionType,
                             Remarks = transactionDto.Remarks,
                             FileName = transactionDto.FileName,
-                            CreatedBy = createdBy
+                            CreatedBy = createdBy,
+                            TransactionDate = transactionDto.TransactionDate ?? DateTime.UtcNow
                         });
+        }
+
+        public async Task<ApiResponseRaw> AddCashTransactionFromReceipt(CashTransactionDto transactionDto, string createdBy, Guid receiptDraftId, string merchant, string category)
+        {
+            return await _dapperContext.GetSingleAsync<ApiResponseRaw>(
+                "SP_AddCashTransaction",
+                new
+                {
+                    CashBookId = transactionDto.CashBookId,
+                    Amount = transactionDto.Amount,
+                    TransactionType = transactionDto.TransactionType,
+                    Remarks = transactionDto.Remarks,
+                    FileName = transactionDto.FileName,
+                    CreatedBy = createdBy,
+                    TransactionDate = transactionDto.TransactionDate ?? DateTime.UtcNow,
+                    ReceiptDraftId = receiptDraftId,
+                    Merchant = merchant,
+                    Category = category
+                });
         }
         public async Task<ApiResponseRaw> DeleteTransactionAsync(Guid id, string ModifiedBy)
         {

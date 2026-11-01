@@ -71,6 +71,41 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             };
         }
 
+        public async Task<ApiResponse<CashTransaction>> AddCashTransactionFromReceipt(CashTransactionDto transactionDto, string createdBy, Guid userId, Guid receiptDraftId, string merchant, string category)
+        {
+            if (transactionDto.CashBookId == Guid.Empty || userId == Guid.Empty || receiptDraftId == Guid.Empty)
+                return ApiResponse<CashTransaction>.FailureResponse("A valid cashbook, receipt draft, and authenticated user are required.");
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(
+                transactionDto.CashBookId,
+                userId,
+                CashbookPermission.TRANSACTION_CREATE.ToString());
+            if (!hasAccess)
+                return ApiResponse<CashTransaction>.FailureResponse("You do not have permission to add a transaction to this cashbook.");
+
+            var raw = await _transactionRepository.AddCashTransactionFromReceipt(transactionDto, createdBy, receiptDraftId, merchant, category);
+            if (!raw.Success || string.IsNullOrWhiteSpace(raw.Data))
+                return new ApiResponse<CashTransaction>
+                {
+                    StatusCode = raw.ResponseCode,
+                    Success = false,
+                    Message = raw.Message,
+                    ErrorCode = raw.Message
+                };
+
+            var data = JsonSerializer.Deserialize<CashTransaction>(raw.Data, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            return new ApiResponse<CashTransaction>
+            {
+                StatusCode = raw.ResponseCode,
+                Success = data != null,
+                Message = raw.Message,
+                Data = data
+            };
+        }
+
         public async Task<ApiResponse<Guid>> DeleteTransaction(Guid id, string modifiedBy, Guid userId)
         {
             var cashbookId = await _transactionRepository.GetCashBookIdByTransactionIdAsync(id);

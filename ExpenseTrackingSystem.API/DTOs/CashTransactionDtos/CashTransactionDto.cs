@@ -18,6 +18,8 @@ namespace SpendwiseSystem.Domain.DTOs.CashTransactionDtos
         [RegularExpression(@"^(CashIn|CashOut)$", ErrorMessage = "TransactionType must be 'CashIn' or 'CashOut'.")]
         public string TransactionType { get; set; }   // CashIn / CashOut
 
+        public DateTime? TransactionDate { get; set; }
+
         [StringLength(500, ErrorMessage = "Description must not exceed 500 characters.")]
         [DataType(DataType.MultilineText)]
         public string Remarks { get; set; }

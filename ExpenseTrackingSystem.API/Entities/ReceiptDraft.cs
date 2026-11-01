@@ -24,6 +24,7 @@ namespace SpendwiseSystem.Domain.Entities
         [MaxLength(50)]
         public string SuggestedCategory { get; set; }
         public double? ParsingConfidence { get; set; }
+        public Guid? CreatedTransactionId { get; set; }
         public DateTime CreatedOn { get; set; }
         public DateTime ExpiresOn { get; set; }
     }

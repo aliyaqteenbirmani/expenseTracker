@@ -7,6 +7,7 @@ namespace SpendwiseSystem.Application.Interfaces
     public interface ITransactionRepository
     {
         Task<ApiResponseRaw> AddCashTransaction(CashTransactionDto transactionDto, string createdBy);
+        Task<ApiResponseRaw> AddCashTransactionFromReceipt(CashTransactionDto transactionDto, string createdBy, Guid receiptDraftId, string merchant, string category);
         Task<SPResponseFromDb> UpdateCashTransaction(CashTransactionUpdateDto dto, string modifiedBy);
         Task<ApiResponseRaw> DeleteTransactionAsync(Guid id, string modifiedBy);
         Task<ApiResponse<CashTransaction>> GetTransactionAsync(Guid id);

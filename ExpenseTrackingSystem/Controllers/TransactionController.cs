@@ -239,6 +239,73 @@ namespace SpendwiseSystem.API.Controllers
                 "Receipt fields were extracted as suggestions. Review and correct them before saving."));
         }
 
+        [HttpPost("receipts/drafts/{draftId:guid}/confirm")]
+        public async Task<IActionResult> ConfirmReceiptDraft(Guid draftId, [FromBody] ConfirmReceiptDraftDto request)
+        {
+            var userId = _currentUserService.UserId;
+            if (!userId.HasValue || userId.Value == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var draft = await _receiptDraftRepository.GetOwnedAsync(draftId, userId.Value, DateTime.UtcNow);
+            if (draft == null)
+                return NotFound(ApiResponses.NotFound("Receipt draft was not found or has expired."));
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(
+                draft.CashBookId,
+                userId.Value,
+                SpendwiseSystem.Domain.Enums.CashbookPermission.TRANSACTION_CREATE.ToString());
+            if (!hasAccess)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden());
+
+            if (draft.Status != "ReadyForReview" || string.IsNullOrWhiteSpace(draft.OcrText))
+                return Conflict(ApiResponses.Conflict("The receipt must be analyzed and parsed before it can be confirmed."));
+
+            if (draft.CreatedTransactionId.HasValue)
+                return Conflict(ApiResponses.Conflict("This receipt draft has already created a transaction."));
+
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponses.BadRequest("Correct the transaction fields and try again."));
+
+            var remarks = string.Join(" | ", new[]
+            {
+                request.Merchant?.Trim(),
+                request.Remarks?.Trim()
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+            var transaction = new CashTransactionDto
+            {
+                CashBookId = draft.CashBookId,
+                Amount = request.Amount,
+                TransactionType = request.TransactionType,
+                TransactionDate = request.TransactionDate!.Value,
+                Remarks = string.IsNullOrWhiteSpace(remarks) ? null : remarks
+            };
+
+            var createResult = await _transactionService.AddCashTransactionFromReceipt(
+                transaction,
+                _currentUserService.UserName,
+                userId.Value,
+                draftId,
+                request.Merchant?.Trim(),
+                request.Category?.Trim());
+
+            if (!createResult.Success || createResult.Data == null)
+                return StatusCode(createResult.StatusCode is >= 400 and <= 599 ? createResult.StatusCode : StatusCodes.Status400BadRequest,
+                    ApiResponses.BadRequest("The transaction could not be created. Review the receipt details and try again."));
+
+            return StatusCode(StatusCodes.Status201Created, ApiResponses.Created(
+                new
+                {
+                    draftId,
+                    transaction = createResult.Data,
+                    transactionDate = request.TransactionDate.Value,
+                    merchant = request.Merchant,
+                    category = request.Category,
+                    draftStatus = "Completed"
+                },
+                "Transaction created from the reviewed receipt."));
+        }
+
         [HttpPost("AddCashTransaction")]
         [Consumes("multipart/form-data")]
         public async Task<ActionResult<CashTransaction>> AddCashTransaction([FromForm] CashTransactionDto transactionDto)
