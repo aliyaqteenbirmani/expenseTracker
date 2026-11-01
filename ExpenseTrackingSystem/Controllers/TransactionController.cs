@@ -144,6 +144,44 @@ namespace SpendwiseSystem.API.Controllers
             };
         }
 
+        [HttpGet("receipts/drafts/{draftId:guid}")]
+        public async Task<IActionResult> GetReceiptDraft(Guid draftId)
+        {
+            var userId = _currentUserService.UserId;
+            if (!userId.HasValue || userId.Value == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var draft = await _receiptDraftRepository.GetOwnedAsync(draftId, userId.Value, DateTime.UtcNow);
+            if (draft == null)
+                return NotFound(ApiResponses.NotFound("Receipt draft was not found or has expired."));
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(
+                draft.CashBookId,
+                userId.Value,
+                SpendwiseSystem.Domain.Enums.CashbookPermission.TRANSACTION_CREATE.ToString());
+            if (!hasAccess)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden());
+
+            return Ok(ApiResponses.SuccessWithData(
+                new ReceiptDraftDetailsDto
+                {
+                    DraftId = draft.Id,
+                    CashBookId = draft.CashBookId,
+                    Status = draft.Status,
+                    RecognizedText = draft.OcrText,
+                    OcrConfidence = draft.OcrConfidence,
+                    SuggestedMerchant = draft.SuggestedMerchant,
+                    SuggestedAmount = draft.SuggestedAmount,
+                    SuggestedTransactionDate = draft.SuggestedTransactionDate,
+                    SuggestedTransactionType = draft.SuggestedTransactionType,
+                    SuggestedCategory = draft.SuggestedCategory,
+                    ParsingConfidence = draft.ParsingConfidence,
+                    CreatedTransactionId = draft.CreatedTransactionId,
+                    ExpiresOn = draft.ExpiresOn
+                },
+                "Receipt draft details retrieved."));
+        }
+
         [HttpPost("receipts/drafts/{draftId:guid}/analyze")]
         public async Task<IActionResult> AnalyzeReceiptDraft(Guid draftId)
         {
