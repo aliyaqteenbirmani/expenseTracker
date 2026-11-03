@@ -51,6 +51,15 @@ namespace SpendwiseSystem.Application.Services.BusinessService
             {
                 data = JsonSerializer.Deserialize<BusinessResponseDto>(dbResult.Data);
             }
+            if (data == null)
+                return new ApiResponse<BusinessResponseDto>
+                {
+                    Success = false,
+                    StatusCode = (int)HttpStatusCode.InternalServerError,
+                    Message = "The business was not returned by the database.",
+                    ErrorCode = "MISSING_RESPONSE_DATA",
+                    Data = null
+                };
             return new ApiResponse<BusinessResponseDto>
             {
                 Success = true,
@@ -124,12 +133,25 @@ namespace SpendwiseSystem.Application.Services.BusinessService
         {
             var responseFromRepo = await _businessRepository.GetBusiness(id);
 
-            if (!responseFromRepo.Success)
+            if (responseFromRepo == null || !responseFromRepo.Success)
                 return new ApiResponse<BusinessResponseDto>
                 {
                     Success = false,
-                    Message = responseFromRepo.Message,
+                    Message = responseFromRepo?.Message ?? "No response from database.",
                     StatusCode = (int)ApiResponses.BadRequest().StatusCode,
+                    Data = null
+                };
+
+            var data = string.IsNullOrWhiteSpace(responseFromRepo.Data)
+                ? null
+                : JsonSerializer.Deserialize<BusinessResponseDto>(responseFromRepo.Data);
+            if (data == null)
+                return new ApiResponse<BusinessResponseDto>
+                {
+                    Success = false,
+                    Message = "The business was not returned by the database.",
+                    StatusCode = (int)HttpStatusCode.InternalServerError,
+                    ErrorCode = "MISSING_RESPONSE_DATA",
                     Data = null
                 };
 
@@ -138,7 +160,7 @@ namespace SpendwiseSystem.Application.Services.BusinessService
                 Success = true,
                 Message = responseFromRepo.Message,
                 StatusCode = (int)ApiResponses.Success().StatusCode,
-                Data = JsonSerializer.Deserialize<BusinessResponseDto>( responseFromRepo.Data)
+                Data = data
             };
 
         }
@@ -146,12 +168,25 @@ namespace SpendwiseSystem.Application.Services.BusinessService
         {
             var responseFromRepo = await _businessRepository.UpdateBusiness(business, CreatedBy);
 
-            if(!responseFromRepo.Success)
+            if(responseFromRepo == null || !responseFromRepo.Success)
                 return new ApiResponse<BusinessResponseDto>
                 {
                     Success = false,
-                    Message = responseFromRepo.Message,
+                    Message = responseFromRepo?.Message ?? "No response from database.",
                     StatusCode = (int)ApiResponses.BadRequest().StatusCode,
+                    Data = null
+                };
+
+            var data = string.IsNullOrWhiteSpace(responseFromRepo.Data)
+                ? null
+                : JsonSerializer.Deserialize<BusinessResponseDto>(responseFromRepo.Data);
+            if (data == null)
+                return new ApiResponse<BusinessResponseDto>
+                {
+                    Success = false,
+                    Message = "The business was not returned by the database.",
+                    StatusCode = (int)HttpStatusCode.InternalServerError,
+                    ErrorCode = "MISSING_RESPONSE_DATA",
                     Data = null
                 };
 
@@ -160,7 +195,7 @@ namespace SpendwiseSystem.Application.Services.BusinessService
                 Success = true,
                 Message = responseFromRepo.Message,
                 StatusCode = (int)ApiResponses.Success().StatusCode,
-                Data = JsonSerializer.Deserialize<BusinessResponseDto>(responseFromRepo.Data)
+                Data = data
             };
         }
     }

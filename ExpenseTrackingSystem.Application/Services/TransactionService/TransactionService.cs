@@ -46,10 +46,21 @@ namespace SpendwiseSystem.Application.Services.TransactionService
 
             if (resultFromRepo.Success)
             {
-                var data = System.Text.Json.JsonSerializer.Deserialize<CashTransaction>(resultFromRepo.Data, new System.Text.Json.JsonSerializerOptions
+                var data = string.IsNullOrWhiteSpace(resultFromRepo.Data)
+                    ? null
+                    : JsonSerializer.Deserialize<CashTransaction>(resultFromRepo.Data, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
                 });
+
+                if (data == null)
+                    return new ApiResponse<CashTransaction>
+                    {
+                        StatusCode = 500,
+                        Success = false,
+                        Message = "The transaction was not returned by the database.",
+                        ErrorCode = "MISSING_RESPONSE_DATA"
+                    };
 
                 return new ApiResponse<CashTransaction>
                 {
@@ -97,10 +108,18 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             {
                 PropertyNameCaseInsensitive = true
             });
+            if (data == null)
+                return new ApiResponse<CashTransaction>
+                {
+                    StatusCode = 500,
+                    Success = false,
+                    Message = "The transaction was not returned by the database.",
+                    ErrorCode = "MISSING_RESPONSE_DATA"
+                };
             return new ApiResponse<CashTransaction>
             {
                 StatusCode = raw.ResponseCode,
-                Success = data != null,
+                Success = true,
                 Message = raw.Message,
                 Data = data
             };
@@ -228,7 +247,17 @@ namespace SpendwiseSystem.Application.Services.TransactionService
                 };
             }
             
-            var cashTransaction = JsonSerializer.Deserialize<CTUpdateResponseDto>(responseFromRepo.Data);
+            var cashTransaction = string.IsNullOrWhiteSpace(responseFromRepo.Data)
+                ? null
+                : JsonSerializer.Deserialize<CTUpdateResponseDto>(responseFromRepo.Data);
+            if (cashTransaction == null)
+                return new ApiResponse<CTUpdateResponseDto>
+                {
+                    Success = false,
+                    StatusCode = 500,
+                    Message = "The updated transaction was not returned by the database.",
+                    ErrorCode = "MISSING_RESPONSE_DATA"
+                };
 
             if (!string.IsNullOrWhiteSpace(cashTransaction.OldFileName))
             {

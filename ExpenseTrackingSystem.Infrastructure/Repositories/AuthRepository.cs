@@ -64,6 +64,14 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 ? null
                 : JsonSerializer.Deserialize<RefreshTokenWithUserDataDto>(raw.Data, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
+            if (data == null)
+                return new ApiResponse<RefreshTokenWithUserDataDto>
+                {
+                    Success = false,
+                    Message = "Refresh token data was not returned by the database.",
+                    Data = null
+                };
+
             return new ApiResponse<RefreshTokenWithUserDataDto>
             {
                 Success = true,

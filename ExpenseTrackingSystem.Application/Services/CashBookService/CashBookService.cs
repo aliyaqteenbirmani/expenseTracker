@@ -111,12 +111,14 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
                 return ApiResponse<List<CreateCashBookDto>>.FailureResponse("No cashbook found");
             }
 
-            var cashbooks = JsonSerializer.Deserialize<List<CreateCashBookDto>>(
-                responseFromRepo.Data,
-                new JsonSerializerOptions
+            var cashbooks = string.IsNullOrWhiteSpace(responseFromRepo.Data)
+                ? new List<CreateCashBookDto>()
+                : JsonSerializer.Deserialize<List<CreateCashBookDto>>(
+                    responseFromRepo.Data,
+                    new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
-                });
+                }) ?? new List<CreateCashBookDto>();
 
             return ApiResponse<List<CreateCashBookDto>>.SuccessResponse(
                 "Cashbooks fetched successfully",
@@ -140,12 +142,17 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
             if (!cashBookFromRepo.Success)
                 return ApiResponses.BadRequest(cashBookFromRepo.Message);
 
-            var cashBook = JsonSerializer.Deserialize<object>(
-                cashBookFromRepo.Data,
-                new JsonSerializerOptions
+            var cashBook = string.IsNullOrWhiteSpace(cashBookFromRepo.Data)
+                || string.Equals(cashBookFromRepo.Data.Trim(), "null", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : JsonSerializer.Deserialize<object>(
+                    cashBookFromRepo.Data,
+                    new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
+            if (cashBook == null)
+                return ApiResponses.InternalServerError("The cashbook was not returned by the database.");
 
             return ApiResponses.SuccessWithData(cashBook, "CashBook fetched successfully");
         }
@@ -193,12 +200,23 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
                 };
             }
 
-            var cashBook = JsonSerializer.Deserialize<CashBook>(
-                result.Data,
-                new JsonSerializerOptions
+            var cashBook = string.IsNullOrWhiteSpace(result.Data)
+                ? null
+                : JsonSerializer.Deserialize<CashBook>(
+                    result.Data,
+                    new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
+            if (cashBook == null)
+                return new ApiResponse<CashBook>
+                {
+                    Success = false,
+                    StatusCode = 500,
+                    Message = "The updated cashbook was not returned by the database.",
+                    ErrorCode = "MISSING_RESPONSE_DATA",
+                    Data = null
+                };
 
             return ApiResponses.SuccessWithData(cashBook, "CashBook updated successfully");
         }
