@@ -119,6 +119,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     Amount = dto.Amount,
                     TransactionType = dto.TransactionType,
                     Remarks = dto.Remarks,
+                    TransactionDate = dto.TransactionDate,
                     FileName = dto.FileName,
                     ModifiedBy = modifiedBy
                 },

@@ -468,6 +468,9 @@ namespace SpendwiseSystem.API.Controllers
             if (userId == Guid.Empty)
                 return Unauthorized(ApiResponses.Unauthorized());
 
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponses.BadRequest("Transaction date, amount, type, and ID are required."));
+
             try
             {
                 if (transactionUpdateDto.File != null && transactionUpdateDto.File.Length > 0)

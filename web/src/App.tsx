@@ -205,6 +205,7 @@ function TransactionEditDialog({ token, transaction, onClose, onSaved }: { token
     const values = new FormData(event.currentTarget)
     const body = new FormData()
     body.append('Id', transaction.id)
+    body.append('TransactionDate', new Date(`${String(values.get('date'))}T12:00:00`).toISOString())
     body.append('Amount', String(values.get('amount')))
     body.append('TransactionType', String(values.get('type')))
     body.append('Remarks', String(values.get('remarks') ?? ''))
@@ -213,7 +214,9 @@ function TransactionEditDialog({ token, transaction, onClose, onSaved }: { token
     catch (e) { setError(e instanceof Error ? e.message : 'Could not update this transaction.') }
     finally { setBusy(false) }
   }
-  return <div className="overlay" onMouseDown={event => event.target === event.currentTarget && !busy && onClose()}><section className="dialog manual-transaction-dialog"><header><div><div className="eyebrow">EDIT TRANSACTION</div><h2>Update details</h2></div><button className="close" onClick={onClose} disabled={busy}>×</button></header><form className="dialog-content manual-form" onSubmit={submit}><p className="muted">Transaction date: {transaction.transactionDate ? new Date(transaction.transactionDate).toLocaleDateString() : 'Not available'} (date editing isn’t available yet)</p><label>Type<select name="type" defaultValue={transaction.transactionType} required><option value="CashOut">Expense · money out</option><option value="CashIn">Income · money in</option></select></label><label>Amount<input name="amount" type="number" inputMode="decimal" min="0.01" step="0.01" required defaultValue={transaction.amount}/></label><label>Notes <span className="muted">(optional)</span><textarea name="remarks" maxLength={500} rows={3} defaultValue={transaction.remarks ?? ''} placeholder="What was this transaction for?"/></label>{error && <div className="error-banner">{error}</div>}<button className="button primary full" disabled={busy}>{busy ? 'Saving changes…' : 'Save changes'} <span>→</span></button></form></section></div>
+  const initialDate = transaction.transactionDate ? new Date(transaction.transactionDate) : new Date()
+  const dateValue = `${initialDate.getFullYear()}-${String(initialDate.getMonth() + 1).padStart(2, '0')}-${String(initialDate.getDate()).padStart(2, '0')}`
+  return <div className="overlay" onMouseDown={event => event.target === event.currentTarget && !busy && onClose()}><section className="dialog manual-transaction-dialog"><header><div><div className="eyebrow">EDIT TRANSACTION</div><h2>Update details</h2></div><button className="close" onClick={onClose} disabled={busy}>×</button></header><form className="dialog-content manual-form" onSubmit={submit}><label>Date<input name="date" type="date" required defaultValue={dateValue}/></label><label>Type<select name="type" defaultValue={transaction.transactionType} required><option value="CashOut">Expense · money out</option><option value="CashIn">Income · money in</option></select></label><label>Amount<input name="amount" type="number" inputMode="decimal" min="0.01" step="0.01" required defaultValue={transaction.amount}/></label><label>Notes <span className="muted">(optional)</span><textarea name="remarks" maxLength={500} rows={3} defaultValue={transaction.remarks ?? ''} placeholder="What was this transaction for?"/></label>{error && <div className="error-banner">{error}</div>}<button className="button primary full" disabled={busy}>{busy ? 'Saving changes…' : 'Save changes'} <span>→</span></button></form></section></div>
 }
 
 function TransactionDeleteDialog({ token, transaction, onClose, onDeleted }: { token: string; transaction: Transaction; onClose: () => void; onDeleted: () => Promise<void> }) {
