@@ -10,6 +10,7 @@ namespace SpendwiseSystem.Domain.DTOs.CashTransactionDtos
 {
     public class AllCashTransactionDto
     {
+        public Guid Id { get; set; }
         public Guid CashBookId { get; set; }
         public decimal Amount { get; set; }
         public string TransactionType { get; set; }  
