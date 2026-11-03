@@ -14,6 +14,7 @@ namespace SpendwiseSystem.Domain.DTOs.CashTransactionDtos
         public decimal Amount { get; set; }
         public string TransactionType { get; set; }  
         public string Remarks { get; set; }
+        public DateTime? TransactionDate { get; set; }
         public string FilePath { get; set; } = null;
         public string FileName { get; set; } = string.Empty;
     }
