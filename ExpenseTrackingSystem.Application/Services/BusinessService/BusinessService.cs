@@ -105,13 +105,13 @@ namespace SpendwiseSystem.Application.Services.BusinessService
                 };
             }
 
-            List<BusinessResponseDto> data = null;
-            if (!string.IsNullOrWhiteSpace(responseFromRepo.Data))
-            {
-                data = JsonSerializer.Deserialize<List<BusinessResponseDto>>(responseFromRepo.Data);
-            }
-            var fileNames = data.Select(b => b.FileName).ToList();
-            //var filePath = FileUploadHelper.FileUploadHelper.GetFileUrl(fileNames, )
+            var data = string.IsNullOrWhiteSpace(responseFromRepo.Data)
+                ? new List<BusinessResponseDto>()
+                : JsonSerializer.Deserialize<List<BusinessResponseDto>>(
+                    responseFromRepo.Data,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                  ?? new List<BusinessResponseDto>();
+
             return new ApiResponse<List<BusinessResponseDto>>
             {
                 Success = true,
