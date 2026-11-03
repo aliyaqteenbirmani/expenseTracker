@@ -253,11 +253,12 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             var responseFromRepo = await _transactionRepository.GetAllTransactionsOfCashBook(CashBookId);
             if (responseFromRepo.Success)
             {
-                List<AllCashTransactionDto> transactions = new List<AllCashTransactionDto>();
-                transactions = JsonSerializer.Deserialize<List<AllCashTransactionDto>>(responseFromRepo.Data, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                var transactions = string.IsNullOrWhiteSpace(responseFromRepo.Data)
+                    ? new List<AllCashTransactionDto>()
+                    : JsonSerializer.Deserialize<List<AllCashTransactionDto>>(
+                        responseFromRepo.Data,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                      ?? new List<AllCashTransactionDto>();
                 
                 var transactionList = _mapper.Map<List<AllCashTransactionDto>>(transactions);
 
