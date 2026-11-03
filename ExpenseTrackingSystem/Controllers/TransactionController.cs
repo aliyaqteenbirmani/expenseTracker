@@ -408,11 +408,12 @@ namespace SpendwiseSystem.API.Controllers
 
             if (responseFromService.Success)
             {
-                List<string> fileNames = responseFromService.Data.Select(x => x.FileName).ToList();
-                var filesPath = FileUploadHelper.GetFileUrl(fileNames, Request);
                 for (int i = 0; i < responseFromService.Data.Count; i++)
                 {
-                    responseFromService.Data[i].FilePath = filesPath[i];
+                    var fileName = responseFromService.Data[i].FileName;
+                    responseFromService.Data[i].FilePath = string.IsNullOrWhiteSpace(fileName)
+                        ? null
+                        : FileUploadHelper.GetFileUrl(new List<string?> { fileName }, Request)?.FirstOrDefault();
                 }
                 return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
             }
