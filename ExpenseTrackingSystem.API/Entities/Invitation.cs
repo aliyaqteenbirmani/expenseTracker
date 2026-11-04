@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,7 +11,7 @@ namespace SpendwiseSystem.Domain.Entities
         public string InvitationType { get; set; } = string.Empty;
         public Guid BusinessId { get; set; }
         public Guid? CashBookId { get; set; }
-        public Guid InvitedUserId { get; set; }
+        public Guid? InvitedUserId { get; set; }
         public Guid InvitedByUserId { get; set; }
         public string Status { get; set; } = string.Empty;
         public DateTime? ExpiresOn { get; set; }
