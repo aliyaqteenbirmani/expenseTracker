@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Check, MailPlus, RefreshCw, Search, Shield, Trash2, UserRound, UserRoundPlus, X } from 'lucide-react'
+import { Check, Copy, MailPlus, RefreshCw, Search, Shield, Trash2, UserRound, UserRoundPlus, X } from 'lucide-react'
 
 type Business = { id: string; name: string }
 type Cashbook = { id: string; cashBookName?: string; name?: string }
@@ -34,6 +34,20 @@ const cashbookPermissions = [
   { id: 4, code: 'TRANSACTION_UPDATE', label: 'Edit transactions' },
   { id: 5, code: 'TRANSACTION_DELETE', label: 'Delete transactions' },
 ]
+
+const permissionCodeMap: Record<string, string> = {
+  BUSINESS_VIEW: 'View business',
+  CASHBOOK_LIST_VIEW: 'View cashbooks',
+  BUSINESS_UPDATE: 'Edit business',
+  CASHBOOK_CREATE: 'Create cashbooks',
+  CASHBOOK_UPDATE: 'Edit cashbooks',
+  CASHBOOK_DELETE: 'Delete cashbooks',
+  CASHBOOK_VIEW: 'View cashbook',
+  TRANSACTION_VIEW: 'View transactions',
+  TRANSACTION_CREATE: 'Create transactions',
+  TRANSACTION_UPDATE: 'Edit transactions',
+  TRANSACTION_DELETE: 'Delete transactions',
+}
 
 async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers)
@@ -136,6 +150,7 @@ export default function MembersPage({
   const [email, setEmail] = useState('')
   const [remarks, setRemarks] = useState('')
   const [permissions, setPermissions] = useState<number[]>([1, 2])
+  const [confirmRemove, setConfirmRemove] = useState<Member | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -223,7 +238,6 @@ export default function MembersPage({
   }
 
   async function removeMember(member: Member) {
-    if (!window.confirm(`Remove ${member.fullName || member.email} from this ${scope}?`)) return
     setBusy(true)
     setError('')
     const path =
@@ -232,6 +246,7 @@ export default function MembersPage({
         : `/api/MemberManagement/businesses/${business.id}/cashbooks/${cashbookId}/members/${member.userId}`
     try {
       await request(path, token, { method: 'DELETE' })
+      setConfirmRemove(null)
       onToast('Member removed')
       await reload()
     } catch (e) {
@@ -405,11 +420,24 @@ export default function MembersPage({
                     <UserRound size={17} />
                   </span>
                   <div className="member-info">
-                    <strong>{member.fullName || member.email}</strong>
-                    <small>
-                      {member.email} · {member.status}
-                    </small>
-                    <span>{member.permissions?.join(' · ') || 'No permissions listed'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <strong>{member.fullName || member.email}</strong>
+                      <span className={`member-status-pill ${(member.status || 'active').toLowerCase()}`}>
+                        {member.status || 'Active'}
+                      </span>
+                    </div>
+                    <small>{member.email}</small>
+                    <div className="member-perm-badges">
+                      {member.permissions && member.permissions.length > 0 ? (
+                        member.permissions.map(p => (
+                          <span key={p} className="member-perm-tag">
+                            {permissionCodeMap[p] || p}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="member-perm-tag empty">No permissions listed</span>
+                      )}
+                    </div>
                     <MemberPermissionEditor
                       key={`${member.userId}-${scope}`}
                       member={member}
@@ -428,7 +456,7 @@ export default function MembersPage({
                     title="Remove member"
                     aria-label={`Remove ${member.fullName || member.email}`}
                     disabled={busy}
-                    onClick={() => void removeMember(member)}
+                    onClick={() => setConfirmRemove(member)}
                   >
                     <Trash2 size={15} />
                   </button>
@@ -514,11 +542,25 @@ export default function MembersPage({
                     {invite.cashbookName ? ` · ${invite.cashbookName}` : ''} · {invite.status}
                   </small>
                 </div>
-                {invite.status?.toLowerCase() === 'pending' && (
-                  <button className="revoke-invitation" disabled={busy} onClick={() => void invitationAction(invite.id, 'revoke')}>
-                    <X size={14} /> Revoke
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="copy-invitation-btn"
+                    title="Copy invite URL"
+                    onClick={() => {
+                      const inviteUrl = `${window.location.origin}?inviteToken=${invite.id}`
+                      navigator.clipboard.writeText(inviteUrl)
+                      onToast(`Invite link copied for ${invite.invitedEmail}`)
+                    }}
+                  >
+                    <Copy size={13} strokeWidth={1.8} /> Copy link
                   </button>
-                )}
+                  {invite.status?.toLowerCase() === 'pending' && (
+                    <button className="revoke-invitation" disabled={busy} onClick={() => void invitationAction(invite.id, 'revoke')}>
+                      <X size={14} /> Revoke
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           ) : (
@@ -526,6 +568,31 @@ export default function MembersPage({
           )}
         </article>
       </div>
+
+      {confirmRemove && (
+        <div className="overlay" onMouseDown={e => e.target === e.currentTarget && !busy && setConfirmRemove(null)}>
+          <section className="dialog" style={{ maxWidth: 420 }}>
+            <header>
+              <div>
+                <div className="eyebrow" style={{ color: '#b95f4b' }}>REMOVE MEMBER</div>
+                <h2>Remove access?</h2>
+              </div>
+              <button className="close" onClick={() => setConfirmRemove(null)} disabled={busy}><X size={16} /></button>
+            </header>
+            <div className="dialog-content">
+              <p>
+                Are you sure you want to remove <strong>{confirmRemove.fullName || confirmRemove.email}</strong> from {scope === 'business' ? business.name : 'this cashbook'}? They will lose access immediately.
+              </p>
+              <div className="form-between" style={{ marginTop: 20 }}>
+                <button className="button secondary-action" disabled={busy} onClick={() => setConfirmRemove(null)}>Cancel</button>
+                <button className="button danger" disabled={busy} onClick={() => void removeMember(confirmRemove)}>
+                  {busy ? 'Removing…' : 'Yes, remove member'}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   )
 }

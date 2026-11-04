@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { BriefcaseBusiness, X } from 'lucide-react'
 
-type Business = { id: string; name: string; category?: string; description?: string }
+type Business = { id: string; name: string; category?: string; description?: string; fileUrl?: string; fileName?: string }
 
 type Props = {
   token: string
@@ -48,6 +48,8 @@ export default function CreateBusinessDialog({ token, onClose, onCreated }: Prop
         name: raw.name ?? raw.Name ?? String(fields.get('name')).trim(),
         category: raw.category ?? raw.Category,
         description: raw.description ?? raw.Description,
+        fileUrl: raw.fileUrl ?? raw.FileUrl,
+        fileName: raw.fileName ?? raw.FileName,
       }
 
       if (!created.id) {

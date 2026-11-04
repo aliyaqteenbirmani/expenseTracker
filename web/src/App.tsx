@@ -32,6 +32,7 @@ import {
   TrendingDown,
   TrendingUp,
   Trash2,
+  Upload,
   Utensils,
   UsersRound,
   Wallet,
@@ -61,7 +62,7 @@ type User = {
   refreshToken?: string
   RefreshToken?: string
 }
-type Business = { id: string; name: string; category?: string; description?: string }
+type Business = { id: string; name: string; category?: string; description?: string; fileUrl?: string; fileName?: string }
 type Cashbook = { id: string; cashBookName?: string; name?: string; businessId: string }
 type Transaction = {
   id: string
@@ -760,6 +761,8 @@ function BusinessSettings({ token, business, onBack, onUpdated, onDeleted, onToa
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(business.fileUrl ?? null)
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -771,9 +774,21 @@ function BusinessSettings({ token, business, onBack, onUpdated, onDeleted, onToa
     form.append('Name', String(fields.get('name')).trim())
     form.append('Category', String(fields.get('category')))
     form.append('Description', String(fields.get('description') ?? '').trim())
+    if (logoFile) {
+      form.append('File', logoFile)
+    }
     try {
       const updated = await api<Business>('/api/Business', token, { method: 'PATCH', body: form })
-      onUpdated({ ...business, ...updated, id: updated.id ?? business.id, name: updated.name ?? String(fields.get('name')).trim() })
+      onUpdated({
+        ...business,
+        ...updated,
+        id: updated.id ?? business.id,
+        name: updated.name ?? String(fields.get('name')).trim(),
+        category: updated.category ?? String(fields.get('category')),
+        description: updated.description ?? String(fields.get('description') ?? '').trim(),
+        fileUrl: updated.fileUrl ?? logoPreview ?? business.fileUrl,
+        fileName: updated.fileName ?? business.fileName
+      })
       onToast('Business settings saved')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save business settings.')
@@ -815,6 +830,47 @@ function BusinessSettings({ token, business, onBack, onUpdated, onDeleted, onToa
             </div>
           </div>
           <form className="setup-form" onSubmit={save}>
+            <div className="workspace-logo-editor" style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 12,
+                  background: '#eef5f0',
+                  border: '1px solid #d9e6dc',
+                  display: 'grid',
+                  placeItems: 'center',
+                  overflow: 'hidden'
+                }}
+              >
+                {logoPreview ? (
+                  <img src={logoPreview} alt={business.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: 20, fontWeight: 800, color: '#1b6343' }}>
+                    {(business.name || 'W').slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div>
+                <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: '#16754d', background: '#edf7ef', padding: '6px 10px', borderRadius: 7 }}>
+                  <Upload size={13} strokeWidth={2} /> Change workspace logo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const f = e.target.files?.[0]
+                      if (f) {
+                        setLogoFile(f)
+                        setLogoPreview(URL.createObjectURL(f))
+                      }
+                    }}
+                  />
+                </label>
+                {logoFile && <small style={{ display: 'block', fontSize: 10, color: '#687e72', marginTop: 3 }}>Selected: {logoFile.name}</small>}
+              </div>
+            </div>
+
             <label>Business name<input name="name" maxLength={150} required defaultValue={business.name} /></label>
             <label>
               Category
@@ -824,6 +880,8 @@ function BusinessSettings({ token, business, onBack, onUpdated, onDeleted, onToa
                 <option>Food & beverage</option>
                 <option>Services</option>
                 <option>Freelance</option>
+                <option>Healthcare</option>
+                <option>Technology</option>
                 <option>Personal</option>
                 <option>Other</option>
               </select>
@@ -1853,7 +1911,11 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       const normalized = (list ?? []).map(item => ({
         ...item,
         id: item.id ?? (item as Business & { Id: string }).Id,
-        name: item.name ?? (item as Business & { Name: string }).Name
+        name: item.name ?? (item as Business & { Name: string }).Name,
+        category: item.category ?? (item as unknown as { Category?: string }).Category,
+        description: item.description ?? (item as unknown as { Description?: string }).Description,
+        fileUrl: item.fileUrl ?? (item as unknown as { FileUrl?: string }).FileUrl,
+        fileName: item.fileName ?? (item as unknown as { FileName?: string }).FileName
       }))
       setBusinesses(normalized)
       if (normalized.length) {
@@ -1988,7 +2050,17 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         <small className="side-label">WORKSPACE</small>
         <div className="workspace-wrapper">
           <label className="workspace">
-            <span className="workspace-icon">{(selectedBusiness?.name ?? 'S').slice(0, 1).toUpperCase()}</span>
+            <span className="workspace-icon">
+              {selectedBusiness?.fileUrl ? (
+                <img
+                  src={selectedBusiness.fileUrl}
+                  alt={selectedBusiness.name}
+                  style={{ width: '100%', height: '100%', borderRadius: 6, objectFit: 'cover' }}
+                />
+              ) : (
+                (selectedBusiness?.name ?? 'S').slice(0, 1).toUpperCase()
+              )}
+            </span>
             <select
               value={businessId}
               onChange={e => {
