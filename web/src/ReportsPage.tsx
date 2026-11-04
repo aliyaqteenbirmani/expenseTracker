@@ -3,7 +3,8 @@ import {
   ArrowDownLeft,
   BriefcaseBusiness,
   Calendar,
-  Download,
+  FileSpreadsheet,
+  FileText,
   Fuel,
   HeartPulse,
   House,
@@ -173,7 +174,59 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-    onToast('Report exported successfully')
+    onToast('Summary text report exported')
+  }
+
+  function exportCsvReport() {
+    const periodLabel = period === 'thisMonth' ? 'This Month' : period === 'lastMonth' ? 'Last Month' : period === 'last30Days' ? 'Last 30 Days' : period === 'thisYear' ? 'This Year' : 'All Time'
+    const escapeCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+
+    const rows: (string | number)[][] = [
+      ['SPENDWISE FINANCIAL REPORT', ''],
+      ['Workspace', businessName],
+      ['Cashbook', cashbookName],
+      ['Period', periodLabel],
+      ['Generated On', new Date().toLocaleString()],
+      [''],
+      ['EXECUTIVE SUMMARY', ''],
+      ['Metric', 'Amount (PKR)'],
+      ['Total Inflow (Income)', totalIncome],
+      ['Total Outflow (Expenses)', totalExpense],
+      ['Net Cash Flow', netBalance],
+      ['Savings Rate (%)', `${savingsRate}%`],
+      ['Total Transactions', filteredTransactions.length],
+      [''],
+      ['EXPENSE BREAKDOWN BY CATEGORY', '', '', ''],
+      ['Category', 'Total Amount (PKR)', 'Count', 'Share of Expenses (%)'],
+      ...categoryBreakdown.map(c => [
+        c.label,
+        c.amount,
+        c.count,
+        `${c.percentage}%`
+      ]),
+      [''],
+      ['TRANSACTION DETAILS', '', '', '', ''],
+      ['Date', 'Remarks', 'Type', 'Category', 'Amount (PKR)'],
+      ...filteredTransactions.map(t => [
+        t.transactionDate?.slice(0, 10) || '',
+        t.remarks || '',
+        t.transactionType?.toLowerCase() === 'cashin' ? 'Income' : 'Expense',
+        getCategoryInfo(t).label,
+        Number(t.amount || 0)
+      ])
+    ]
+
+    const csvContent = '\uFEFF' + rows.map(r => r.map(escapeCell).join(',')).join('\r\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `spendwise-report-${period}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    onToast('CSV report exported successfully')
   }
 
   return (
@@ -190,8 +243,11 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
           </p>
         </div>
         <div className="reports-top-actions">
-          <button className="export-button" onClick={exportReport} disabled={filteredTransactions.length === 0}>
-            <Download size={14} /> Export summary
+          <button className="export-button" onClick={exportReport} disabled={filteredTransactions.length === 0} title="Download plain text summary">
+            <FileText size={14} /> Summary (.txt)
+          </button>
+          <button className="button primary" onClick={exportCsvReport} disabled={filteredTransactions.length === 0} style={{ height: 36, padding: '0 14px', fontSize: 11 }} title="Download comprehensive CSV spreadsheet">
+            <FileSpreadsheet size={14} strokeWidth={2} /> Export CSV
           </button>
         </div>
       </div>

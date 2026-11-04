@@ -1289,12 +1289,20 @@ function TransactionsPage({
   const [query, setQuery] = useState('')
   const [type, setType] = useState<'all' | 'income' | 'expense'>('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [draftFromDate, setDraftFromDate] = useState('')
   const [draftToDate, setDraftToDate] = useState('')
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
+
+  // Reset page when filters or sorting change
+  useEffect(() => {
+    setPage(1)
+  }, [query, type, categoryFilter, sortBy, fromDate, toDate, pageSize])
 
   const filteredTransactions = useMemo(() => transactions.filter(transaction => {
     const normalizedType = transaction.transactionType?.toLowerCase()
@@ -1304,7 +1312,19 @@ function TransactionsPage({
     const cat = getTransactionCategory(transaction)
     const matchesCategory = categoryFilter === 'all' || cat.label === categoryFilter
     return matchesType && matchesQuery && matchesCategory && (!fromDate || date >= fromDate) && (!toDate || date <= toDate)
-  }).sort((a, b) => (b.transactionDate ?? '').localeCompare(a.transactionDate ?? '')), [transactions, query, type, categoryFilter, fromDate, toDate])
+  }).sort((a, b) => {
+    if (sortBy === 'date-desc') return (b.transactionDate ?? '').localeCompare(a.transactionDate ?? '')
+    if (sortBy === 'date-asc') return (a.transactionDate ?? '').localeCompare(b.transactionDate ?? '')
+    if (sortBy === 'amount-desc') return Number(b.amount || 0) - Number(a.amount || 0)
+    if (sortBy === 'amount-asc') return Number(a.amount || 0) - Number(b.amount || 0)
+    return 0
+  }), [transactions, query, type, categoryFilter, fromDate, toDate, sortBy])
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize))
+  const paginatedTransactions = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filteredTransactions.slice(start, start + pageSize)
+  }, [filteredTransactions, page, pageSize])
 
   const totalIncome = filteredTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashin').reduce((sum, t) => sum + Number(t.amount || 0), 0)
   const totalExpense = filteredTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashout').reduce((sum, t) => sum + Number(t.amount || 0), 0)
@@ -1342,18 +1362,20 @@ function TransactionsPage({
   const calendarOffset = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay()
   const dateRangeLabel = fromDate || toDate ? `${fromDate ? new Date(`${fromDate}T00:00:00`).toLocaleDateString() : 'Start'} – ${toDate ? new Date(`${toDate}T00:00:00`).toLocaleDateString() : 'End'}` : 'Date range'
 
-  const groups = filteredTransactions.reduce<{ label: string; transactions: Transaction[] }[]>((result, transaction) => {
-    const date = transaction.transactionDate ? new Date(transaction.transactionDate) : null
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const dateDay = date ? new Date(date.getFullYear(), date.getMonth(), date.getDate()) : null
-    const daysAgo = dateDay ? Math.floor((today.getTime() - dateDay.getTime()) / 86400000) : Infinity
-    const label = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo >= 2 && daysAgo <= 7 ? 'This week' : date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : 'Date unavailable'
-    const current = result[result.length - 1]
-    if (current?.label === label) current.transactions.push(transaction)
-    else result.push({ label, transactions: [transaction] })
-    return result
-  }, [])
+  const groups = useMemo(() => {
+    return paginatedTransactions.reduce<{ label: string; transactions: Transaction[] }[]>((result, transaction) => {
+      const date = transaction.transactionDate ? new Date(transaction.transactionDate) : null
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const dateDay = date ? new Date(date.getFullYear(), date.getMonth(), date.getDate()) : null
+      const daysAgo = dateDay ? Math.floor((today.getTime() - dateDay.getTime()) / 86400000) : Infinity
+      const label = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo >= 2 && daysAgo <= 7 ? 'This week' : date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : 'Date unavailable'
+      const current = result[result.length - 1]
+      if (current?.label === label) current.transactions.push(transaction)
+      else result.push({ label, transactions: [transaction] })
+      return result
+    }, [])
+  }, [paginatedTransactions])
 
   function exportCsv() {
     const escapeCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
@@ -1477,6 +1499,27 @@ function TransactionsPage({
           <option value="Income">Income</option>
           <option value="Other expense">Other</option>
         </select>
+        <select
+          aria-label="Sort transactions"
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value as 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc')}
+          style={{
+            height: 36,
+            border: '1px solid #e1e7e3',
+            borderRadius: 8,
+            padding: '0 10px',
+            fontSize: 10,
+            fontWeight: 650,
+            color: '#4b6355',
+            background: '#fff',
+            outline: 'none'
+          }}
+        >
+          <option value="date-desc">Newest first</option>
+          <option value="date-asc">Oldest first</option>
+          <option value="amount-desc">Amount: High to Low</option>
+          <option value="amount-asc">Amount: Low to High</option>
+        </select>
         <div className="date-range-control">
           <button className={'date-range-button ' + (datePickerOpen ? 'open' : '')} aria-expanded={datePickerOpen} onClick={() => { if (!datePickerOpen) { setDraftFromDate(fromDate); setDraftToDate(toDate); setCalendarMonth(fromDate ? new Date(`${fromDate}T00:00:00`) : new Date()) } setDatePickerOpen(!datePickerOpen) }}>
             <CalendarDays size={15} /><span>{dateRangeLabel}</span><ChevronDown size={14} />
@@ -1521,7 +1564,7 @@ function TransactionsPage({
         <button className="export-button" onClick={exportCsv} disabled={!filteredTransactions.length}>
           <Download size={14} strokeWidth={1.8} /> Export CSV
         </button>
-        <button className="history-clear" onClick={() => { setQuery(''); setType('all'); setCategoryFilter('all'); setFromDate(''); setToDate(''); setDatePickerOpen(false) }}>Clear filters</button>
+        <button className="history-clear" onClick={() => { setQuery(''); setType('all'); setCategoryFilter('all'); setSortBy('date-desc'); setFromDate(''); setToDate(''); setDatePickerOpen(false) }}>Clear filters</button>
       </div>
 
       <article className="panel history-panel">
@@ -1579,6 +1622,54 @@ function TransactionsPage({
             {!transactions.length && (
               <button className="button primary" onClick={onAdd}><Plus size={15} /> Add your first transaction</button>
             )}
+          </div>
+        )}
+
+        {filteredTransactions.length > 0 && (
+          <div className="table-pagination">
+            <div className="pagination-info">
+              Showing <strong>{(page - 1) * pageSize + 1}</strong>–<strong>{Math.min(page * pageSize, filteredTransactions.length)}</strong> of <strong>{filteredTransactions.length}</strong>
+            </div>
+            <div className="pagination-controls">
+              <label className="page-size-label">
+                <span>Per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={e => {
+                    setPageSize(Number(e.target.value))
+                    setPage(1)
+                  }}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </label>
+              <div className="page-nav">
+                <button
+                  type="button"
+                  className="page-btn"
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  title="Previous page"
+                >
+                  <ChevronLeft size={14} /> Prev
+                </button>
+                <span className="page-current">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="page-btn"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  title="Next page"
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </article>
@@ -1691,6 +1782,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [viewAttachment, setViewAttachment] = useState<Transaction | null>(null)
   const [pendingUrlInviteToken, setPendingUrlInviteToken] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [overviewPeriod, setOverviewPeriod] = useState<'month' | 'year' | 'all'>('month')
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
@@ -1817,12 +1909,29 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       .finally(() => setLoadingTransactions(false))
   }, [book?.id, token])
 
+  const overviewTransactions = useMemo(() => {
+    const now = new Date()
+    return transactions.filter(t => {
+      if (overviewPeriod === 'all') return true
+      if (!t.transactionDate) return false
+      const d = new Date(t.transactionDate)
+      if (Number.isNaN(d.getTime())) return false
+      if (overviewPeriod === 'month') {
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+      }
+      if (overviewPeriod === 'year') {
+        return d.getFullYear() === now.getFullYear()
+      }
+      return true
+    })
+  }, [transactions, overviewPeriod])
+
   const visible = useMemo(
     () => transactions.filter(t => `${t.remarks ?? ''} ${t.transactionType}`.toLowerCase().includes(search.toLowerCase())),
     [transactions, search]
   )
-  const income = transactions.filter(t => t.transactionType?.toLowerCase() === 'cashin').reduce((s, t) => s + Number(t.amount || 0), 0)
-  const expense = transactions.filter(t => t.transactionType?.toLowerCase() === 'cashout').reduce((s, t) => s + Number(t.amount || 0), 0)
+  const income = overviewTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashin').reduce((s, t) => s + Number(t.amount || 0), 0)
+  const expense = overviewTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashout').reduce((s, t) => s + Number(t.amount || 0), 0)
   const balance = income - expense
 
   async function reloadCashbooks(selectName?: string) {
@@ -2108,9 +2217,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 </div>
                 <div className="hero-chart">
                   <div className="hero-total">
-                    <small>THIS MONTH</small>
+                    <small>{overviewPeriod === 'month' ? 'THIS MONTH' : overviewPeriod === 'year' ? 'THIS YEAR' : 'ALL TIME'}</small>
                     <strong>Rs. {Math.abs(balance).toLocaleString('en-PK')}</strong>
-                    <span><b>↗ 8.4%</b> vs last month</span>
+                    <span><b>{balance >= 0 ? '↗' : '↘'}</b> {balance >= 0 ? 'Net surplus' : 'Net deficit'}</span>
                   </div>
                   <div className="chart-bars">
                     {[34, 52, 42, 66, 48, 72, 57, 87, 65, 96, 72, 82, 60, 91, 74].map((h, i) => (
@@ -2126,9 +2235,22 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   <h2>Your overview</h2>
                   <p>A snapshot of your selected cashbook.</p>
                 </div>
-                <button className="period" onClick={() => setShowReports(true)}>
-                  View full report →
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div className="type-chips" role="group" aria-label="Overview timeframe">
+                    <button className={overviewPeriod === 'month' ? 'selected' : ''} onClick={() => setOverviewPeriod('month')}>
+                      This month
+                    </button>
+                    <button className={overviewPeriod === 'year' ? 'selected' : ''} onClick={() => setOverviewPeriod('year')}>
+                      This year
+                    </button>
+                    <button className={overviewPeriod === 'all' ? 'selected' : ''} onClick={() => setOverviewPeriod('all')}>
+                      All time
+                    </button>
+                  </div>
+                  <button className="period" onClick={() => setShowReports(true)}>
+                    Full report →
+                  </button>
+                </div>
               </div>
 
               <section className="metrics">
@@ -2137,7 +2259,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   <span className="trend">↗ 8.4%</span>
                   <small>TOTAL BALANCE</small>
                   <strong>Rs. {balance.toLocaleString('en-PK')}</strong>
-                  <p>Across selected cashbook</p>
+                  <p>Across selected timeframe</p>
                   <div className="sparkline green-line" />
                 </article>
                 <article>
@@ -2158,10 +2280,10 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 </article>
                 <article>
                   <div className="metric-symbol purple"><ReceiptText size={17} strokeWidth={1.8} /></div>
-                  <span className="trend neutral">THIS MONTH</span>
+                  <span className="trend neutral">{overviewPeriod === 'month' ? 'THIS MONTH' : overviewPeriod === 'year' ? 'THIS YEAR' : 'ALL TIME'}</span>
                   <small>TRANSACTIONS</small>
-                  <strong>{transactions.length}</strong>
-                  <p>Activity in this cashbook</p>
+                  <strong>{overviewTransactions.length}</strong>
+                  <p>Activity in this timeframe</p>
                   <div className="sparkline purple-line" />
                 </article>
               </section>
