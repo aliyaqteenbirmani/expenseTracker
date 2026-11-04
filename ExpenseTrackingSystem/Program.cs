@@ -155,6 +155,26 @@ builder.Services.AddSwaggerGen(c =>
 }); 
 var app = builder.Build();
 
+// ---- AUTOMATIC MIGRATION CODE START ----
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        // Replace 'YourDbContext' with the actual name of your DbContext class
+        var context = services.GetRequiredService<AppDbContext>();
+
+        // This will create the database if it doesn't exist and apply pending migrations
+        context.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while migrating the database.");
+    }
+}
+// ---- AUTOMATIC MIGRATION CODE END ----
+
 app.UseExceptionHandler();
 app.UseHttpLogging();
 app.UseSwagger();
