@@ -1,4 +1,4 @@
-﻿using SpendwiseSystem.Domain.Entities.ConfigModel;
+using SpendwiseSystem.Domain.Entities.ConfigModel;
 using System;
 using System.Collections.Generic;
 using System.Linq;

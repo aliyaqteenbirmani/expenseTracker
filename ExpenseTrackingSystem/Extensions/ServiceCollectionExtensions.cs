@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using CashBookSystem.Application.Interfaces;
 using CashBookSystem.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -66,6 +66,7 @@ namespace SpendwiseSystem.API.Extensions
             services.AddTransient<IInvitationService, InvitationService>();
             services.AddTransient<IInvitationRepository, InvitationRepository>();
 
+            services.Configure<SpendwiseSystem.Domain.DTOs.SmtpSettings>(configuration.GetSection("SmtpSettings"));
             services.AddTransient<IEmailService, EmailService>();
             services.AddTransient<IInvitationEmailService, InvitationEmailService>();
 

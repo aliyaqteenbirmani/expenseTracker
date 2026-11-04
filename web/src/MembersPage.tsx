@@ -205,13 +205,26 @@ export default function MembersPage({
         ? `/api/Invitations/business/${business.id}`
         : `/api/Invitations/business/${business.id}/cashbooks/${cashbookId}`
     try {
-      await request(path, token, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'}${path}`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ invitedEmail: email, remarks, permissions })
       })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(body.message || body.Message || `Could not send invitation (${response.status})`)
+      }
       setEmail('')
       setRemarks('')
-      onToast('Invitation sent')
+      const msg = body.message || body.Message || ''
+      if (msg.toLowerCase().includes('could not be sent')) {
+        onToast('Invitation created, but email delivery failed (check SMTP settings). You can copy the invite link below.')
+      } else {
+        onToast(msg || 'Invitation sent')
+      }
       await reload()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not send invitation.')
