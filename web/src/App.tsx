@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -1089,6 +1089,10 @@ function TransactionEditDialog({ token, transaction, onClose, onSaved }: { token
     body.append('Amount', String(values.get('amount')))
     body.append('TransactionType', String(values.get('type')))
     body.append('Remarks', String(values.get('remarks') ?? ''))
+    const file = values.get('file')
+    if (file instanceof File && file.size > 0) {
+      body.append('File', file)
+    }
     setBusy(true)
     setError('')
     try {
@@ -1126,6 +1130,10 @@ function TransactionEditDialog({ token, transaction, onClose, onSaved }: { token
           </label>
           <label>Amount<input name="amount" type="number" inputMode="decimal" min="0.01" step="0.01" required defaultValue={transaction.amount} /></label>
           <label>Notes <span className="muted">(optional)</span><textarea name="remarks" maxLength={500} rows={3} defaultValue={transaction.remarks ?? ''} placeholder="What was this transaction for?" /></label>
+          <label>
+            {transaction.fileName ? `Replace receipt (${transaction.fileName})` : 'Attach receipt or invoice'} <span className="muted">(optional)</span>
+            <input name="file" type="file" accept="image/*,application/pdf" />
+          </label>
           {error && <div className="error-banner">{error}</div>}
           <button className="button primary full" disabled={busy}>
             {busy ? 'Saving changes…' : 'Save changes'} <span>→</span>
@@ -1231,6 +1239,9 @@ function TransactionsPage({
   transactions,
   token,
   cashbookName,
+  books,
+  selectedBookId,
+  onSelectBook,
   onBack,
   onAdd,
   onRefresh,
@@ -1240,6 +1251,9 @@ function TransactionsPage({
   transactions: Transaction[]
   token: string
   cashbookName: string
+  books?: Cashbook[]
+  selectedBookId?: string
+  onSelectBook?: (book: Cashbook) => void
   onBack: () => void
   onAdd: () => void
   onRefresh: () => Promise<void>
@@ -1345,7 +1359,36 @@ function TransactionsPage({
           </button>
           <div className="eyebrow">CASHBOOK ACTIVITY</div>
           <h1>All transactions</h1>
-          <p className="muted">{cashbookName} · {filteredTransactions.length} of {transactions.length} transactions</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            {books && books.length > 1 ? (
+              <select
+                value={selectedBookId}
+                onChange={e => {
+                  const chosen = books.find(b => b.id === e.target.value)
+                  if (chosen && onSelectBook) onSelectBook(chosen)
+                }}
+                style={{
+                  border: '1px solid #d8e4da',
+                  borderRadius: 7,
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#1a4734',
+                  background: '#fff',
+                  outline: 'none'
+                }}
+              >
+                {books.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.cashBookName ?? b.name ?? 'Cashbook'}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="muted" style={{ fontSize: 11 }}>{cashbookName}</span>
+            )}
+            <span className="muted" style={{ fontSize: 11 }}>· {filteredTransactions.length} of {transactions.length} transactions</span>
+          </div>
         </div>
         <button className="button primary" onClick={onAdd}>
           <Plus size={15} strokeWidth={1.8} /> Add transaction
@@ -1601,6 +1644,27 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [needsSetup, setNeedsSetup] = useState(false)
 
   const fullName = `${user.firstName ?? user.FirstName ?? ''} ${user.lastName ?? user.LastName ?? ''}`.trim() || user.email || user.Email || 'there'
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+      if (e.key === 'Escape') {
+        setShowReceipt(false)
+        setShowManualTransaction(false)
+        setShowCreateCashbook(false)
+        setShowCreateBusiness(false)
+        setShowNotifications(false)
+        setManageCashbook(null)
+        setViewAttachment(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   function showToast(message: string) {
     setToast(message)
@@ -1875,7 +1939,12 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           </div>
           <label className="search">
             <Search size={17} strokeWidth={1.8} />
-            <input placeholder="Search transactions..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input
+              ref={searchInputRef}
+              placeholder="Search transactions..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
             <kbd>⌘ K</kbd>
           </label>
           <button
@@ -1926,6 +1995,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               transactions={transactions}
               token={token}
               cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
+              books={books}
+              selectedBookId={book?.id}
+              onSelectBook={b => setBook(b)}
               onBack={() => setShowAllTransactions(false)}
               onAdd={() => {
                 setShowAllTransactions(false)
