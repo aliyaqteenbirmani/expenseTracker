@@ -43,6 +43,7 @@ import ReportsPage from './ReportsPage'
 import NotificationsPopover from './NotificationsPopover'
 import CreateBusinessDialog from './CreateBusinessDialog'
 import TransactionAttachmentDialog from './TransactionAttachmentDialog'
+import UserProfileDialog from './UserProfileDialog'
 import './App.css'
 
 const API = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'
@@ -934,9 +935,19 @@ function ManualTransactionDialog({ token, book, onClose, onDone }: { token: stri
 
 function ReceiptDialog({ token, book, onClose, onDone }: { token: string; book: Cashbook; onClose: () => void; onDone: () => void }) {
   const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [draft, setDraft] = useState<ReceiptDraft | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (file && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file)
+      setPreviewUrl(url)
+      return () => URL.revokeObjectURL(url)
+    }
+    setPreviewUrl(null)
+  }, [file])
 
   async function upload() {
     if (!file) return
@@ -1010,7 +1021,13 @@ function ReceiptDialog({ token, book, onClose, onDone }: { token: string; book: 
             <>
               <p className="muted">Upload a JPG, PNG, or PDF. Review the extracted details before saving.</p>
               <label className="dropzone">
-                <span className="upload-symbol"><ArrowUpRight size={20} strokeWidth={1.8} /></span>
+                {previewUrl ? (
+                  <div style={{ maxHeight: 110, overflow: 'hidden', borderRadius: 8, margin: '4px auto 8px' }}>
+                    <img src={previewUrl} alt="Selected receipt" style={{ maxHeight: 110, maxWidth: '100%', objectFit: 'contain' }} />
+                  </div>
+                ) : (
+                  <span className="upload-symbol"><ArrowUpRight size={20} strokeWidth={1.8} /></span>
+                )}
                 <strong>{file?.name ?? 'Choose a receipt file'}</strong>
                 <small>{file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'JPG, PNG, or PDF · up to 10 MB'}</small>
                 <input type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" onChange={e => setFile(e.target.files?.[0] ?? null)} />
@@ -1041,6 +1058,15 @@ function ReceiptDialog({ token, book, onClose, onDone }: { token: string; book: 
                   <small>Check each field before creating the transaction.</small>
                 </div>
               </div>
+              {previewUrl && (
+                <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                  <img
+                    src={previewUrl}
+                    alt="Receipt preview"
+                    style={{ maxHeight: 130, maxWidth: '100%', borderRadius: 8, border: '1px solid #dce8dd', objectFit: 'contain' }}
+                  />
+                </div>
+              )}
               <div className="confidence">
                 <span>Extraction confidence</span>
                 <b>{Math.round((draft.parsingConfidence ?? 0) * 100)}%</b>
@@ -1262,6 +1288,7 @@ function TransactionsPage({
 }) {
   const [query, setQuery] = useState('')
   const [type, setType] = useState<'all' | 'income' | 'expense'>('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [datePickerOpen, setDatePickerOpen] = useState(false)
@@ -1274,8 +1301,10 @@ function TransactionsPage({
     const date = transaction.transactionDate?.slice(0, 10) ?? ''
     const matchesType = type === 'all' || (type === 'income' ? normalizedType === 'cashin' : normalizedType === 'cashout')
     const matchesQuery = (transaction.remarks ?? '').concat(' ', transaction.transactionType ?? '').toLowerCase().includes(query.trim().toLowerCase())
-    return matchesType && matchesQuery && (!fromDate || date >= fromDate) && (!toDate || date <= toDate)
-  }).sort((a, b) => (b.transactionDate ?? '').localeCompare(a.transactionDate ?? '')), [transactions, query, type, fromDate, toDate])
+    const cat = getTransactionCategory(transaction)
+    const matchesCategory = categoryFilter === 'all' || cat.label === categoryFilter
+    return matchesType && matchesQuery && matchesCategory && (!fromDate || date >= fromDate) && (!toDate || date <= toDate)
+  }).sort((a, b) => (b.transactionDate ?? '').localeCompare(a.transactionDate ?? '')), [transactions, query, type, categoryFilter, fromDate, toDate])
 
   const totalIncome = filteredTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashin').reduce((sum, t) => sum + Number(t.amount || 0), 0)
   const totalExpense = filteredTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashout').reduce((sum, t) => sum + Number(t.amount || 0), 0)
@@ -1423,6 +1452,31 @@ function TransactionsPage({
           <button className={type === 'income' ? 'selected' : ''} onClick={() => setType('income')}>Income</button>
           <button className={type === 'expense' ? 'selected' : ''} onClick={() => setType('expense')}>Expense</button>
         </div>
+        <select
+          aria-label="Filter by category"
+          value={categoryFilter}
+          onChange={e => setCategoryFilter(e.target.value)}
+          style={{
+            height: 36,
+            border: '1px solid #e1e7e3',
+            borderRadius: 8,
+            padding: '0 10px',
+            fontSize: 10,
+            fontWeight: 650,
+            color: '#4b6355',
+            background: '#fff',
+            outline: 'none'
+          }}
+        >
+          <option value="all">All categories</option>
+          <option value="Food">Food & Dining</option>
+          <option value="Transport">Transport & Fuel</option>
+          <option value="Housing">Housing & Bills</option>
+          <option value="Health">Health & Medical</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Income">Income</option>
+          <option value="Other expense">Other</option>
+        </select>
         <div className="date-range-control">
           <button className={'date-range-button ' + (datePickerOpen ? 'open' : '')} aria-expanded={datePickerOpen} onClick={() => { if (!datePickerOpen) { setDraftFromDate(fromDate); setDraftToDate(toDate); setCalendarMonth(fromDate ? new Date(`${fromDate}T00:00:00`) : new Date()) } setDatePickerOpen(!datePickerOpen) }}>
             <CalendarDays size={15} /><span>{dateRangeLabel}</span><ChevronDown size={14} />
@@ -1467,7 +1521,7 @@ function TransactionsPage({
         <button className="export-button" onClick={exportCsv} disabled={!filteredTransactions.length}>
           <Download size={14} strokeWidth={1.8} /> Export CSV
         </button>
-        <button className="history-clear" onClick={() => { setQuery(''); setType('all'); setFromDate(''); setToDate(''); setDatePickerOpen(false) }}>Clear filters</button>
+        <button className="history-clear" onClick={() => { setQuery(''); setType('all'); setCategoryFilter('all'); setFromDate(''); setToDate(''); setDatePickerOpen(false) }}>Clear filters</button>
       </div>
 
       <article className="panel history-panel">
@@ -1631,6 +1685,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [showCreateCashbook, setShowCreateCashbook] = useState(false)
   const [showCreateBusiness, setShowCreateBusiness] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const [unreadInvitesCount, setUnreadInvitesCount] = useState(0)
   const [manageCashbook, setManageCashbook] = useState<{ book: Cashbook; mode: 'edit' | 'delete' } | null>(null)
   const [viewAttachment, setViewAttachment] = useState<Transaction | null>(null)
@@ -1658,6 +1713,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         setShowCreateCashbook(false)
         setShowCreateBusiness(false)
         setShowNotifications(false)
+        setShowProfile(false)
         setManageCashbook(null)
         setViewAttachment(null)
       }
@@ -1910,14 +1966,14 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             <p>Tips to make the most of Spendwise.</p>
             <a href="mailto:support@spendwise.app">Visit help center →</a>
           </div>
-          <button className="user-row" onClick={onLogout}>
+          <div className="user-row" onClick={() => setShowProfile(true)} style={{ cursor: 'pointer' }} title="View profile & account details">
             <span className="user-avatar">{fullName.slice(0, 1).toUpperCase()}</span>
             <span>
               <strong>{fullName}</strong>
               <small>{user.email ?? user.Email ?? 'My account'}</small>
             </span>
-            <span className="logout"><LogOut size={16} strokeWidth={1.8} /></span>
-          </button>
+            <span className="logout" title="Sign out" onClick={e => { e.stopPropagation(); onLogout() }}><LogOut size={16} strokeWidth={1.8} /></span>
+          </div>
         </div>
       </aside>
 
@@ -1955,7 +2011,14 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             <Bell size={18} strokeWidth={1.8} />
             {unreadInvitesCount > 0 && <span className="topbar-badge">{unreadInvitesCount}</span>}
           </button>
-          <span className="top-user">{fullName.slice(0, 1).toUpperCase()}</span>
+          <span
+            className="top-user"
+            style={{ cursor: 'pointer' }}
+            title="View profile & account details"
+            onClick={() => setShowProfile(true)}
+          >
+            {fullName.slice(0, 1).toUpperCase()}
+          </span>
         </header>
 
         <div className="content">
@@ -2315,6 +2378,17 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             void reloadBusinesses()
             void fetchUnreadInvites()
           }}
+          onToast={showToast}
+        />
+      )}
+
+      {showProfile && (
+        <UserProfileDialog
+          user={user}
+          token={token}
+          workspaceCount={businesses.length}
+          onClose={() => setShowProfile(false)}
+          onLogout={onLogout}
           onToast={showToast}
         />
       )}
