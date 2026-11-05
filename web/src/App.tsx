@@ -23,6 +23,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
+  Menu,
   Paperclip,
   Pencil,
   Plus,
@@ -1738,7 +1739,8 @@ function TransactionsPage({
   onAddReceipt,
   onRefresh,
   onToast,
-  onViewAttachment
+  onViewAttachment,
+  initialSearch
 }: {
   transactions: Transaction[]
   token: string
@@ -1752,8 +1754,15 @@ function TransactionsPage({
   onRefresh: () => Promise<void>
   onToast: (message: string) => void
   onViewAttachment: (transaction: Transaction) => void
+  initialSearch?: string
 }) {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialSearch ?? '')
+
+  useEffect(() => {
+    if (initialSearch !== undefined) {
+      setQuery(initialSearch)
+    }
+  }, [initialSearch])
   const [type, setType] = useState<'all' | 'income' | 'expense'>('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc')
@@ -2268,6 +2277,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [manageCashbook, setManageCashbook] = useState<{ book: Cashbook; mode: 'edit' | 'delete' } | null>(null)
   const [viewAttachment, setViewAttachment] = useState<Transaction | null>(null)
   const [pendingUrlInviteToken, setPendingUrlInviteToken] = useState<string | null>(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [overviewPeriod, setOverviewPeriod] = useState<'month' | 'year' | 'all'>('month')
   const [error, setError] = useState('')
@@ -2287,6 +2297,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         searchInputRef.current?.focus()
       }
       if (e.key === 'Escape') {
+        setMobileNavOpen(false)
         setShowReceipt(false)
         setShowManualTransaction(false)
         setShowCreateCashbook(false)
@@ -2558,6 +2569,202 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
 
   return (
     <div className="shell">
+      {mobileNavOpen && (
+        <div className="mobile-drawer-overlay" onClick={() => setMobileNavOpen(false)}>
+          <div className="mobile-drawer" onClick={e => e.stopPropagation()}>
+            <div className="mobile-drawer-header">
+              <div className="brand">
+                <span className="brand-symbol"><Wallet size={18} strokeWidth={1.9} /></span> spendwise<span>.</span>
+              </div>
+              <button
+                className="mobile-drawer-close"
+                onClick={() => setMobileNavOpen(false)}
+                aria-label="Close menu"
+              >
+                <X size={19} strokeWidth={1.9} />
+              </button>
+            </div>
+
+            <div className="mobile-drawer-body">
+              <small className="side-label">WORKSPACE</small>
+              <div className="workspace-wrapper">
+                <label className="workspace">
+                  <span className="workspace-icon">
+                    {selectedBusiness?.fileUrl ? (
+                      <img
+                        src={selectedBusiness.fileUrl}
+                        alt={selectedBusiness.name}
+                        style={{ width: '100%', height: '100%', borderRadius: 6, objectFit: 'cover' }}
+                      />
+                    ) : (
+                      (selectedBusiness?.name ?? 'S').slice(0, 1).toUpperCase()
+                    )}
+                  </span>
+                  <select
+                    value={businessId}
+                    onChange={e => {
+                      setBusinessId(e.target.value)
+                      showOverview()
+                      setMobileNavOpen(false)
+                    }}
+                  >
+                    {businesses.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                  <span><ChevronDown size={14} strokeWidth={1.8} /></span>
+                </label>
+                <button
+                  className="add-workspace-btn"
+                  title="Create new workspace"
+                  aria-label="Create new workspace"
+                  onClick={() => {
+                    setMobileNavOpen(false)
+                    setShowCreateBusiness(true)
+                  }}
+                >
+                  <Plus size={16} strokeWidth={2} />
+                </button>
+              </div>
+
+              {book && (
+                <div style={{ marginBottom: 16 }}>
+                  <small className="side-label">ACTIVE CASHBOOK</small>
+                  <div className="topbar-book-switcher" style={{ width: '100%', maxWidth: '100%' }}>
+                    <BookOpen size={13} strokeWidth={2} />
+                    <select
+                      value={book.id}
+                      onChange={e => {
+                        const chosen = books.find(b => b.id === e.target.value)
+                        if (chosen) {
+                          setBook(chosen)
+                          showToast(`Switched to "${chosen.cashBookName ?? chosen.name ?? 'Cashbook'}"`)
+                        }
+                      }}
+                    >
+                      {books.map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.cashBookName ?? b.name ?? 'Cashbook'}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={11} strokeWidth={2} className="topbar-book-arrow" />
+                  </div>
+                </div>
+              )}
+
+              <small className="side-label">MENU</small>
+              <nav className="mobile-nav-list">
+                <button
+                  className={'nav ' + (!showAllTransactions && !showCashbooks && !showMembers && !showSettings && !showReports ? 'active' : '')}
+                  onClick={() => {
+                    showOverview()
+                    setMobileNavOpen(false)
+                  }}
+                >
+                  <span><LayoutDashboard size={17} strokeWidth={1.8} /></span> Overview
+                </button>
+                <button
+                  className={'nav ' + (showAllTransactions ? 'active' : '')}
+                  onClick={() => {
+                    setShowAllTransactions(true)
+                    setShowCashbooks(false)
+                    setShowReports(false)
+                    setShowMembers(false)
+                    setShowSettings(false)
+                    setMobileNavOpen(false)
+                  }}
+                >
+                  <span><ReceiptText size={17} strokeWidth={1.8} /></span> Transactions
+                  {transactions.length > 0 && <i>{transactions.length}</i>}
+                </button>
+                <button
+                  className={'nav ' + (showCashbooks ? 'active' : '')}
+                  onClick={() => {
+                    setShowCashbooks(true)
+                    setShowAllTransactions(false)
+                    setShowReports(false)
+                    setShowMembers(false)
+                    setShowSettings(false)
+                    setMobileNavOpen(false)
+                  }}
+                >
+                  <span><BookOpen size={17} strokeWidth={1.8} /></span> Cashbooks
+                  {books.length > 0 && <i>{books.length}</i>}
+                </button>
+                <button
+                  className={'nav ' + (showReports ? 'active' : '')}
+                  onClick={() => {
+                    setShowReports(true)
+                    setShowCashbooks(false)
+                    setShowAllTransactions(false)
+                    setShowMembers(false)
+                    setShowSettings(false)
+                    setMobileNavOpen(false)
+                  }}
+                >
+                  <span><ChartNoAxesCombined size={17} strokeWidth={1.8} /></span> Reports
+                </button>
+                <button
+                  className={'nav ' + (showMembers ? 'active' : '')}
+                  onClick={() => {
+                    setShowMembers(true)
+                    setShowCashbooks(false)
+                    setShowReports(false)
+                    setShowSettings(false)
+                    setShowAllTransactions(false)
+                    setMobileNavOpen(false)
+                  }}
+                >
+                  <span><UsersRound size={17} strokeWidth={1.8} /></span> Members
+                </button>
+                <button
+                  className={'nav ' + (showSettings ? 'active' : '')}
+                  onClick={() => {
+                    setShowSettings(true)
+                    setShowCashbooks(false)
+                    setShowReports(false)
+                    setShowMembers(false)
+                    setShowAllTransactions(false)
+                    setMobileNavOpen(false)
+                  }}
+                >
+                  <span><Settings size={17} strokeWidth={1.8} /></span> Settings
+                </button>
+              </nav>
+            </div>
+
+            <div className="mobile-drawer-footer">
+              <div
+                className="user-row"
+                onClick={() => {
+                  setMobileNavOpen(false)
+                  setShowProfile(true)
+                }}
+                style={{ cursor: 'pointer' }}
+                title="View profile & account details"
+              >
+                <span className="user-avatar">{fullName.slice(0, 1).toUpperCase()}</span>
+                <span>
+                  <strong>{fullName}</strong>
+                  <small>{user.email ?? user.Email ?? 'My account'}</small>
+                </span>
+                <span
+                  className="logout"
+                  title="Sign out"
+                  onClick={e => {
+                    e.stopPropagation()
+                    setMobileNavOpen(false)
+                    onLogout()
+                  }}
+                >
+                  <LogOut size={16} strokeWidth={1.8} />
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-symbol"><Wallet size={18} strokeWidth={1.9} /></span> spendwise<span>.</span>
@@ -2691,6 +2898,13 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
 
       <main className="main">
         <header className="topbar">
+          <button
+            className="mobile-menu-toggle"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open navigation menu"
+          >
+            <Menu size={19} strokeWidth={1.9} />
+          </button>
           <div className="crumb">
             Workspace <span>/</span>{' '}
             <button className="crumb-button" onClick={showOverview}>
@@ -2737,6 +2951,15 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               placeholder="Search transactions..."
               value={search}
               onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  setShowAllTransactions(true)
+                  setShowCashbooks(false)
+                  setShowReports(false)
+                  setShowMembers(false)
+                  setShowSettings(false)
+                }
+              }}
             />
             <kbd>⌘ K</kbd>
           </label>
@@ -2828,6 +3051,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               onRefresh={() => reloadTransactions()}
               onToast={showToast}
               onViewAttachment={txn => setViewAttachment(txn)}
+              initialSearch={search}
             />
           ) : (
             <>
