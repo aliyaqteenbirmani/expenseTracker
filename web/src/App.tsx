@@ -20,6 +20,7 @@ import {
   House,
   Image as ImageIcon,
   KeyRound,
+  Keyboard,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -54,6 +55,8 @@ import UserProfileDialog from './UserProfileDialog'
 import TransactionDetailDialog from './TransactionDetailDialog'
 import MonthlyBudgetCard from './MonthlyBudgetCard'
 import ReceiptsVaultPage from './ReceiptsVaultPage'
+import KeyboardShortcutsDialog from './KeyboardShortcutsDialog'
+import CategoryBreakdownCard from './CategoryBreakdownCard'
 import './App.css'
 
 const API = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'
@@ -2499,6 +2502,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [showCreateBusiness, setShowCreateBusiness] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [unreadInvitesCount, setUnreadInvitesCount] = useState(0)
   const [manageCashbook, setManageCashbook] = useState<{ book: Cashbook; mode: 'edit' | 'delete' } | null>(null)
   const [viewAttachment, setViewAttachment] = useState<Transaction | null>(null)
@@ -2520,11 +2524,30 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    let gotoPrefix = false
+    let gotoTimer: number | null = null
+
     function handleKeyDown(e: KeyboardEvent) {
+      const activeEl = document.activeElement
+      const isInputActive =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.tagName === 'SELECT' ||
+          (activeEl as HTMLElement).isContentEditable)
+
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         searchInputRef.current?.focus()
+        return
       }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault()
+        setShowShortcuts(prev => !prev)
+        return
+      }
+
       if (e.key === 'Escape') {
         setMobileNavOpen(false)
         setShowReceipt(false)
@@ -2533,15 +2556,100 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         setShowCreateBusiness(false)
         setShowNotifications(false)
         setShowProfile(false)
+        setShowShortcuts(false)
         setManageCashbook(null)
         setViewAttachment(null)
         setViewTransactionDetail(null)
         setEditingTransaction(null)
         setDeletingTransaction(null)
+        return
+      }
+
+      if (isInputActive) return
+
+      if (e.key === '?') {
+        e.preventDefault()
+        setShowShortcuts(prev => !prev)
+        return
+      }
+
+      if (e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        setShowManualTransaction(true)
+        return
+      }
+
+      if (e.key.toLowerCase() === 'r') {
+        e.preventDefault()
+        setShowReceipt(true)
+        return
+      }
+
+      if (e.key.toLowerCase() === 'g') {
+        gotoPrefix = true
+        if (gotoTimer) window.clearTimeout(gotoTimer)
+        gotoTimer = window.setTimeout(() => {
+          gotoPrefix = false
+        }, 1200)
+        return
+      }
+
+      if (gotoPrefix) {
+        gotoPrefix = false
+        if (gotoTimer) window.clearTimeout(gotoTimer)
+        const k = e.key.toLowerCase()
+        if (k === 'o') {
+          showOverview()
+        } else if (k === 't') {
+          setShowAllTransactions(true)
+          setShowCashbooks(false)
+          setShowReceiptsVault(false)
+          setShowReports(false)
+          setShowMembers(false)
+          setShowSettings(false)
+        } else if (k === 'c') {
+          setShowCashbooks(true)
+          setShowAllTransactions(false)
+          setShowReceiptsVault(false)
+          setShowReports(false)
+          setShowMembers(false)
+          setShowSettings(false)
+        } else if (k === 'v') {
+          setShowReceiptsVault(true)
+          setShowCashbooks(false)
+          setShowAllTransactions(false)
+          setShowReports(false)
+          setShowMembers(false)
+          setShowSettings(false)
+        } else if (k === 'r') {
+          setShowReports(true)
+          setShowCashbooks(false)
+          setShowReceiptsVault(false)
+          setShowAllTransactions(false)
+          setShowMembers(false)
+          setShowSettings(false)
+        } else if (k === 'm') {
+          setShowMembers(true)
+          setShowCashbooks(false)
+          setShowReceiptsVault(false)
+          setShowReports(false)
+          setShowSettings(false)
+          setShowAllTransactions(false)
+        } else if (k === 's') {
+          setShowSettings(true)
+          setShowCashbooks(false)
+          setShowReceiptsVault(false)
+          setShowReports(false)
+          setShowMembers(false)
+          setShowAllTransactions(false)
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      if (gotoTimer) window.clearTimeout(gotoTimer)
+    }
   }, [])
 
   function showToast(message: string) {
@@ -2808,6 +2916,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
     setShowAllTransactions(false)
     setShowCashbooks(false)
     setShowReceiptsVault(false)
+    setShowShortcuts(false)
   }
 
   return (
@@ -3160,6 +3269,15 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         </nav>
 
         <div className="sidebar-bottom">
+          <button
+            type="button"
+            className="sidebar-shortcuts-btn"
+            onClick={() => setShowShortcuts(true)}
+            title="Keyboard shortcuts (?)"
+          >
+            <span><Keyboard size={13} strokeWidth={2} /> Shortcuts</span>
+            <kbd className="sidebar-kbd">?</kbd>
+          </button>
           <div className="support-card">
             <span><CircleHelp size={16} strokeWidth={1.8} /></span>
             <strong>Need a hand?</strong>
@@ -3668,6 +3786,16 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   <button className="create-book" onClick={() => setShowCreateCashbook(true)}>
                     <Plus size={15} strokeWidth={1.8} /> Create a cashbook
                   </button>
+
+                  <CategoryBreakdownCard
+                    transactions={overviewTransactions}
+                    onSelectCategory={catLabel => {
+                      setSearch(catLabel)
+                      setShowAllTransactions(true)
+                    }}
+                    onViewAllTransactions={() => setShowAllTransactions(true)}
+                  />
+
                   <div className="insight-card">
                     <span><Sparkles size={16} strokeWidth={1.8} /></span>
                     <div>
@@ -3828,6 +3956,67 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           onDeleted={async () => {
             await reloadTransactions()
             showToast('Transaction deleted')
+          }}
+        />
+      )}
+
+      {showShortcuts && (
+        <KeyboardShortcutsDialog
+          onClose={() => setShowShortcuts(false)}
+          onNavigate={dest => {
+            if (dest === 'overview') showOverview()
+            else if (dest === 'transactions') {
+              setShowAllTransactions(true)
+              setShowCashbooks(false)
+              setShowReceiptsVault(false)
+              setShowReports(false)
+              setShowMembers(false)
+              setShowSettings(false)
+            } else if (dest === 'cashbooks') {
+              setShowCashbooks(true)
+              setShowAllTransactions(false)
+              setShowReceiptsVault(false)
+              setShowReports(false)
+              setShowMembers(false)
+              setShowSettings(false)
+            } else if (dest === 'receipts') {
+              setShowReceiptsVault(true)
+              setShowCashbooks(false)
+              setShowAllTransactions(false)
+              setShowReports(false)
+              setShowMembers(false)
+              setShowSettings(false)
+            } else if (dest === 'reports') {
+              setShowReports(true)
+              setShowCashbooks(false)
+              setShowReceiptsVault(false)
+              setShowAllTransactions(false)
+              setShowMembers(false)
+              setShowSettings(false)
+            } else if (dest === 'members') {
+              setShowMembers(true)
+              setShowCashbooks(false)
+              setShowReceiptsVault(false)
+              setShowReports(false)
+              setShowSettings(false)
+              setShowAllTransactions(false)
+            } else if (dest === 'settings') {
+              setShowSettings(true)
+              setShowCashbooks(false)
+              setShowReceiptsVault(false)
+              setShowReports(false)
+              setShowMembers(false)
+              setShowAllTransactions(false)
+            }
+          }}
+          onAction={act => {
+            if (act === 'focus-search') {
+              searchInputRef.current?.focus()
+            } else if (act === 'add-transaction') {
+              if (book) setShowManualTransaction(true)
+            } else if (act === 'add-receipt') {
+              if (book) setShowReceipt(true)
+            }
           }}
         />
       )}
