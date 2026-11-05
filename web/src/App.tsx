@@ -920,12 +920,36 @@ function BusinessSettings({ token, business, onBack, onUpdated, onDeleted, onToa
   )
 }
 
+const QUICK_AMOUNT_PRESETS = [500, 1000, 2000, 5000, 10000]
+const QUICK_REMARK_SUGGESTIONS = [
+  'Food & Dining',
+  'Fuel & Transport',
+  'Groceries',
+  'Office Supplies',
+  'Utilities Bill',
+  'Rent & Maintenance',
+  'Salary / Payment'
+]
+
 function ManualTransactionDialog({ token, book, onClose, onDone }: { token: string; book: Cashbook; onClose: () => void; onDone: () => Promise<void> }) {
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [amount, setAmount] = useState('')
+  const [remarks, setRemarks] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [filePreview, setFilePreview] = useState<string | null>(null)
   const today = new Date()
   const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+  useEffect(() => {
+    if (file && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file)
+      setFilePreview(url)
+      return () => URL.revokeObjectURL(url)
+    }
+    setFilePreview(null)
+  }, [file])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -934,13 +958,12 @@ function ManualTransactionDialog({ token, book, onClose, onDone }: { token: stri
     const data = new FormData(event.currentTarget)
     const form = new FormData()
     form.append('CashBookId', book.id)
-    form.append('Amount', String(data.get('amount')))
+    form.append('Amount', String(data.get('amount') || amount))
     form.append('TransactionType', String(data.get('type')))
     const date = String(data.get('date') ?? '')
     if (date) form.append('TransactionDate', new Date(`${date}T12:00:00`).toISOString())
-    form.append('Remarks', String(data.get('remarks') ?? ''))
-    const file = data.get('file')
-    if (file instanceof File && file.size > 0) form.append('File', file)
+    form.append('Remarks', String(data.get('remarks') || remarks || ''))
+    if (file && file.size > 0) form.append('File', file)
     let wasSaved = saved
     try {
       if (!saved) {
@@ -979,10 +1002,108 @@ function ManualTransactionDialog({ token, book, onClose, onDone }: { token: stri
                   <option value="CashIn">Income · money in</option>
                 </select>
               </label>
-              <label>Amount<input name="amount" type="number" inputMode="decimal" min="0.01" step="0.01" required placeholder="0.00" autoFocus /></label>
+
+              <div>
+                <label>
+                  Amount (Rs.)
+                  <input
+                    name="amount"
+                    type="number"
+                    inputMode="decimal"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    placeholder="0.00"
+                    autoFocus
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                  />
+                </label>
+                <div className="quick-amount-chips">
+                  {QUICK_AMOUNT_PRESETS.map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      className="quick-amount-chip"
+                      onClick={() => {
+                        const cur = Number(amount) || 0
+                        setAmount(String(cur + val))
+                      }}
+                    >
+                      +{val.toLocaleString('en-PK')}
+                    </button>
+                  ))}
+                  {amount && (
+                    <button
+                      type="button"
+                      className="quick-amount-chip clear"
+                      onClick={() => setAmount('')}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <label>Date<input name="date" type="date" defaultValue={localToday} /></label>
-              <label>Notes <span className="muted">(optional)</span><textarea name="remarks" maxLength={500} rows={3} placeholder="What was this transaction for?" /></label>
-              <label>Receipt or Invoice attachment <span className="muted">(optional)</span><input name="file" type="file" accept="image/*,application/pdf" /></label>
+
+              <div>
+                <label>
+                  Notes <span className="muted">(optional)</span>
+                  <textarea
+                    name="remarks"
+                    maxLength={500}
+                    rows={2}
+                    placeholder="What was this transaction for?"
+                    value={remarks}
+                    onChange={e => setRemarks(e.target.value)}
+                  />
+                </label>
+                <div className="quick-category-chips">
+                  {QUICK_REMARK_SUGGESTIONS.map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`quick-category-chip ${remarks === s ? 'selected' : ''}`}
+                      onClick={() => setRemarks(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label>Receipt or Invoice attachment <span className="muted">(optional)</span></label>
+                {file ? (
+                  <div className="selected-attachment-preview">
+                    {filePreview ? (
+                      <img src={filePreview} alt="Receipt preview" className="preview-thumb" />
+                    ) : (
+                      <Paperclip size={18} style={{ color: '#276944' }} />
+                    )}
+                    <div className="file-info">
+                      <strong>{file.name}</strong>
+                      <small>{(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                    </div>
+                    <button
+                      type="button"
+                      className="remove-file-btn"
+                      title="Remove attachment"
+                      onClick={() => setFile(null)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    name="file"
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={e => setFile(e.target.files?.[0] ?? null)}
+                  />
+                )}
+              </div>
             </>
           )}
           {error && <div className="error-banner">{error}</div>}
@@ -1614,6 +1735,7 @@ function TransactionsPage({
   onSelectBook,
   onBack,
   onAdd,
+  onAddReceipt,
   onRefresh,
   onToast,
   onViewAttachment
@@ -1626,6 +1748,7 @@ function TransactionsPage({
   onSelectBook?: (book: Cashbook) => void
   onBack: () => void
   onAdd: () => void
+  onAddReceipt?: () => void
   onRefresh: () => Promise<void>
   onToast: (message: string) => void
   onViewAttachment: (transaction: Transaction) => void
@@ -1785,9 +1908,16 @@ function TransactionsPage({
             <span className="muted" style={{ fontSize: 11 }}>· {filteredTransactions.length} of {transactions.length} transactions</span>
           </div>
         </div>
-        <button className="button primary" onClick={onAdd}>
-          <Plus size={15} strokeWidth={1.8} /> Add transaction
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {onAddReceipt && (
+            <button className="button secondary-action" onClick={onAddReceipt}>
+              <Sparkles size={15} strokeWidth={1.8} /> Scan receipt
+            </button>
+          )}
+          <button className="button primary" onClick={onAdd}>
+            <Plus size={15} strokeWidth={1.8} /> Add transaction
+          </button>
+        </div>
       </div>
 
       <div className="transaction-summary">
@@ -1914,9 +2044,21 @@ function TransactionsPage({
       <article className="panel history-panel">
         <div className="history-table-head">
           <span>TRANSACTION</span>
-          <span>DATE</span>
+          <span
+            className="sortable-head"
+            title="Click to sort by date"
+            onClick={() => setSortBy(s => s === 'date-desc' ? 'date-asc' : 'date-desc')}
+          >
+            DATE {sortBy === 'date-desc' ? '↓' : sortBy === 'date-asc' ? '↑' : ''}
+          </span>
           <span>TYPE</span>
-          <span>AMOUNT</span>
+          <span
+            className="sortable-head"
+            title="Click to sort by amount"
+            onClick={() => setSortBy(s => s === 'amount-desc' ? 'amount-asc' : 'amount-desc')}
+          >
+            AMOUNT {sortBy === 'amount-desc' ? '↓' : sortBy === 'amount-asc' ? '↑' : ''}
+          </span>
           <span>ACTIONS</span>
         </div>
         {groups.length ? groups.map(group => (
@@ -2678,10 +2820,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               selectedBookId={book?.id}
               onSelectBook={b => setBook(b)}
               onBack={() => setShowAllTransactions(false)}
-              onAdd={() => {
-                setShowAllTransactions(false)
-                setShowManualTransaction(true)
-              }}
+              onAdd={() => setShowManualTransaction(true)}
+              onAddReceipt={() => setShowReceipt(true)}
               onRefresh={() => reloadTransactions()}
               onToast={showToast}
               onViewAttachment={txn => setViewAttachment(txn)}

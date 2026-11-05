@@ -1330,3 +1330,93 @@ input,select,textarea{transition:border-color .16s ease,box-shadow .16s ease}.lo
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* Quick Entry Chips in Transaction Dialog */
+.quick-amount-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0 10px;
+}
+.quick-amount-chip {
+  padding: 3px 8px;
+  border: 1px solid #dce6de;
+  border-radius: 6px;
+  background: #f4f8f4;
+  color: #276944;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.quick-amount-chip:hover {
+  background: #e6f3e8;
+  border-color: #a4d2b2;
+}
+.quick-amount-chip.clear {
+  color: #8c9c91;
+  background: transparent;
+  border-color: #e2e8e3;
+}
+.quick-amount-chip.clear:hover {
+  color: #ba4c40;
+  border-color: #ecc2bd;
+}
+
+/* Attachment Preview in Manual Form */
+.selected-attachment-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f7faf7;
+  border: 1px solid #dbe6dd;
+  border-radius: 8px;
+  margin-top: 6px;
+}
+.preview-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #cfe0d3;
+}
+.file-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.file-info strong {
+  font-size: 11px;
+  color: #1f3f31;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-info small {
+  font-size: 9.5px;
+  color: #718679;
+}
+.remove-file-btn {
+  border: 0;
+  background: transparent;
+  color: #8c9e93;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+}
+.remove-file-btn:hover {
+  color: #ba473b;
+}
+
+/* Sortable column indicators */
+.sortable-head {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+.sortable-head:hover {
+  color: #1f653e;
+}
