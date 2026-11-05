@@ -51,6 +51,7 @@ import CreateBusinessDialog from './CreateBusinessDialog'
 import TransactionAttachmentDialog from './TransactionAttachmentDialog'
 import UserProfileDialog from './UserProfileDialog'
 import TransactionDetailDialog from './TransactionDetailDialog'
+import MonthlyBudgetCard from './MonthlyBudgetCard'
 import './App.css'
 
 const API = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'
@@ -3401,6 +3402,15 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   <div className="sparkline purple-line" />
                 </article>
               </section>
+
+              {book && (
+                <MonthlyBudgetCard
+                  cashbookId={book.id}
+                  cashbookName={book.cashBookName ?? book.name ?? 'Cashbook'}
+                  transactions={transactions}
+                  onToast={showToast}
+                />
+              )}
 
               <section className="bottom-grid">
                 <article className="panel transactions" id="transactions">
