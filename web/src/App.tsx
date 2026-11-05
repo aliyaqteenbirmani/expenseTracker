@@ -50,6 +50,7 @@ import NotificationsPopover from './NotificationsPopover'
 import CreateBusinessDialog from './CreateBusinessDialog'
 import TransactionAttachmentDialog from './TransactionAttachmentDialog'
 import UserProfileDialog from './UserProfileDialog'
+import TransactionDetailDialog from './TransactionDetailDialog'
 import './App.css'
 
 const API = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'
@@ -69,7 +70,7 @@ type User = {
 }
 type Business = { id: string; name: string; category?: string; description?: string; fileUrl?: string; fileName?: string }
 export type Cashbook = { id: string; cashBookName?: string; name?: string; businessId: string }
-type Transaction = {
+export type Transaction = {
   id: string
   amount: number
   transactionType: string
@@ -78,9 +79,9 @@ type Transaction = {
   fileName?: string
   filePath?: string
 }
-type TransactionCategory = { label: string; Icon: LucideIcon }
+export type TransactionCategory = { label: string; Icon: LucideIcon }
 
-function getTransactionCategory(transaction: Transaction): TransactionCategory {
+export function getTransactionCategory(transaction: Transaction): TransactionCategory {
   const text = (transaction.remarks ?? '').toLowerCase()
   if (transaction.transactionType?.toLowerCase() === 'cashin') return { label: 'Income', Icon: BriefcaseBusiness }
   if (/rent|house|home|electric|utility|water bill/.test(text)) return { label: 'Housing', Icon: House }
@@ -1740,6 +1741,7 @@ function TransactionsPage({
   onRefresh,
   onToast,
   onViewAttachment,
+  onOpenDetail,
   initialSearch
 }: {
   transactions: Transaction[]
@@ -1754,6 +1756,7 @@ function TransactionsPage({
   onRefresh: () => Promise<void>
   onToast: (message: string) => void
   onViewAttachment: (transaction: Transaction) => void
+  onOpenDetail?: (transaction: Transaction) => void
   initialSearch?: string
 }) {
   const [query, setQuery] = useState(initialSearch ?? '')
@@ -2081,7 +2084,19 @@ function TransactionsPage({
               const hasAttachment = Boolean(transaction.filePath || transaction.fileName)
 
               return (
-                <div className="history-row" key={transaction.id}>
+                <div
+                  className="history-row clickable-row"
+                  key={transaction.id}
+                  onClick={() => onOpenDetail?.(transaction)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onOpenDetail?.(transaction)
+                    }
+                  }}
+                >
                   <div className="table-transaction">
                     <span className={'txn-icon ' + (isIncome ? 'txn-income' : 'txn-expense')}>
                       <CategoryIcon size={16} strokeWidth={1.8} />
@@ -2094,7 +2109,10 @@ function TransactionsPage({
                           type="button"
                           className="txn-attachment-btn"
                           title="View receipt attachment"
-                          onClick={() => onViewAttachment(transaction)}
+                          onClick={e => {
+                            e.stopPropagation()
+                            onViewAttachment(transaction)
+                          }}
                         >
                           <Paperclip size={11} strokeWidth={2} /> Receipt
                         </button>
@@ -2104,7 +2122,9 @@ function TransactionsPage({
                   <span>{date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString() : '—'}</span>
                   <span><em className={'pill ' + (isIncome ? 'income-pill' : 'expense-pill')}>{isIncome ? 'Income' : 'Expense'}</em></span>
                   <strong className={isIncome ? 'income-amount' : ''}>{isIncome ? '+' : '−'} Rs. {Number(transaction.amount || 0).toLocaleString('en-PK')}</strong>
-                  <TransactionRowActions token={token} transaction={transaction} onRefresh={onRefresh} onToast={onToast} />
+                  <div onClick={e => e.stopPropagation()}>
+                    <TransactionRowActions token={token} transaction={transaction} onRefresh={onRefresh} onToast={onToast} />
+                  </div>
                 </div>
               )
             })}
@@ -2276,6 +2296,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [unreadInvitesCount, setUnreadInvitesCount] = useState(0)
   const [manageCashbook, setManageCashbook] = useState<{ book: Cashbook; mode: 'edit' | 'delete' } | null>(null)
   const [viewAttachment, setViewAttachment] = useState<Transaction | null>(null)
+  const [viewTransactionDetail, setViewTransactionDetail] = useState<Transaction | null>(null)
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null)
   const [pendingUrlInviteToken, setPendingUrlInviteToken] = useState<string | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -2306,6 +2329,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         setShowProfile(false)
         setManageCashbook(null)
         setViewAttachment(null)
+        setViewTransactionDetail(null)
+        setEditingTransaction(null)
+        setDeletingTransaction(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -3051,6 +3077,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               onRefresh={() => reloadTransactions()}
               onToast={showToast}
               onViewAttachment={txn => setViewAttachment(txn)}
+              onOpenDetail={txn => setViewTransactionDetail(txn)}
               initialSearch={search}
             />
           ) : (
@@ -3198,7 +3225,19 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                     visible.slice(0, 7).map((t, i) => {
                       const hasAttachment = Boolean(t.filePath || t.fileName)
                       return (
-                        <div className="table-row" key={t.id ?? `${t.remarks}-${i}`}>
+                        <div
+                          className="table-row clickable-row"
+                          key={t.id ?? `${t.remarks}-${i}`}
+                          onClick={() => setViewTransactionDetail(t)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              setViewTransactionDetail(t)
+                            }
+                          }}
+                        >
                           <div className="table-transaction">
                             <span className={`txn-icon txn-${i % 4}`}>
                               {t.transactionType?.toLowerCase() === 'cashin' ? (
@@ -3215,7 +3254,10 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                                   type="button"
                                   className="txn-attachment-btn"
                                   title="View receipt attachment"
-                                  onClick={() => setViewAttachment(t)}
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    setViewAttachment(t)
+                                  }}
                                 >
                                   <Paperclip size={11} strokeWidth={2} /> Receipt
                                 </button>
@@ -3231,7 +3273,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                           <strong className={t.transactionType === 'CashIn' ? 'income-amount' : ''}>
                             {t.transactionType === 'CashIn' ? '+' : '−'} Rs. {Number(t.amount).toLocaleString('en-PK')}
                           </strong>
-                          <TransactionRowActions token={token} transaction={t} onRefresh={() => reloadTransactions()} onToast={showToast} />
+                          <div onClick={e => e.stopPropagation()}>
+                            <TransactionRowActions token={token} transaction={t} onRefresh={() => reloadTransactions()} onToast={showToast} />
+                          </div>
                         </div>
                       )
                     })
@@ -3429,6 +3473,48 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           onClose={() => setShowProfile(false)}
           onLogout={onLogout}
           onToast={showToast}
+        />
+      )}
+
+      {viewTransactionDetail && (
+        <TransactionDetailDialog
+          transaction={viewTransactionDetail}
+          cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
+          businessName={selectedBusiness?.name ?? 'Workspace'}
+          onClose={() => setViewTransactionDetail(null)}
+          onEdit={txn => {
+            setViewTransactionDetail(null)
+            setEditingTransaction(txn)
+          }}
+          onDelete={txn => {
+            setViewTransactionDetail(null)
+            setDeletingTransaction(txn)
+          }}
+          onViewAttachment={txn => setViewAttachment(txn)}
+        />
+      )}
+
+      {editingTransaction && (
+        <TransactionEditDialog
+          token={token}
+          transaction={editingTransaction}
+          onClose={() => setEditingTransaction(null)}
+          onSaved={async () => {
+            await reloadTransactions()
+            showToast('Transaction updated')
+          }}
+        />
+      )}
+
+      {deletingTransaction && (
+        <TransactionDeleteDialog
+          token={token}
+          transaction={deletingTransaction}
+          onClose={() => setDeletingTransaction(null)}
+          onDeleted={async () => {
+            await reloadTransactions()
+            showToast('Transaction deleted')
+          }}
         />
       )}
 
