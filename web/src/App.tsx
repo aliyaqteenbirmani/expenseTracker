@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ChartNoAxesCombined,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
   Fuel,
   HeartPulse,
   House,
+  Image as ImageIcon,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -25,6 +27,7 @@ import {
   Pencil,
   Plus,
   ReceiptText,
+  RefreshCw,
   Search,
   Settings,
   ShoppingCart,
@@ -991,12 +994,40 @@ function ManualTransactionDialog({ token, book, onClose, onDone }: { token: stri
   )
 }
 
-function ReceiptDialog({ token, book, onClose, onDone }: { token: string; book: Cashbook; onClose: () => void; onDone: () => void }) {
+const QUICK_RECEIPT_CATEGORIES = [
+  'Food & Dining',
+  'Groceries',
+  'Fuel & Transport',
+  'Office Supplies',
+  'Utilities',
+  'Software & Services',
+  'General Expense'
+]
+
+type ReceiptScanStep = 'idle' | 'uploading' | 'analyzing' | 'suggesting' | 'review'
+
+function ReceiptDialog({
+  token,
+  book,
+  onClose,
+  onDone,
+  onToast
+}: {
+  token: string
+  book: Cashbook
+  onClose: () => void
+  onDone: () => void
+  onToast?: (msg: string) => void
+}) {
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [draft, setDraft] = useState<ReceiptDraft | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [step, setStep] = useState<ReceiptScanStep>('idle')
+  const [stepMessage, setStepMessage] = useState('')
   const [error, setError] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [copiedText, setCopiedText] = useState(false)
 
   useEffect(() => {
     if (file && file.type.startsWith('image/')) {
@@ -1007,34 +1038,84 @@ function ReceiptDialog({ token, book, onClose, onDone }: { token: string; book: 
     setPreviewUrl(null)
   }, [file])
 
-  async function upload() {
-    if (!file) return
-    const form = new FormData()
-    form.append('CashBookId', book.id)
-    form.append('File', file)
-    setBusy(true)
+  useEffect(() => {
+    if (draft?.suggestedCategory) {
+      setSelectedCategory(draft.suggestedCategory)
+    }
+  }, [draft?.suggestedCategory])
+
+  async function runScanPipeline(targetFile: File) {
     setError('')
+    setFile(targetFile)
+
+    // 1. Upload draft
+    setStep('uploading')
+    setStepMessage('Uploading receipt image...')
+    let uploadedDraft: ReceiptDraft
     try {
-      setDraft(await api<ReceiptDraft>('/api/Transaction/receipts/drafts', token, { method: 'POST', body: form }))
+      const form = new FormData()
+      form.append('CashBookId', book.id)
+      form.append('File', targetFile)
+      uploadedDraft = await api<ReceiptDraft>('/api/Transaction/receipts/drafts', token, {
+        method: 'POST',
+        body: form
+      })
+      setDraft(uploadedDraft)
     } catch (e) {
+      setStep('idle')
       setError(e instanceof Error ? e.message : 'Upload failed.')
-    } finally {
-      setBusy(false)
+      return
+    }
+
+    // 2. OCR text extraction
+    setStep('analyzing')
+    setStepMessage('Extracting text with OCR engine...')
+    try {
+      await api(`/api/Transaction/receipts/drafts/${uploadedDraft.draftId}/analyze`, token, { method: 'POST' })
+    } catch (e) {
+      setStep('idle')
+      setError(
+        e instanceof Error
+          ? `${e.message} (Tip: Ensure receipt is well-lit, upright, and legible.)`
+          : 'Receipt OCR analysis failed.'
+      )
+      return
+    }
+
+    // 3. Suggestion parsing
+    setStep('suggesting')
+    setStepMessage('Detecting merchant, amount & date...')
+    try {
+      await api(`/api/Transaction/receipts/drafts/${uploadedDraft.draftId}/suggest`, token, { method: 'POST' })
+      const latest = await api<ReceiptDraft>(`/api/Transaction/receipts/drafts/${uploadedDraft.draftId}`, token)
+      setDraft(latest)
+      setStep('review')
+    } catch (e) {
+      try {
+        const latest = await api<ReceiptDraft>(`/api/Transaction/receipts/drafts/${uploadedDraft.draftId}`, token)
+        setDraft(latest)
+        setStep('review')
+        setError('Auto-suggestion was partial. Please review and complete remaining fields.')
+      } catch {
+        setStep('idle')
+        setError(e instanceof Error ? e.message : 'Could not generate receipt suggestions.')
+      }
     }
   }
 
-  async function analyze() {
-    if (!draft) return
-    setBusy(true)
-    setError('')
-    try {
-      await api(`/api/Transaction/receipts/drafts/${draft.draftId}/analyze`, token, { method: 'POST' })
-      await api(`/api/Transaction/receipts/drafts/${draft.draftId}/suggest`, token, { method: 'POST' })
-      setDraft(await api<ReceiptDraft>(`/api/Transaction/receipts/drafts/${draft.draftId}`, token))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Receipt analysis failed.')
-    } finally {
-      setBusy(false)
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (f) {
+      runScanPipeline(f)
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+    const f = e.dataTransfer.files?.[0]
+    if (f) {
+      runScanPipeline(f)
     }
   }
 
@@ -1042,7 +1123,8 @@ function ReceiptDialog({ token, book, onClose, onDone }: { token: string; book: 
     event.preventDefault()
     if (!draft) return
     const data = new FormData(event.currentTarget)
-    setBusy(true)
+    setStep('suggesting')
+    setStepMessage('Saving transaction...')
     setError('')
     try {
       await api(`/api/Transaction/receipts/drafts/${draft.draftId}/confirm`, token, {
@@ -1053,107 +1135,310 @@ function ReceiptDialog({ token, book, onClose, onDone }: { token: string; book: 
           transactionDate: new Date(String(data.get('date'))).toISOString(),
           merchant: data.get('merchant'),
           remarks: data.get('notes'),
-          category: data.get('category')
+          category: selectedCategory || data.get('category')
         })
       })
+      onToast?.('Transaction created from receipt!')
       onDone()
     } catch (e) {
+      setStep('review')
       setError(e instanceof Error ? e.message : 'Could not create transaction.')
-    } finally {
-      setBusy(false)
     }
   }
 
+  function copyOcrText() {
+    if (draft?.recognizedText) {
+      navigator.clipboard.writeText(draft.recognizedText)
+      setCopiedText(true)
+      setTimeout(() => setCopiedText(false), 2000)
+    }
+  }
+
+  const confidence = Math.round((draft?.parsingConfidence ?? 0) * 100)
+  const isBusy = step === 'uploading' || step === 'analyzing' || (step === 'suggesting' && !draft?.status)
+
+  const progressPercent =
+    step === 'uploading' ? 33 : step === 'analyzing' ? 66 : step === 'suggesting' ? 92 : step === 'review' ? 100 : 0
+
   return (
     <div className="overlay" onMouseDown={e => e.target === e.currentTarget && onClose()}>
-      <section className="dialog">
+      <section className="dialog receipt-dialog">
         <header>
           <div>
-            <div className="eyebrow">RECEIPT ASSIST</div>
+            <div className="eyebrow">SMART RECEIPT OCR</div>
             <h2>Add from a receipt</h2>
           </div>
           <button className="close" onClick={onClose}><X size={16} strokeWidth={1.8} /></button>
         </header>
+
         <div className="dialog-content">
-          {!draft && (
+          {step === 'idle' && !draft && (
             <>
-              <p className="muted">Upload a JPG, PNG, or PDF. Review the extracted details before saving.</p>
-              <label className="dropzone">
+              <p className="muted">
+                Drop your receipt image or document below. We’ll automatically extract the merchant, date, amount, and category for review.
+              </p>
+              <label
+                className={`dropzone ${isDragging ? 'receipt-dropzone-drag' : ''}`}
+                onDragOver={e => {
+                  e.preventDefault()
+                  setIsDragging(true)
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+              >
                 {previewUrl ? (
-                  <div style={{ maxHeight: 110, overflow: 'hidden', borderRadius: 8, margin: '4px auto 8px' }}>
-                    <img src={previewUrl} alt="Selected receipt" style={{ maxHeight: 110, maxWidth: '100%', objectFit: 'contain' }} />
+                  <div style={{ maxHeight: 120, overflow: 'hidden', borderRadius: 8, margin: '4px auto 8px' }}>
+                    <img src={previewUrl} alt="Selected receipt" style={{ maxHeight: 120, maxWidth: '100%', objectFit: 'contain' }} />
                   </div>
                 ) : (
-                  <span className="upload-symbol"><ArrowUpRight size={20} strokeWidth={1.8} /></span>
+                  <span className="upload-symbol"><Upload size={20} strokeWidth={1.8} /></span>
                 )}
-                <strong>{file?.name ?? 'Choose a receipt file'}</strong>
+                <strong>{file?.name ?? 'Choose or drag & drop a receipt'}</strong>
                 <small>{file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'JPG, PNG, or PDF · up to 10 MB'}</small>
-                <input type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf"
+                  onChange={handleFileSelect}
+                />
               </label>
-              <button className="button primary full" disabled={!file || busy} onClick={upload}>
-                {busy ? 'Uploading…' : 'Upload receipt'} <span>→</span>
-              </button>
+
+              {file && (
+                <button
+                  className="button primary full"
+                  disabled={isBusy}
+                  onClick={() => runScanPipeline(file)}
+                >
+                  <Sparkles size={16} strokeWidth={1.8} /> Scan & Extract with OCR <span>→</span>
+                </button>
+              )}
             </>
           )}
 
-          {draft && draft.status !== 'ReadyForReview' && (
-            <div className="processing">
-              <div className="processing-icon">▤</div>
-              <h3>Receipt uploaded</h3>
-              <p className="muted">It won’t be added as a transaction until you review and confirm it.</p>
-              <button className="button primary full" disabled={busy} onClick={analyze}>
-                {busy ? 'Reading receipt…' : 'Analyze receipt'} <span>→</span>
-              </button>
+          {isBusy && (
+            <div className="receipt-pipeline-steps">
+              <div style={{ textAlign: 'center', marginBottom: 8 }}>
+                <div className="processing-icon">
+                  <RefreshCw size={24} className="spin" style={{ animation: 'spin 1.2s linear infinite' }} />
+                </div>
+                <h3 style={{ margin: '14px 0 6px', fontSize: 17, color: '#1f4837' }}>{stepMessage}</h3>
+                <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+                  Analyzing receipt geometry and recognizing printed values…
+                </p>
+              </div>
+
+              <div className="receipt-progress-bar-bg">
+                <div className="receipt-progress-bar-fill" style={{ width: `${progressPercent}%` }} />
+              </div>
+
+              <div className="receipt-step-indicators">
+                {(() => {
+                  const stepIndex = step === 'uploading' ? 1 : step === 'analyzing' ? 2 : step === 'suggesting' ? 3 : 0
+                  return (
+                    <>
+                      <span className={`receipt-step-item ${stepIndex === 1 ? 'active' : stepIndex > 1 ? 'completed' : ''}`}>
+                        {stepIndex > 1 ? <CheckCircle2 size={13} /> : '1.'} Upload
+                      </span>
+                      <span className={`receipt-step-item ${stepIndex === 2 ? 'active' : stepIndex > 2 ? 'completed' : ''}`}>
+                        {stepIndex > 2 ? <CheckCircle2 size={13} /> : '2.'} OCR Scan
+                      </span>
+                      <span className={`receipt-step-item ${stepIndex === 3 ? 'active' : stepIndex > 3 ? 'completed' : ''}`}>
+                        {stepIndex > 3 ? <CheckCircle2 size={13} /> : '3.'} Suggest details
+                      </span>
+                    </>
+                  )
+                })()}
+              </div>
             </div>
           )}
 
-          {draft?.status === 'ReadyForReview' && (
+          {step === 'review' && draft && (
             <form className="review-form" onSubmit={confirm}>
               <div className="review-alert">
-                <span>✦</span>
+                <Sparkles size={18} strokeWidth={2} style={{ color: '#277e4e' }} />
+                <div style={{ flex: 1 }}>
+                  <strong>Draft extracted & ready for review</strong>
+                  <small>Verify the detected amounts and fields against the receipt below.</small>
+                </div>
+                <span className={`confidence-pill ${confidence >= 70 ? 'high' : confidence >= 40 ? 'medium' : 'low'}`}>
+                  {confidence}% confidence
+                </span>
+              </div>
+
+              <div className="receipt-review-split">
+                {/* Left: Receipt Preview */}
+                <div className="receipt-preview-card">
+                  <div className="receipt-preview-img-container">
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="Receipt" className="receipt-preview-img" />
+                    ) : (
+                      <div style={{ padding: 24, color: '#7a8e82' }}>
+                        <ImageIcon size={32} strokeWidth={1.5} />
+                        <div style={{ fontSize: 11, marginTop: 6 }}>Receipt document attached</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="receipt-preview-meta">
+                    <strong>{file?.name ?? 'Receipt File'}</strong>
+                    {file?.size && <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>}
+                  </div>
+                  <button
+                    type="button"
+                    className="button secondary-action"
+                    style={{ minHeight: 32, fontSize: 11, width: '100%' }}
+                    onClick={() => {
+                      setDraft(null)
+                      setStep('idle')
+                      setFile(null)
+                    }}
+                  >
+                    Scan another receipt
+                  </button>
+                </div>
+
+                {/* Right: Extracted Fields */}
                 <div>
-                  <strong>Draft ready for review</strong>
-                  <small>Check each field before creating the transaction.</small>
+                  <div className="fields">
+                    <label>
+                      Merchant
+                      <input
+                        name="merchant"
+                        defaultValue={draft.suggestedMerchant ?? ''}
+                        placeholder="e.g. Metro Mart, Shell, Office Depot"
+                      />
+                    </label>
+                    <label>
+                      Amount (Rs.)
+                      <input
+                        name="amount"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        required
+                        defaultValue={draft.suggestedAmount ?? ''}
+                        placeholder="0.00"
+                      />
+                    </label>
+                    <label>
+                      Date
+                      <input
+                        name="date"
+                        type="date"
+                        required
+                        defaultValue={draft.suggestedTransactionDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)}
+                      />
+                    </label>
+                    <label>
+                      Type
+                      <select name="type" defaultValue={draft.suggestedTransactionType ?? 'CashOut'}>
+                        <option value="CashOut">Cash out (Expense)</option>
+                        <option value="CashIn">Cash in (Income / Refund)</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div style={{ marginTop: 12 }}>
+                    <label style={{ display: 'grid', gap: 6, color: '#53675b', fontSize: 9, fontWeight: 700 }}>
+                      Category
+                      <input
+                        name="category"
+                        value={selectedCategory}
+                        onChange={e => setSelectedCategory(e.target.value)}
+                        placeholder="e.g. Food & Dining, Office Supplies, Fuel"
+                        style={{ height: 38, fontSize: 10, padding: '0 10px' }}
+                      />
+                    </label>
+                    <div className="quick-category-chips">
+                      {QUICK_RECEIPT_CATEGORIES.map(cat => (
+                        <button
+                          key={cat}
+                          type="button"
+                          className={`quick-category-chip ${selectedCategory === cat ? 'selected' : ''}`}
+                          onClick={() => setSelectedCategory(cat)}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 12 }}>
+                    <label style={{ display: 'grid', gap: 6, color: '#53675b', fontSize: 9, fontWeight: 700 }}>
+                      Notes / Remarks
+                      <input
+                        name="notes"
+                        defaultValue={draft.suggestedMerchant ? `Receipt from ${draft.suggestedMerchant}` : ''}
+                        placeholder="Optional remarks or memo"
+                        style={{ height: 38, fontSize: 10, padding: '0 10px' }}
+                      />
+                    </label>
+                  </div>
+
+                  {draft.recognizedText && (
+                    <details style={{ marginTop: 14 }}>
+                      <summary style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>Recognized receipt text</span>
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.preventDefault()
+                            copyOcrText()
+                          }}
+                          style={{
+                            border: 0,
+                            background: 'transparent',
+                            color: copiedText ? '#28734b' : '#627a6c',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {copiedText ? '✓ Copied' : 'Copy raw text'}
+                        </button>
+                      </summary>
+                      <pre>{draft.recognizedText}</pre>
+                    </details>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                    <button
+                      type="button"
+                      className="button secondary-action"
+                      style={{ flex: 1 }}
+                      onClick={onClose}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="button primary"
+                      style={{ flex: 2 }}
+                      disabled={isBusy}
+                    >
+                      {isBusy ? 'Saving transaction…' : 'Confirm & Add Transaction'} <span>→</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-              {previewUrl && (
-                <div style={{ textAlign: 'center', marginBottom: 12 }}>
-                  <img
-                    src={previewUrl}
-                    alt="Receipt preview"
-                    style={{ maxHeight: 130, maxWidth: '100%', borderRadius: 8, border: '1px solid #dce8dd', objectFit: 'contain' }}
-                  />
-                </div>
-              )}
-              <div className="confidence">
-                <span>Extraction confidence</span>
-                <b>{Math.round((draft.parsingConfidence ?? 0) * 100)}%</b>
-              </div>
-              <div className="fields">
-                <label>Merchant<input name="merchant" defaultValue={draft.suggestedMerchant ?? ''} placeholder="Merchant name" /></label>
-                <label>Amount<input name="amount" type="number" min="0.01" step="0.01" required defaultValue={draft.suggestedAmount ?? ''} /></label>
-                <label>Date<input name="date" type="date" required defaultValue={draft.suggestedTransactionDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)} /></label>
-                <label>
-                  Type
-                  <select name="type" defaultValue={draft.suggestedTransactionType ?? 'CashOut'}>
-                    <option value="CashOut">Cash out</option>
-                    <option value="CashIn">Cash in</option>
-                  </select>
-                </label>
-                <label>Category<input name="category" defaultValue={draft.suggestedCategory ?? ''} placeholder="Category suggestion" /></label>
-                <label>Notes<input name="notes" placeholder="Optional note" /></label>
-              </div>
-              <details>
-                <summary>Recognized receipt text</summary>
-                <pre>{draft.recognizedText}</pre>
-              </details>
-              <button className="button primary full" disabled={busy}>
-                {busy ? 'Saving transaction…' : 'Confirm and add transaction'} <span>→</span>
-              </button>
             </form>
           )}
 
-          {error && <div className="error-banner">{error}</div>}
+          {error && (
+            <div className="error-banner" style={{ marginTop: 14 }}>
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setError('')
+                  if (step !== 'review') {
+                    setStep('idle')
+                    setDraft(null)
+                  }
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
         </div>
       </section>
     </div>
@@ -1996,6 +2281,92 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const expense = overviewTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashout').reduce((s, t) => s + Number(t.amount || 0), 0)
   const balance = income - expense
 
+  const heroChartData = useMemo(() => {
+    const barsCount = 15
+    if (!overviewTransactions.length) {
+      const placeholderHeights = [30, 48, 38, 58, 42, 68, 52, 78, 56, 82, 62, 72, 52, 68, 48]
+      return placeholderHeights.map((h, i) => ({
+        key: `placeholder-${i}`,
+        height: h,
+        label: 'No transactions yet in this timeframe',
+        incomeSum: 0,
+        expenseSum: 0,
+        net: 0,
+        count: 0,
+        isIncome: true,
+        isEmpty: true
+      }))
+    }
+
+    const sorted = [...overviewTransactions]
+      .filter(t => t.transactionDate && !Number.isNaN(new Date(t.transactionDate).getTime()))
+      .sort((a, b) => new Date(a.transactionDate!).getTime() - new Date(b.transactionDate!).getTime())
+
+    if (!sorted.length) {
+      return Array.from({ length: barsCount }).map((_, i) => ({
+        key: `empty-${i}`,
+        height: 25,
+        label: 'No transaction dates',
+        incomeSum: 0,
+        expenseSum: 0,
+        net: 0,
+        count: 0,
+        isIncome: true,
+        isEmpty: true
+      }))
+    }
+
+    const minTime = new Date(sorted[0].transactionDate!).getTime()
+    const maxTime = Math.max(new Date(sorted[sorted.length - 1].transactionDate!).getTime(), minTime + 1000)
+    const step = (maxTime - minTime) / barsCount || 1
+
+    const buckets = Array.from({ length: barsCount }).map((_, i) => {
+      const bucketStart = minTime + i * step
+      const bucketEnd = bucketStart + step
+      const bucketTxns = sorted.filter(t => {
+        const time = new Date(t.transactionDate!).getTime()
+        return i === barsCount - 1
+          ? time >= bucketStart && time <= bucketEnd + 1000
+          : time >= bucketStart && time < bucketEnd
+      })
+
+      const incomeSum = bucketTxns
+        .filter(t => t.transactionType?.toLowerCase() === 'cashin')
+        .reduce((s, t) => s + Number(t.amount || 0), 0)
+      const expenseSum = bucketTxns
+        .filter(t => t.transactionType?.toLowerCase() === 'cashout')
+        .reduce((s, t) => s + Number(t.amount || 0), 0)
+      const totalVolume = incomeSum + expenseSum
+      const net = incomeSum - expenseSum
+
+      const startDateStr = new Date(bucketStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      const endDateStr = new Date(bucketEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      const label = startDateStr === endDateStr ? startDateStr : `${startDateStr} - ${endDateStr}`
+
+      return {
+        key: `bar-${i}`,
+        label,
+        totalVolume,
+        incomeSum,
+        expenseSum,
+        net,
+        count: bucketTxns.length,
+        isIncome: net >= 0,
+        isEmpty: bucketTxns.length === 0
+      }
+    })
+
+    const maxVolume = Math.max(...buckets.map(b => b.totalVolume), 1)
+
+    return buckets.map(b => {
+      const height = b.totalVolume === 0 ? 12 : Math.max(16, Math.min(100, Math.round((b.totalVolume / maxVolume) * 100)))
+      return {
+        ...b,
+        height
+      }
+    })
+  }, [overviewTransactions])
+
   async function reloadCashbooks(selectName?: string) {
     if (!businessId) return
     const list = await api<Cashbook[]>(`/api/CashBook/getall?id=${encodeURIComponent(businessId)}`, token)
@@ -2294,8 +2665,20 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                     <span><b>{balance >= 0 ? '↗' : '↘'}</b> {balance >= 0 ? 'Net surplus' : 'Net deficit'}</span>
                   </div>
                   <div className="chart-bars">
-                    {[34, 52, 42, 66, 48, 72, 57, 87, 65, 96, 72, 82, 60, 91, 74].map((h, i) => (
-                      <i key={i} style={{ height: `${h}%` }} />
+                    {heroChartData.map(bar => (
+                      <i
+                        key={bar.key}
+                        style={{
+                          height: `${bar.height}%`,
+                          opacity: bar.isEmpty ? 0.35 : 1,
+                          background: bar.isEmpty ? '#ffffff32' : bar.isIncome ? '#a5e492' : '#f7ab76'
+                        }}
+                        title={
+                          bar.isEmpty
+                            ? `${bar.label}`
+                            : `${bar.label}\n${bar.count} transaction${bar.count === 1 ? '' : 's'}\nIncome: Rs. ${bar.incomeSum.toLocaleString('en-PK')}\nExpense: Rs. ${bar.expenseSum.toLocaleString('en-PK')}\nNet: Rs. ${bar.net.toLocaleString('en-PK')}`
+                        }
+                      />
                     ))}
                   </div>
                 </div>
@@ -2442,24 +2825,45 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                     </button>
                   </div>
                   <div className="book-list">
-                    {books.map((b, i) => (
-                      <div className="book-entry" key={b.id}>
-                        <button className={`book-row ${book?.id === b.id ? 'chosen' : ''}`} onClick={() => setBook(b)}>
-                          <span className={`book-mark mark-${i % 3}`}><BookOpen size={16} strokeWidth={1.8} /></span>
-                          <span>
-                            <strong>{b.cashBookName ?? b.name ?? 'Cashbook'}</strong>
-                            <small>{b.businessId ? 'Business cashbook' : 'Cashbook'}</small>
-                          </span>
-                          <span className="row-arrow">→</span>
-                        </button>
-                        <button className="book-action" aria-label={`Rename ${b.cashBookName ?? b.name ?? 'cashbook'}`} title="Rename cashbook" onClick={() => setManageCashbook({ book: b, mode: 'edit' })}>
-                          <Pencil size={14} strokeWidth={1.8} />
-                        </button>
-                        <button className="book-action delete-action" aria-label={`Delete ${b.cashBookName ?? b.name ?? 'cashbook'}`} title="Delete cashbook" onClick={() => setManageCashbook({ book: b, mode: 'delete' })}>
-                          <Trash2 size={14} strokeWidth={1.8} />
-                        </button>
-                      </div>
-                    ))}
+                    {books.map((b, i) => {
+                      const isActive = book?.id === b.id
+                      return (
+                        <div className={`book-entry ${isActive ? 'is-active' : ''}`} key={b.id}>
+                          <button
+                            className={`book-row ${isActive ? 'chosen' : ''}`}
+                            onClick={() => {
+                              if (!isActive) {
+                                setBook(b)
+                                showToast(`Switched to "${b.cashBookName ?? b.name ?? 'Cashbook'}"`)
+                              }
+                            }}
+                          >
+                            <span className={`book-mark mark-${i % 3}`}><BookOpen size={16} strokeWidth={1.8} /></span>
+                            <span>
+                              <strong>{b.cashBookName ?? b.name ?? 'Cashbook'}</strong>
+                              <small>
+                                {isActive ? (
+                                  <span className="active-book-indicator">
+                                    <span className="dot" /> Active · {transactions.length} txns
+                                  </span>
+                                ) : (
+                                  b.businessId ? 'Business cashbook' : 'Cashbook'
+                                )}
+                              </small>
+                            </span>
+                            <span className="row-arrow">
+                              {isActive ? <Check size={14} strokeWidth={2.4} /> : '→'}
+                            </span>
+                          </button>
+                          <button className="book-action" aria-label={`Rename ${b.cashBookName ?? b.name ?? 'cashbook'}`} title="Rename cashbook" onClick={() => setManageCashbook({ book: b, mode: 'edit' })}>
+                            <Pencil size={14} strokeWidth={1.8} />
+                          </button>
+                          <button className="book-action delete-action" aria-label={`Delete ${b.cashBookName ?? b.name ?? 'cashbook'}`} title="Delete cashbook" onClick={() => setManageCashbook({ book: b, mode: 'delete' })}>
+                            <Trash2 size={14} strokeWidth={1.8} />
+                          </button>
+                        </div>
+                      )
+                    })}
                     {loadingBooks ? <CashbookSkeletonRows /> : !books.length && <div className="book-empty">No cashbooks found for this business.</div>}
                   </div>
                   <button className="create-book" onClick={() => setShowCreateCashbook(true)}>
@@ -2490,10 +2894,10 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           token={token}
           book={book}
           onClose={() => setShowReceipt(false)}
+          onToast={showToast}
           onDone={() => {
             setShowReceipt(false)
-            api<Transaction[]>(`/api/Transaction/getall?CashBookId=${encodeURIComponent(book.id)}`, token)
-              .then(setTransactions)
+            reloadTransactions(book.id)
               .catch(e => setError(e instanceof Error ? e.message : 'Could not refresh transactions.'))
           }}
         />
