@@ -16,6 +16,7 @@ import {
   Wallet,
   type LucideIcon
 } from 'lucide-react'
+import type { Cashbook } from './App'
 
 type Transaction = {
   id: string
@@ -29,6 +30,9 @@ type Props = {
   transactions: Transaction[]
   cashbookName: string
   businessName: string
+  books?: Cashbook[]
+  selectedBookId?: string
+  onSelectBook?: (book: Cashbook) => void
   onBack: () => void
   onToast: (message: string) => void
 }
@@ -65,8 +69,18 @@ function getCategoryInfo(transaction: Transaction): { label: string; Icon: Lucid
   return { label: 'Other Expenses', Icon: ReceiptText, color: '#6c757d' }
 }
 
-export default function ReportsPage({ transactions, cashbookName, businessName, onBack, onToast }: Props) {
+export default function ReportsPage({
+  transactions,
+  cashbookName,
+  businessName,
+  books,
+  selectedBookId,
+  onSelectBook,
+  onBack,
+  onToast
+}: Props) {
   const [period, setPeriod] = useState<'thisMonth' | 'lastMonth' | 'last30Days' | 'thisYear' | 'all'>('thisMonth')
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null)
 
   const filteredTransactions = useMemo(() => {
     const now = new Date()
@@ -112,6 +126,89 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
     return filteredTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashout')
   }, [filteredTransactions])
 
+  const statsOverview = useMemo(() => {
+    if (!filteredTransactions.length) {
+      return { dailyAverage: 0, peakExpense: null }
+    }
+
+    let days = 30
+    if (period === 'thisMonth' || period === 'lastMonth') days = 30
+    else if (period === 'thisYear') days = 365
+    else if (period === 'all') {
+      const dates = filteredTransactions
+        .map(t => (t.transactionDate ? new Date(t.transactionDate).getTime() : 0))
+        .filter(t => t > 0)
+      if (dates.length >= 2) {
+        const diff = Math.max(...dates) - Math.min(...dates)
+        days = Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)))
+      }
+    }
+    const dailyAverage = Math.round(totalExpense / days)
+
+    let peakExpense: Transaction | null = null
+    for (const t of expenseTransactions) {
+      if (!peakExpense || Number(t.amount) > Number(peakExpense.amount)) {
+        peakExpense = t
+      }
+    }
+
+    return { dailyAverage, peakExpense }
+  }, [filteredTransactions, expenseTransactions, totalExpense, period])
+
+  const timelineBuckets = useMemo(() => {
+    const barsCount = 12
+    if (!filteredTransactions.length) return []
+
+    const sorted = [...filteredTransactions]
+      .filter(t => t.transactionDate && !Number.isNaN(new Date(t.transactionDate).getTime()))
+      .sort((a, b) => new Date(a.transactionDate!).getTime() - new Date(b.transactionDate!).getTime())
+
+    if (!sorted.length) return []
+
+    const minTime = new Date(sorted[0].transactionDate!).getTime()
+    const maxTime = Math.max(new Date(sorted[sorted.length - 1].transactionDate!).getTime(), minTime + 1000)
+    const step = (maxTime - minTime) / barsCount || 1
+
+    const buckets = Array.from({ length: barsCount }).map((_, i) => {
+      const bucketStart = minTime + i * step
+      const bucketEnd = bucketStart + step
+      const bucketTxns = sorted.filter(t => {
+        const time = new Date(t.transactionDate!).getTime()
+        return i === barsCount - 1
+          ? time >= bucketStart && time <= bucketEnd + 1000
+          : time >= bucketStart && time < bucketEnd
+      })
+
+      const inflow = bucketTxns
+        .filter(t => t.transactionType?.toLowerCase() === 'cashin')
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+      const outflow = bucketTxns
+        .filter(t => t.transactionType?.toLowerCase() === 'cashout')
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+
+      const startLabel = new Date(bucketStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      const endLabel = new Date(bucketEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      const label = startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`
+
+      return {
+        key: `report-bar-${i}`,
+        label,
+        inflow,
+        outflow,
+        net: inflow - outflow,
+        count: bucketTxns.length
+      }
+    })
+
+    const maxVal = Math.max(...buckets.map(b => Math.max(b.inflow, b.outflow)), 1)
+
+    return buckets.map(b => ({
+      ...b,
+      inflowPct: b.inflow > 0 ? Math.max(8, Math.round((b.inflow / maxVal) * 100)) : 0,
+      outflowPct: b.outflow > 0 ? Math.max(8, Math.round((b.outflow / maxVal) * 100)) : 0
+    }))
+  }, [filteredTransactions])
+
   const categoryBreakdown = useMemo<CategorySummary[]>(() => {
     const map = new Map<string, { amount: number; count: number; Icon: LucideIcon; color: string }>()
 
@@ -139,10 +236,14 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
   }, [expenseTransactions, totalExpense])
 
   const topExpenses = useMemo(() => {
-    return [...expenseTransactions]
+    const list = selectedCategoryFilter
+      ? expenseTransactions.filter(t => getCategoryInfo(t).label === selectedCategoryFilter)
+      : expenseTransactions
+
+    return [...list]
       .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
-      .slice(0, 5)
-  }, [expenseTransactions])
+      .slice(0, 6)
+  }, [expenseTransactions, selectedCategoryFilter])
 
   function exportReport() {
     const periodLabel = period === 'thisMonth' ? 'This Month' : period === 'lastMonth' ? 'Last Month' : period === 'last30Days' ? 'Last 30 Days' : period === 'thisYear' ? 'This Year' : 'All Time'
@@ -153,10 +254,11 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
       `Period: ${periodLabel}`,
       `Generated: ${new Date().toLocaleDateString()}`,
       `----------------------------------------`,
-      `Total Income:   Rs. ${totalIncome.toLocaleString('en-PK')}`,
-      `Total Expenses: Rs. ${totalExpense.toLocaleString('en-PK')}`,
-      `Net Cash Flow:  Rs. ${netBalance.toLocaleString('en-PK')}`,
-      `Savings Rate:   ${savingsRate}%`,
+      `Total Income:       Rs. ${totalIncome.toLocaleString('en-PK')}`,
+      `Total Expenses:     Rs. ${totalExpense.toLocaleString('en-PK')}`,
+      `Net Cash Flow:      Rs. ${netBalance.toLocaleString('en-PK')}`,
+      `Savings Rate:       ${savingsRate}%`,
+      `Avg Daily Spend:    Rs. ${statsOverview.dailyAverage.toLocaleString('en-PK')}`,
       `----------------------------------------`,
       `EXPENSE BREAKDOWN BY CATEGORY:`,
       ...categoryBreakdown.map(c => `- ${c.label}: Rs. ${c.amount.toLocaleString('en-PK')} (${c.percentage}%) [${c.count} txns]`),
@@ -194,6 +296,7 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
       ['Total Outflow (Expenses)', totalExpense],
       ['Net Cash Flow', netBalance],
       ['Savings Rate (%)', `${savingsRate}%`],
+      ['Average Daily Spend', statsOverview.dailyAverage],
       ['Total Transactions', filteredTransactions.length],
       [''],
       ['EXPENSE BREAKDOWN BY CATEGORY', '', '', ''],
@@ -238,9 +341,36 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
           </button>
           <div className="eyebrow">FINANCIAL INTELLIGENCE</div>
           <h1>Financial Reports & Insights</h1>
-          <p className="muted">
-            {businessName} · {cashbookName}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            {books && books.length > 1 ? (
+              <select
+                value={selectedBookId}
+                onChange={e => {
+                  const chosen = books.find(b => b.id === e.target.value)
+                  if (chosen && onSelectBook) onSelectBook(chosen)
+                }}
+                style={{
+                  border: '1px solid #d8e4da',
+                  borderRadius: 7,
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#1a4734',
+                  background: '#fff',
+                  outline: 'none'
+                }}
+              >
+                {books.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.cashBookName ?? b.name ?? 'Cashbook'}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="muted" style={{ fontSize: 11 }}>{cashbookName}</span>
+            )}
+            <span className="muted" style={{ fontSize: 11 }}>· {businessName}</span>
+          </div>
         </div>
         <div className="reports-top-actions">
           <button className="export-button" onClick={exportReport} disabled={filteredTransactions.length === 0} title="Download plain text summary">
@@ -273,7 +403,8 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
         </div>
       </div>
 
-      <div className="reports-kpi-grid">
+      {/* 4 KPI Summary Cards */}
+      <div className="reports-kpi-grid four-cards">
         <article className="report-kpi income-card">
           <div className="kpi-icon green">
             <TrendingUp size={18} />
@@ -302,7 +433,62 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
           </strong>
           <span className="kpi-sub">Savings rate: {savingsRate}%</span>
         </article>
+
+        <article className="report-kpi cadence-card">
+          <div className="kpi-icon purple">
+            <Calendar size={18} />
+          </div>
+          <small>AVERAGE DAILY SPEND</small>
+          <strong>Rs. {statsOverview.dailyAverage.toLocaleString('en-PK')}</strong>
+          <span className="kpi-sub">
+            {statsOverview.peakExpense ? `Peak: Rs. ${Number(statsOverview.peakExpense.amount).toLocaleString('en-PK')}` : 'No expenses recorded'}
+          </span>
+        </article>
       </div>
+
+      {/* Cash Flow Comparison Timeline */}
+      <article className="panel reports-timeline-panel">
+        <div className="panel-head">
+          <div>
+            <h2>Cash Flow Trend & Comparison</h2>
+            <p>Visualizing money coming in versus money going out over this timeframe.</p>
+          </div>
+          <div className="reports-chart-legend">
+            <span className="legend-item"><span className="legend-dot green" /> Inflow</span>
+            <span className="legend-item"><span className="legend-dot orange" /> Outflow</span>
+          </div>
+        </div>
+
+        {timelineBuckets.length > 0 ? (
+          <div className="reports-chart-wrapper">
+            <div className="reports-dual-bars">
+              {timelineBuckets.map(b => (
+                <div
+                  key={b.key}
+                  className="dual-bar-column"
+                  title={`${b.label}\nInflow: Rs. ${b.inflow.toLocaleString('en-PK')}\nOutflow: Rs. ${b.outflow.toLocaleString('en-PK')}\nNet: Rs. ${b.net.toLocaleString('en-PK')}`}
+                >
+                  <div className="bar-track">
+                    <div
+                      className="bar-fill green-fill"
+                      style={{ height: `${b.inflowPct}%` }}
+                    />
+                    <div
+                      className="bar-fill orange-fill"
+                      style={{ height: `${b.outflowPct}%` }}
+                    />
+                  </div>
+                  <span className="column-label">{b.label.split(' - ')[0]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="empty-category-state">
+            <p className="muted">No transactions recorded for this period to chart.</p>
+          </div>
+        )}
+      </article>
 
       <div className="reports-grid">
         <article className="panel category-panel">
@@ -311,7 +497,19 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
               <h2>Spending by category</h2>
               <p>Where your money went during this period.</p>
             </div>
-            <span className="panel-badge">{categoryBreakdown.length} Categories</span>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {selectedCategoryFilter && (
+                <button
+                  type="button"
+                  className="text-button"
+                  style={{ fontSize: 10 }}
+                  onClick={() => setSelectedCategoryFilter(null)}
+                >
+                  Clear filter ✕
+                </button>
+              )}
+              <span className="panel-badge">{categoryBreakdown.length} Categories</span>
+            </div>
           </div>
 
           {categoryBreakdown.length === 0 ? (
@@ -322,8 +520,15 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
             <div className="category-bars-list">
               {categoryBreakdown.map(cat => {
                 const CatIcon = cat.Icon
+                const isFiltered = selectedCategoryFilter === cat.label
                 return (
-                  <div className="category-bar-row" key={cat.label}>
+                  <div
+                    className={`category-bar-row ${isFiltered ? 'is-selected' : ''}`}
+                    key={cat.label}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setSelectedCategoryFilter(f => f === cat.label ? null : cat.label)}
+                    title={`Click to filter top expenses by ${cat.label}`}
+                  >
                     <div className="cat-title-row">
                       <div className="cat-left">
                         <span className="cat-icon-badge" style={{ backgroundColor: `${cat.color}18`, color: cat.color }}>
@@ -353,14 +558,24 @@ export default function ReportsPage({ transactions, cashbookName, businessName, 
         <article className="panel top-expenses-panel">
           <div className="panel-head">
             <div>
-              <h2>Largest expenses</h2>
+              <h2>Largest expenses {selectedCategoryFilter ? `(${selectedCategoryFilter})` : ''}</h2>
               <p>Top single purchases in this period.</p>
             </div>
+            {selectedCategoryFilter && (
+              <button
+                type="button"
+                className="text-button"
+                style={{ fontSize: 11 }}
+                onClick={() => setSelectedCategoryFilter(null)}
+              >
+                Show all
+              </button>
+            )}
           </div>
 
           {topExpenses.length === 0 ? (
             <div className="empty-category-state">
-              <p className="muted">No expenses recorded for this period.</p>
+              <p className="muted">No expenses recorded for this selection.</p>
             </div>
           ) : (
             <div className="top-expenses-list">

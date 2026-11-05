@@ -2787,6 +2787,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               transactions={transactions}
               cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
               businessName={selectedBusiness?.name ?? 'Workspace'}
+              books={books}
+              selectedBookId={book?.id}
+              onSelectBook={b => setBook(b)}
               onBack={showOverview}
               onToast={showToast}
             />
