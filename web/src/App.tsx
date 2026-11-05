@@ -44,6 +44,7 @@ import {
 } from 'lucide-react'
 import MembersPage from './MembersPage'
 import ReportsPage from './ReportsPage'
+import CashbooksPage from './CashbooksPage'
 import NotificationsPopover from './NotificationsPopover'
 import CreateBusinessDialog from './CreateBusinessDialog'
 import TransactionAttachmentDialog from './TransactionAttachmentDialog'
@@ -66,7 +67,7 @@ type User = {
   RefreshToken?: string
 }
 type Business = { id: string; name: string; category?: string; description?: string; fileUrl?: string; fileName?: string }
-type Cashbook = { id: string; cashBookName?: string; name?: string; businessId: string }
+export type Cashbook = { id: string; cashBookName?: string; name?: string; businessId: string }
 type Transaction = {
   id: string
   amount: number
@@ -2116,6 +2117,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [showMembers, setShowMembers] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showReports, setShowReports] = useState(false)
+  const [showCashbooks, setShowCashbooks] = useState(false)
   const [showCreateCashbook, setShowCreateCashbook] = useState(false)
   const [showCreateBusiness, setShowCreateBusiness] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -2409,6 +2411,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
     setShowSettings(false)
     setShowReports(false)
     setShowAllTransactions(false)
+    setShowCashbooks(false)
   }
 
   return (
@@ -2458,7 +2461,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         <small className="side-label">MENU</small>
         <nav>
           <button
-            className={'nav ' + (showAllTransactions || showMembers || showSettings || showReports ? '' : 'active')}
+            className={'nav ' + (!showAllTransactions && !showCashbooks && !showMembers && !showSettings && !showReports ? 'active' : '')}
             onClick={showOverview}
           >
             <span><LayoutDashboard size={17} strokeWidth={1.8} /></span> Overview
@@ -2466,11 +2469,23 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           <button
             className={'nav ' + (showAllTransactions ? 'active' : '')}
             onClick={() => {
+              setShowAllTransactions(true)
+              setShowCashbooks(false)
               setShowMembers(false)
               setShowSettings(false)
               setShowReports(false)
-              if (showAllTransactions) setShowAllTransactions(false)
-              else document.getElementById('cashbooks')?.scrollIntoView({ behavior: 'smooth' })
+            }}
+          >
+            <span><ReceiptText size={17} strokeWidth={1.8} /></span> Transactions <i>{transactions.length}</i>
+          </button>
+          <button
+            className={'nav ' + (showCashbooks ? 'active' : '')}
+            onClick={() => {
+              setShowCashbooks(true)
+              setShowAllTransactions(false)
+              setShowMembers(false)
+              setShowSettings(false)
+              setShowReports(false)
             }}
           >
             <span><BookOpen size={17} strokeWidth={1.8} /></span> Cashbooks <i>{books.length}</i>
@@ -2479,6 +2494,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             className={'nav ' + (showReports ? 'active' : '')}
             onClick={() => {
               setShowReports(true)
+              setShowCashbooks(false)
               setShowMembers(false)
               setShowSettings(false)
               setShowAllTransactions(false)
@@ -2490,6 +2506,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             className={'nav ' + (showMembers ? 'active' : '')}
             onClick={() => {
               setShowMembers(true)
+              setShowCashbooks(false)
               setShowReports(false)
               setShowSettings(false)
               setShowAllTransactions(false)
@@ -2502,6 +2519,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             className={'nav ' + (showSettings ? 'active' : '')}
             onClick={() => {
               setShowSettings(true)
+              setShowCashbooks(false)
               setShowReports(false)
               setShowMembers(false)
               setShowAllTransactions(false)
@@ -2540,11 +2558,36 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 ? 'Members'
                 : showReports
                 ? 'Reports'
+                : showCashbooks
+                ? 'Cashbooks'
                 : showAllTransactions
                 ? 'Transactions'
                 : 'Overview'}
             </button>
           </div>
+          {book && (
+            <div className="topbar-book-switcher" title="Active cashbook (click to switch)">
+              <BookOpen size={13} strokeWidth={2} />
+              <select
+                value={book.id}
+                onChange={e => {
+                  const chosen = books.find(b => b.id === e.target.value)
+                  if (chosen) {
+                    setBook(chosen)
+                    showToast(`Switched to "${chosen.cashBookName ?? chosen.name ?? 'Cashbook'}"`)
+                  }
+                }}
+                aria-label="Active cashbook"
+              >
+                {books.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.cashBookName ?? b.name ?? 'Cashbook'}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={11} strokeWidth={2} className="topbar-book-arrow" />
+            </div>
+          )}
           <label className="search">
             <Search size={17} strokeWidth={1.8} />
             <input
@@ -2602,6 +2645,27 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               transactions={transactions}
               cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
               businessName={selectedBusiness?.name ?? 'Workspace'}
+              onBack={showOverview}
+              onToast={showToast}
+            />
+          ) : showCashbooks ? (
+            <CashbooksPage
+              books={books}
+              selectedBook={book}
+              businessName={selectedBusiness?.name ?? 'Workspace'}
+              activeBookTransactionsCount={transactions.length}
+              onSelectBook={b => {
+                setBook(b)
+                showToast(`Switched to "${b.cashBookName ?? b.name ?? 'Cashbook'}"`)
+              }}
+              onOpenTransactions={b => {
+                setBook(b)
+                setShowCashbooks(false)
+                setShowAllTransactions(true)
+              }}
+              onAddCashbook={() => setShowCreateCashbook(true)}
+              onEditCashbook={b => setManageCashbook({ book: b, mode: 'edit' })}
+              onDeleteCashbook={b => setManageCashbook({ book: b, mode: 'delete' })}
               onBack={showOverview}
               onToast={showToast}
             />
@@ -2820,9 +2884,19 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                       <h2>Your cashbooks</h2>
                       <p>Choose a book to focus your view.</p>
                     </div>
-                    <button className="add-small" aria-label="Create a cashbook" onClick={() => setShowCreateCashbook(true)}>
-                      <Plus size={16} strokeWidth={1.8} />
-                    </button>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <button
+                        className="text-button"
+                        style={{ fontSize: 11 }}
+                        title="Open full cashbooks manager"
+                        onClick={() => setShowCashbooks(true)}
+                      >
+                        Manage all →
+                      </button>
+                      <button className="add-small" aria-label="Create a cashbook" onClick={() => setShowCreateCashbook(true)}>
+                        <Plus size={16} strokeWidth={1.8} />
+                      </button>
+                    </div>
                   </div>
                   <div className="book-list">
                     {books.map((b, i) => {
