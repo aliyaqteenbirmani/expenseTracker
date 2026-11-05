@@ -27,6 +27,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Receipt,
   ReceiptText,
   RefreshCw,
   Search,
@@ -52,6 +53,7 @@ import TransactionAttachmentDialog from './TransactionAttachmentDialog'
 import UserProfileDialog from './UserProfileDialog'
 import TransactionDetailDialog from './TransactionDetailDialog'
 import MonthlyBudgetCard from './MonthlyBudgetCard'
+import ReceiptsVaultPage from './ReceiptsVaultPage'
 import './App.css'
 
 const API = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'
@@ -2491,6 +2493,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [showSettings, setShowSettings] = useState(false)
   const [showReports, setShowReports] = useState(false)
   const [showCashbooks, setShowCashbooks] = useState(false)
+  const [showReceiptsVault, setShowReceiptsVault] = useState(false)
+  const [overviewFilter, setOverviewFilter] = useState<'all' | 'income' | 'expense' | 'receipts'>('all')
   const [showCreateCashbook, setShowCreateCashbook] = useState(false)
   const [showCreateBusiness, setShowCreateBusiness] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -2657,8 +2661,16 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   }, [transactions, overviewPeriod])
 
   const visible = useMemo(
-    () => transactions.filter(t => `${t.remarks ?? ''} ${t.transactionType}`.toLowerCase().includes(search.toLowerCase())),
-    [transactions, search]
+    () =>
+      transactions
+        .filter(t => `${t.remarks ?? ''} ${t.transactionType}`.toLowerCase().includes(search.toLowerCase()))
+        .filter(t => {
+          if (overviewFilter === 'income') return t.transactionType?.toLowerCase() === 'cashin'
+          if (overviewFilter === 'expense') return t.transactionType?.toLowerCase() === 'cashout'
+          if (overviewFilter === 'receipts') return Boolean(t.filePath || t.fileName)
+          return true
+        }),
+    [transactions, search, overviewFilter]
   )
   const income = overviewTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashin').reduce((s, t) => s + Number(t.amount || 0), 0)
   const expense = overviewTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashout').reduce((s, t) => s + Number(t.amount || 0), 0)
@@ -2750,6 +2762,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
     })
   }, [overviewTransactions])
 
+  const receiptsCount = useMemo(() => transactions.filter(t => Boolean(t.filePath || t.fileName)).length, [transactions])
+
   async function reloadCashbooks(selectName?: string) {
     if (!businessId) return
     const list = await api<Cashbook[]>(`/api/CashBook/getall?id=${encodeURIComponent(businessId)}`, token)
@@ -2793,6 +2807,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
     setShowReports(false)
     setShowAllTransactions(false)
     setShowCashbooks(false)
+    setShowReceiptsVault(false)
   }
 
   return (
@@ -2884,7 +2899,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               <small className="side-label">MENU</small>
               <nav className="mobile-nav-list">
                 <button
-                  className={'nav ' + (!showAllTransactions && !showCashbooks && !showMembers && !showSettings && !showReports ? 'active' : '')}
+                  className={'nav ' + (!showAllTransactions && !showCashbooks && !showMembers && !showSettings && !showReports && !showReceiptsVault ? 'active' : '')}
                   onClick={() => {
                     showOverview()
                     setMobileNavOpen(false)
@@ -2897,6 +2912,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   onClick={() => {
                     setShowAllTransactions(true)
                     setShowCashbooks(false)
+                    setShowReceiptsVault(false)
                     setShowReports(false)
                     setShowMembers(false)
                     setShowSettings(false)
@@ -2911,6 +2927,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   onClick={() => {
                     setShowCashbooks(true)
                     setShowAllTransactions(false)
+                    setShowReceiptsVault(false)
                     setShowReports(false)
                     setShowMembers(false)
                     setShowSettings(false)
@@ -2921,10 +2938,26 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   {books.length > 0 && <i>{books.length}</i>}
                 </button>
                 <button
+                  className={'nav ' + (showReceiptsVault ? 'active' : '')}
+                  onClick={() => {
+                    setShowReceiptsVault(true)
+                    setShowCashbooks(false)
+                    setShowAllTransactions(false)
+                    setShowReports(false)
+                    setShowMembers(false)
+                    setShowSettings(false)
+                    setMobileNavOpen(false)
+                  }}
+                >
+                  <span><Receipt size={17} strokeWidth={1.8} /></span> Receipts
+                  {receiptsCount > 0 && <i>{receiptsCount}</i>}
+                </button>
+                <button
                   className={'nav ' + (showReports ? 'active' : '')}
                   onClick={() => {
                     setShowReports(true)
                     setShowCashbooks(false)
+                    setShowReceiptsVault(false)
                     setShowAllTransactions(false)
                     setShowMembers(false)
                     setShowSettings(false)
@@ -2938,6 +2971,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   onClick={() => {
                     setShowMembers(true)
                     setShowCashbooks(false)
+                    setShowReceiptsVault(false)
                     setShowReports(false)
                     setShowSettings(false)
                     setShowAllTransactions(false)
@@ -2951,6 +2985,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   onClick={() => {
                     setShowSettings(true)
                     setShowCashbooks(false)
+                    setShowReceiptsVault(false)
                     setShowReports(false)
                     setShowMembers(false)
                     setShowAllTransactions(false)
@@ -3038,7 +3073,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         <small className="side-label">MENU</small>
         <nav>
           <button
-            className={'nav ' + (!showAllTransactions && !showCashbooks && !showMembers && !showSettings && !showReports ? 'active' : '')}
+            className={'nav ' + (!showAllTransactions && !showCashbooks && !showMembers && !showSettings && !showReports && !showReceiptsVault ? 'active' : '')}
             onClick={showOverview}
           >
             <span><LayoutDashboard size={17} strokeWidth={1.8} /></span> Overview
@@ -3048,6 +3083,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             onClick={() => {
               setShowAllTransactions(true)
               setShowCashbooks(false)
+              setShowReceiptsVault(false)
               setShowMembers(false)
               setShowSettings(false)
               setShowReports(false)
@@ -3060,6 +3096,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             onClick={() => {
               setShowCashbooks(true)
               setShowAllTransactions(false)
+              setShowReceiptsVault(false)
               setShowMembers(false)
               setShowSettings(false)
               setShowReports(false)
@@ -3068,10 +3105,24 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             <span><BookOpen size={17} strokeWidth={1.8} /></span> Cashbooks <i>{books.length}</i>
           </button>
           <button
+            className={'nav ' + (showReceiptsVault ? 'active' : '')}
+            onClick={() => {
+              setShowReceiptsVault(true)
+              setShowCashbooks(false)
+              setShowAllTransactions(false)
+              setShowMembers(false)
+              setShowSettings(false)
+              setShowReports(false)
+            }}
+          >
+            <span><Receipt size={17} strokeWidth={1.8} /></span> Receipts <i>{receiptsCount}</i>
+          </button>
+          <button
             className={'nav ' + (showReports ? 'active' : '')}
             onClick={() => {
               setShowReports(true)
               setShowCashbooks(false)
+              setShowReceiptsVault(false)
               setShowMembers(false)
               setShowSettings(false)
               setShowAllTransactions(false)
@@ -3084,6 +3135,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             onClick={() => {
               setShowMembers(true)
               setShowCashbooks(false)
+              setShowReceiptsVault(false)
               setShowReports(false)
               setShowSettings(false)
               setShowAllTransactions(false)
@@ -3097,6 +3149,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             onClick={() => {
               setShowSettings(true)
               setShowCashbooks(false)
+              setShowReceiptsVault(false)
               setShowReports(false)
               setShowMembers(false)
               setShowAllTransactions(false)
@@ -3144,6 +3197,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 ? 'Reports'
                 : showCashbooks
                 ? 'Cashbooks'
+                : showReceiptsVault
+                ? 'Receipts Vault'
                 : showAllTransactions
                 ? 'Transactions'
                 : 'Overview'}
@@ -3183,6 +3238,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 if (e.key === 'Enter') {
                   setShowAllTransactions(true)
                   setShowCashbooks(false)
+                  setShowReceiptsVault(false)
                   setShowReports(false)
                   setShowMembers(false)
                   setShowSettings(false)
@@ -3263,6 +3319,21 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               onEditCashbook={b => setManageCashbook({ book: b, mode: 'edit' })}
               onDeleteCashbook={b => setManageCashbook({ book: b, mode: 'delete' })}
               onBack={showOverview}
+              onToast={showToast}
+            />
+          ) : showReceiptsVault ? (
+            <ReceiptsVaultPage
+              transactions={transactions}
+              token={token}
+              cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
+              businessName={selectedBusiness?.name ?? 'Workspace'}
+              books={books}
+              selectedBookId={book?.id}
+              onSelectBook={b => setBook(b)}
+              onBack={showOverview}
+              onUploadReceipt={() => setShowReceipt(true)}
+              onViewAttachment={txn => setViewAttachment(txn)}
+              onOpenDetail={txn => setViewTransactionDetail(txn)}
               onToast={showToast}
             />
           ) : showAllTransactions ? (
@@ -3419,9 +3490,41 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                       <h2>Recent transactions</h2>
                       <p>{book?.cashBookName ?? book?.name ?? 'Select a cashbook to see activity'}</p>
                     </div>
-                    <button className="text-button" onClick={() => setShowAllTransactions(true)}>
-                      View all <ArrowRight size={14} strokeWidth={1.8} />
-                    </button>
+                    <div className="panel-head-right">
+                      <div className="overview-filter-tabs" role="tablist" aria-label="Transaction type filter">
+                        <button
+                          type="button"
+                          className={`overview-filter-tab ${overviewFilter === 'all' ? 'active' : ''}`}
+                          onClick={() => setOverviewFilter('all')}
+                        >
+                          All
+                        </button>
+                        <button
+                          type="button"
+                          className={`overview-filter-tab ${overviewFilter === 'income' ? 'active' : ''}`}
+                          onClick={() => setOverviewFilter('income')}
+                        >
+                          Income
+                        </button>
+                        <button
+                          type="button"
+                          className={`overview-filter-tab ${overviewFilter === 'expense' ? 'active' : ''}`}
+                          onClick={() => setOverviewFilter('expense')}
+                        >
+                          Expense
+                        </button>
+                        <button
+                          type="button"
+                          className={`overview-filter-tab ${overviewFilter === 'receipts' ? 'active' : ''}`}
+                          onClick={() => setOverviewFilter('receipts')}
+                        >
+                          Receipts {receiptsCount > 0 ? `(${receiptsCount})` : ''}
+                        </button>
+                      </div>
+                      <button className="text-button" onClick={() => setShowAllTransactions(true)}>
+                        View all <ArrowRight size={14} strokeWidth={1.8} />
+                      </button>
+                    </div>
                   </div>
                   <div className="table-head">
                     <span>TRANSACTION</span>
