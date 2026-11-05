@@ -1777,6 +1777,14 @@ function TransactionsPage({
   const [draftFromDate, setDraftFromDate] = useState('')
   const [draftToDate, setDraftToDate] = useState('')
   const [calendarMonth, setCalendarMonth] = useState(() => new Date())
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+
+  // Clear selected IDs when cashbook or active filters change
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [cashbookName, type, categoryFilter, fromDate, toDate])
 
   // Reset page when filters or sorting change
   useEffect(() => {
@@ -1808,6 +1816,95 @@ function TransactionsPage({
   const totalIncome = filteredTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashin').reduce((sum, t) => sum + Number(t.amount || 0), 0)
   const totalExpense = filteredTransactions.filter(t => t.transactionType?.toLowerCase() === 'cashout').reduce((sum, t) => sum + Number(t.amount || 0), 0)
   const netBalance = totalIncome - totalExpense
+
+  const pageIds = useMemo(() => paginatedTransactions.map(t => t.id).filter(Boolean), [paginatedTransactions])
+  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id))
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectPage() {
+    if (allPageSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        pageIds.forEach(id => next.delete(id))
+        return next
+      })
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        pageIds.forEach(id => next.add(id))
+        return next
+      })
+    }
+  }
+
+  const selectedTransactions = useMemo(() => {
+    return transactions.filter(t => selectedIds.has(t.id))
+  }, [transactions, selectedIds])
+
+  const selectedIncome = selectedTransactions
+    .filter(t => t.transactionType?.toLowerCase() === 'cashin')
+    .reduce((s, t) => s + Number(t.amount || 0), 0)
+
+  const selectedExpense = selectedTransactions
+    .filter(t => t.transactionType?.toLowerCase() === 'cashout')
+    .reduce((s, t) => s + Number(t.amount || 0), 0)
+
+  const selectedNet = selectedIncome - selectedExpense
+
+  function exportSelectedCsv() {
+    const escapeCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+    const rows = [
+      ['Date', 'Description', 'Category', 'Type', 'Amount', 'Currency', 'Cashbook', 'Transaction ID'],
+      ...selectedTransactions.map(transaction => [
+        transaction.transactionDate?.slice(0, 10) ?? '',
+        transaction.remarks ?? '',
+        getTransactionCategory(transaction).label,
+        transaction.transactionType?.toLowerCase() === 'cashin' ? 'Income' : 'Expense',
+        transaction.amount ?? 0,
+        'PKR',
+        cashbookName,
+        transaction.id
+      ])
+    ]
+    const csvContent = '\uFEFF' + rows.map(r => r.map(escapeCell).join(',')).join('\r\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `spendwise-selected-${selectedTransactions.length}-transactions.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    onToast(`Exported ${selectedTransactions.length} selected transactions`)
+  }
+
+  async function handleBulkDelete() {
+    try {
+      setBulkDeleting(true)
+      const ids = Array.from(selectedIds)
+      const results = await Promise.allSettled(
+        ids.map(id => api(`/api/Transaction/${encodeURIComponent(id)}`, token, { method: 'DELETE' }))
+      )
+      const successCount = results.filter(r => r.status === 'fulfilled').length
+      setSelectedIds(new Set())
+      setShowBulkDeleteConfirm(false)
+      await onRefresh()
+      onToast(`Deleted ${successCount} transactions successfully`)
+    } catch {
+      onToast('Could not complete all deletions.')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
 
   const dateInputValue = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 
@@ -2054,7 +2151,15 @@ function TransactionsPage({
       </div>
 
       <article className="panel history-panel">
-        <div className="history-table-head">
+        <div className="history-table-head with-checkbox">
+          <label className="checkbox-wrap" onClick={e => e.stopPropagation()} title="Select all on current page">
+            <input
+              type="checkbox"
+              checked={allPageSelected}
+              onChange={toggleSelectPage}
+              aria-label="Select all transactions on page"
+            />
+          </label>
           <span>TRANSACTION</span>
           <span
             className="sortable-head"
@@ -2085,7 +2190,7 @@ function TransactionsPage({
 
               return (
                 <div
-                  className="history-row clickable-row"
+                  className={`history-row with-checkbox clickable-row ${selectedIds.has(transaction.id) ? 'selected-row' : ''}`}
                   key={transaction.id}
                   onClick={() => onOpenDetail?.(transaction)}
                   role="button"
@@ -2097,6 +2202,14 @@ function TransactionsPage({
                     }
                   }}
                 >
+                  <label className="checkbox-wrap" onClick={e => e.stopPropagation()} title="Select transaction">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(transaction.id)}
+                      onChange={() => toggleSelect(transaction.id)}
+                      aria-label="Select transaction"
+                    />
+                  </label>
                   <div className="table-transaction">
                     <span className={'txn-icon ' + (isIncome ? 'txn-income' : 'txn-expense')}>
                       <CategoryIcon size={16} strokeWidth={1.8} />
@@ -2188,6 +2301,94 @@ function TransactionsPage({
           </div>
         )}
       </article>
+
+      {selectedIds.size > 0 && (
+        <div className="bulk-actions-floating-bar" role="toolbar" aria-label="Bulk actions">
+          <div className="bulk-bar-info">
+            <span className="bulk-badge">{selectedIds.size}</span>
+            <strong>{selectedIds.size} {selectedIds.size === 1 ? 'selected' : 'selected'}</strong>
+            <span className="bulk-totals">
+              {selectedIncome > 0 && <span className="bulk-inc">+Rs. {selectedIncome.toLocaleString('en-PK')}</span>}
+              {selectedExpense > 0 && <span className="bulk-exp">−Rs. {selectedExpense.toLocaleString('en-PK')}</span>}
+            </span>
+          </div>
+          <div className="bulk-bar-actions">
+            <button
+              type="button"
+              className="button secondary-action bulk-action-btn"
+              onClick={exportSelectedCsv}
+            >
+              <Download size={13} strokeWidth={2} /> Export ({selectedIds.size})
+            </button>
+            <button
+              type="button"
+              className="button danger bulk-action-btn"
+              onClick={() => setShowBulkDeleteConfirm(true)}
+            >
+              <Trash2 size={13} strokeWidth={2} /> Delete ({selectedIds.size})
+            </button>
+            <button
+              type="button"
+              className="bulk-deselect-btn"
+              onClick={() => setSelectedIds(new Set())}
+              title="Deselect all"
+              aria-label="Deselect all"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showBulkDeleteConfirm && (
+        <div className="overlay" onClick={() => setShowBulkDeleteConfirm(false)}>
+          <div className="dialog delete-dialog" onClick={e => e.stopPropagation()}>
+            <header>
+              <div>
+                <div className="eyebrow" style={{ color: '#b64e45' }}>BULK REMOVAL</div>
+                <h2>Delete {selectedIds.size} Transactions?</h2>
+              </div>
+              <button className="close" onClick={() => setShowBulkDeleteConfirm(false)}><X size={18} /></button>
+            </header>
+            <div className="dialog-content">
+              <p className="muted" style={{ fontSize: 12, lineHeight: 1.6, margin: '0 0 14px' }}>
+                Are you sure you want to permanently delete these <strong>{selectedIds.size}</strong> selected transactions from &ldquo;{cashbookName}&rdquo;?
+                This action cannot be undone.
+              </p>
+              <div className="delete-confirm-box">
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                  <span>Inflow: <strong style={{ color: '#16835c' }}>+Rs. {selectedIncome.toLocaleString('en-PK')}</strong></span>
+                  <span>Outflow: <strong style={{ color: '#c05c43' }}>−Rs. {selectedExpense.toLocaleString('en-PK')}</strong></span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, paddingTop: 6, borderTop: '1px solid #f0e1de' }}>
+                  <span>Net impact:</span>
+                  <span style={{ color: selectedNet >= 0 ? '#16835c' : '#c05c43' }}>
+                    {selectedNet >= 0 ? '+' : '−'} Rs. {Math.abs(selectedNet).toLocaleString('en-PK')}
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+                <button
+                  type="button"
+                  className="button secondary-action"
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                  disabled={bulkDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="button danger"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                >
+                  {bulkDeleting ? 'Deleting…' : `Confirm Delete (${selectedIds.size})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

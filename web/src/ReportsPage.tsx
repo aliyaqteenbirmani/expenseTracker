@@ -8,6 +8,7 @@ import {
   Fuel,
   HeartPulse,
   House,
+  Printer,
   ReceiptText,
   ShoppingCart,
   TrendingDown,
@@ -17,6 +18,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import type { Cashbook } from './App'
+import FinancialStatementModal from './FinancialStatementModal'
 
 type Transaction = {
   id: string
@@ -81,6 +83,7 @@ export default function ReportsPage({
 }: Props) {
   const [period, setPeriod] = useState<'thisMonth' | 'lastMonth' | 'last30Days' | 'thisYear' | 'all'>('thisMonth')
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null)
+  const [showStatementModal, setShowStatementModal] = useState(false)
 
   const filteredTransactions = useMemo(() => {
     const now = new Date()
@@ -373,10 +376,20 @@ export default function ReportsPage({
           </div>
         </div>
         <div className="reports-top-actions">
+          <button
+            type="button"
+            className="button secondary-action"
+            onClick={() => setShowStatementModal(true)}
+            disabled={filteredTransactions.length === 0}
+            style={{ minHeight: 36, height: 36, padding: '0 12px', fontSize: 11 }}
+            title="Generate printable financial statement and PDF"
+          >
+            <Printer size={14} strokeWidth={2} /> Print Statement
+          </button>
           <button className="export-button" onClick={exportReport} disabled={filteredTransactions.length === 0} title="Download plain text summary">
             <FileText size={14} /> Summary (.txt)
           </button>
-          <button className="button primary" onClick={exportCsvReport} disabled={filteredTransactions.length === 0} style={{ height: 36, padding: '0 14px', fontSize: 11 }} title="Download comprehensive CSV spreadsheet">
+          <button className="button primary" onClick={exportCsvReport} disabled={filteredTransactions.length === 0} style={{ minHeight: 36, height: 36, padding: '0 14px', fontSize: 11 }} title="Download comprehensive CSV spreadsheet">
             <FileSpreadsheet size={14} strokeWidth={2} /> Export CSV
           </button>
         </div>
@@ -604,6 +617,31 @@ export default function ReportsPage({
           )}
         </article>
       </div>
+
+      {showStatementModal && (
+        <FinancialStatementModal
+          businessName={businessName}
+          cashbookName={cashbookName}
+          periodLabel={
+            period === 'thisMonth'
+              ? 'This Month'
+              : period === 'lastMonth'
+              ? 'Last Month'
+              : period === 'last30Days'
+              ? 'Last 30 Days'
+              : period === 'thisYear'
+              ? 'This Year'
+              : 'All Time'
+          }
+          totalIncome={totalIncome}
+          totalExpense={totalExpense}
+          netBalance={netBalance}
+          savingsRate={savingsRate}
+          categoryBreakdown={categoryBreakdown}
+          transactions={filteredTransactions}
+          onClose={() => setShowStatementModal(false)}
+        />
+      )}
     </section>
   )
 }
