@@ -92,7 +92,7 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
                 return ApiResponse<Guid>.FailureResponse("One or more invalid business permissions provided.");
 
             // Convert int permissions to string codes for repository
-            var permissionCodes = request.Permissions.Select(x => x.ToString()).ToList();
+            var permissionCodes = businessPermissions.Select(x => x.ToString()).ToList();
 
             var result = await _memberManagementRepository.UpdateBusinessMemberPermissionsAsync(
                 businessId,
@@ -139,7 +139,7 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
             if (!PermissionValidationHelper.AreValidCashbookPermissions(cashbookPermissions))
                 return ApiResponse<Guid>.FailureResponse("One or more invalid cashbook permissions provided.");
 
-            var permissionCodes = request.Permissions.Select(x => x.ToString()).ToList();
+            var permissionCodes = cashbookPermissions.Select(x => x.ToString()).ToList();
 
             var result = await _memberManagementRepository.UpdateCashbookMemberPermissionsAsync(
                 businessId,
