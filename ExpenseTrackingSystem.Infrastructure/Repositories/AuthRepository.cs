@@ -29,12 +29,13 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 "SP_GetUserByEmail",
                 new { Email = loginDto.UserName });
 
-            if (!userFromDb.Success)
+            if (userFromDb is null || (userFromDb.Id == Guid.Empty && !userFromDb.Success))
             {
                 return new ApiResponse<LoginResponseDbo>
                 {
                     Success = false,
-                    Message = "Invalid UserName",
+                    Message = "User not exists.",
+                    Data = null
                 };
             }
 

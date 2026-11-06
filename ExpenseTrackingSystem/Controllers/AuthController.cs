@@ -63,13 +63,22 @@ namespace SpendwiseSystem.API.Controllers
 
 
         [HttpPost("Login")]
-        public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginDto loginDto)
+        public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
             var serviceResponse = await _authService.LoginUser(loginDto);
 
             if (!serviceResponse.Success)
             {
-                return Unauthorized(ApiResponses.Unauthorized());
+                var errorMessage = string.IsNullOrWhiteSpace(serviceResponse.Message)
+                    ? "User not exists."
+                    : serviceResponse.Message;
+
+                if (string.Equals(errorMessage, "User not exists.", StringComparison.OrdinalIgnoreCase))
+                {
+                    return NotFound(ApiResponses.NotFound(errorMessage));
+                }
+
+                return Unauthorized(ApiResponses.Unauthorized(errorMessage));
             }
 
             return Ok(ApiResponses.SuccessWithData(serviceResponse.Data, "Login successful"));

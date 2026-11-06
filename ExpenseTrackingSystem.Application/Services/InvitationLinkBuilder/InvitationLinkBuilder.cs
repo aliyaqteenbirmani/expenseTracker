@@ -1,9 +1,5 @@
 using SpendwiseSystem.Domain.Entities.ConfigModel;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SpendwiseSystem.Application.Services.InvitationLinkBuilder
 {
@@ -18,7 +14,22 @@ namespace SpendwiseSystem.Application.Services.InvitationLinkBuilder
 
         public string BuildInvitationLink(string inviteToken)
         {
-            return $"{_appLinkSettings.InvitationBaseUrl}?token={Uri.EscapeDataString(inviteToken)}";
+            var rawUrl = _appLinkSettings?.InvitationBaseUrl?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(rawUrl) || rawUrl.Contains("sameyahusa-web.web.app", StringComparison.OrdinalIgnoreCase))
+            {
+                rawUrl = "http://localhost:5173";
+            }
+
+            var baseUrl = rawUrl.TrimEnd('/', '?', '&');
+            if (baseUrl.EndsWith("/invite/accept", StringComparison.OrdinalIgnoreCase))
+            {
+                baseUrl = baseUrl.Substring(0, baseUrl.Length - "/invite/accept".Length).TrimEnd('/');
+                if (string.IsNullOrWhiteSpace(baseUrl))
+                    baseUrl = "http://localhost:5173";
+            }
+
+            var separator = baseUrl.Contains('?') ? "&" : "?";
+            return $"{baseUrl}{separator}inviteToken={Uri.EscapeDataString(inviteToken)}";
         }
     }
 }

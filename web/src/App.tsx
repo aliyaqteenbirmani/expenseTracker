@@ -273,12 +273,21 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const tokenParam = params.get('token') || params.get('resetToken')
+    const inviteParam = params.get('inviteToken')
+    const resetParam = params.get('resetToken')
+    const tokenParam = params.get('token')
     const emailParam = params.get('email')
-    if (tokenParam) {
-      setResetToken(tokenParam)
+
+    if (inviteParam) {
+      sessionStorage.setItem('spendwise-invite-token', inviteParam)
+      setNotice("You've been invited to collaborate! Please sign in or create an account to accept your invitation.")
+    } else if (resetParam || (tokenParam && emailParam)) {
+      setResetToken(resetParam || tokenParam || '')
       if (emailParam) setResetEmail(emailParam)
       setMode('reset')
+    } else if (tokenParam) {
+      sessionStorage.setItem('spendwise-invite-token', tokenParam)
+      setNotice("You've been invited to collaborate! Please sign in or create an account to accept your invitation.")
     }
   }, [])
 
@@ -2422,7 +2431,8 @@ function DirectInviteModal({
       try {
         setLoading(true)
         const res = await api<unknown>(`/api/Invitations/by-token?token=${encodeURIComponent(inviteToken)}`, token)
-        setInviteData(res as { id?: string; businessName?: string; cashbookName?: string; invitedByName?: string })
+        const item = Array.isArray(res) ? res[0] : res
+        setInviteData(item as { id?: string; businessName?: string; cashbookName?: string; invitedByName?: string })
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Invalid or expired invitation link.')
       } finally {
@@ -2679,7 +2689,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const inviteParam = params.get('token') || params.get('inviteToken')
+    const inviteParam = params.get('inviteToken') || params.get('token') || sessionStorage.getItem('spendwise-invite-token')
     if (inviteParam) {
       setPendingUrlInviteToken(inviteParam)
     }
@@ -3898,8 +3908,12 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         <DirectInviteModal
           token={token}
           inviteToken={pendingUrlInviteToken}
-          onClose={() => setPendingUrlInviteToken(null)}
+          onClose={() => {
+            sessionStorage.removeItem('spendwise-invite-token')
+            setPendingUrlInviteToken(null)
+          }}
           onAccepted={() => {
+            sessionStorage.removeItem('spendwise-invite-token')
             void reloadBusinesses()
             void fetchUnreadInvites()
           }}

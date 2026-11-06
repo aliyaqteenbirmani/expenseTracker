@@ -81,7 +81,9 @@ namespace SpendwiseSystem.Application.Services.AuthService
                 return new ApiResponse<LoginResponseDto>
                 {
                     Success = false,
-                    Message = "Invalid login credentials.",
+                    Message = !string.IsNullOrWhiteSpace(responseFromRepo?.Message)
+                        ? responseFromRepo.Message
+                        : "User not exists.",
                     Data = null,
                 };
             }
