@@ -1,4 +1,5 @@
-﻿using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -46,12 +47,29 @@ namespace SpendwiseSystem.Application.Services.PermissionAccessService
                 permissionCode.Trim());
         }
 
+        public async Task<bool> HasAnyCashbookAccessInBusinessAsync(Guid businessId, Guid userId)
+        {
+            if (businessId == Guid.Empty || userId == Guid.Empty)
+                return false;
+
+            return await _permissionAccessRepository.HasAnyCashbookAccessInBusinessAsync(businessId, userId);
+        }
+
         public async Task<bool> HasBusinessOrOwnerAccessAsync(Guid businessId, Guid userId, string permissionCode)
         {
             if (await IsBusinessOwnerAsync(businessId, userId))
                 return true;
 
-            return await HasBusinessPermissionAsync(businessId, userId, permissionCode);
+            if (await HasBusinessPermissionAsync(businessId, userId, permissionCode))
+                return true;
+
+            if (string.Equals(permissionCode, BusinessPermission.CASHBOOK_LIST_VIEW.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                if (await HasBusinessPermissionAsync(businessId, userId, BusinessPermission.BUSINESS_VIEW.ToString()))
+                    return true;
+            }
+
+            return false;
         }
 
         public async Task<bool> HasCashbookOrOwnerAccessAsync(Guid cashbookId, Guid userId, string permissionCode)
@@ -64,7 +82,21 @@ namespace SpendwiseSystem.Application.Services.PermissionAccessService
             if (await IsBusinessOwnerAsync(businessId.Value, userId))
                 return true;
 
-            return await HasCashbookPermissionAsync(cashbookId, userId, permissionCode);
+            if (await HasCashbookPermissionAsync(cashbookId, userId, permissionCode))
+                return true;
+
+            // Business-level members with view permissions can view cashbooks and their transactions
+            if (string.Equals(permissionCode, CashbookPermission.CASHBOOK_VIEW.ToString(), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(permissionCode, CashbookPermission.TRANSACTION_VIEW.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                if (await HasBusinessPermissionAsync(businessId.Value, userId, BusinessPermission.BUSINESS_VIEW.ToString()) ||
+                    await HasBusinessPermissionAsync(businessId.Value, userId, BusinessPermission.CASHBOOK_LIST_VIEW.ToString()))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public async Task<Guid?> GetBusinessIdByCashbookIdAsync(Guid cashbookId)

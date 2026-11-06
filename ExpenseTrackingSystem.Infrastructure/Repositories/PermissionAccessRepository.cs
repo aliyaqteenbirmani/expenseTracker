@@ -1,4 +1,4 @@
-﻿using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.DTOs.PermissionDto;
 using SpendwiseSystem.Infrastructure.Data.DbContext;
 using System;
@@ -54,6 +54,19 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     CashBookId = cashbookId,
                     UserId = userId,
                     PermissionCode = permissionCode
+                });
+
+            return result?.IsAllowed ?? false;
+        }
+
+        public async Task<bool> HasAnyCashbookAccessInBusinessAsync(Guid businessId, Guid userId)
+        {
+            var result = await _dapper.GetSingleAsync<PermissionCheckResult>(
+                "SP_HasAnyCashbookAccessInBusiness",
+                new
+                {
+                    BusinessId = businessId,
+                    UserId = userId
                 });
 
             return result?.IsAllowed ?? false;

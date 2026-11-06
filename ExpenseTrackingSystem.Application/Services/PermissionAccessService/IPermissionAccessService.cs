@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,6 +11,7 @@ namespace SpendwiseSystem.Application.Services.PermissionAccessService
         Task<bool> IsBusinessOwnerAsync(Guid businessId, Guid userId);
         Task<bool> HasBusinessPermissionAsync(Guid businessId, Guid userId, string permissionCode);
         Task<bool> HasCashbookPermissionAsync(Guid cashbookId, Guid userId, string permissionCode);
+        Task<bool> HasAnyCashbookAccessInBusinessAsync(Guid businessId, Guid userId);
         Task<bool> HasBusinessOrOwnerAccessAsync(Guid businessId, Guid userId, string permissionCode);
         Task<bool> HasCashbookOrOwnerAccessAsync(Guid cashbookId, Guid userId, string permissionCode);
         Task<Guid?> GetBusinessIdByCashbookIdAsync(Guid cashbookId);

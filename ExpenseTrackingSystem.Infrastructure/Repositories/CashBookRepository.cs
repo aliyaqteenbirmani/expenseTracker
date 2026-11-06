@@ -1,5 +1,3 @@
-
-
 using CashBookSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs.CashBookDtos;
@@ -30,11 +28,16 @@ namespace CashBookSystem.Infrastructure.Repositories
                 });
         }
 
-        public async Task<ApiResponseRaw> GetAllCashBooks(string businessId)
+        public async Task<ApiResponseRaw> GetAllCashBooks(string businessId, string? userId = null)
         {
+            var pUserId = string.IsNullOrWhiteSpace(userId) ? (Guid?)null : Guid.Parse(userId);
             return await _dapperContext.GetSingleAsync<ApiResponseRaw>(
                 "SP_GetCashBooksByBusinessId",
-                new { BusinessId = Guid.Parse(businessId) });
+                new
+                {
+                    BusinessId = Guid.Parse(businessId),
+                    UserId = pUserId
+                });
         }
 
         public async Task<ApiResponseRaw> GetCashBookById(Guid id, string userId)
@@ -69,7 +72,3 @@ namespace CashBookSystem.Infrastructure.Repositories
         }
     }
 }
-
-
-
-

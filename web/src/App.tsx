@@ -2418,11 +2418,20 @@ function DirectInviteModal({
   token: string
   inviteToken: string
   onClose: () => void
-  onAccepted: () => void
+  onAccepted: (target?: { businessId?: string; cashbookId?: string }) => void
   onToast: (msg: string) => void
 }) {
   const [loading, setLoading] = useState(true)
-  const [inviteData, setInviteData] = useState<{ id?: string; businessName?: string; cashbookName?: string; invitedByName?: string } | null>(null)
+  const [inviteData, setInviteData] = useState<{
+    id?: string
+    businessId?: string
+    BusinessId?: string
+    cashBookId?: string
+    CashBookId?: string
+    businessName?: string
+    cashbookName?: string
+    invitedByName?: string
+  } | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -2432,7 +2441,7 @@ function DirectInviteModal({
         setLoading(true)
         const res = await api<unknown>(`/api/Invitations/by-token?token=${encodeURIComponent(inviteToken)}`, token)
         const item = Array.isArray(res) ? res[0] : res
-        setInviteData(item as { id?: string; businessName?: string; cashbookName?: string; invitedByName?: string })
+        setInviteData(item as typeof inviteData)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Invalid or expired invitation link.')
       } finally {
@@ -2449,7 +2458,9 @@ function DirectInviteModal({
     try {
       await api(`/api/Invitations/${inviteData.id}/accept`, token, { method: 'POST' })
       onToast('Invitation accepted! Welcome to the workspace.')
-      onAccepted()
+      const bId = inviteData.businessId || inviteData.BusinessId
+      const cbId = inviteData.cashBookId || inviteData.CashBookId
+      onAccepted(bId ? { businessId: bId, cashbookId: cbId } : undefined)
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not accept invitation.')
@@ -2498,6 +2509,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [businessId, setBusinessId] = useState('')
   const [books, setBooks] = useState<Cashbook[]>([])
   const [book, setBook] = useState<Cashbook | null>(null)
+  const [preferredBookId, setPreferredBookId] = useState<string | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [showReceipt, setShowReceipt] = useState(false)
   const [showManualTransaction, setShowManualTransaction] = useState(false)
@@ -2695,7 +2707,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
     }
   }, [])
 
-  const reloadBusinesses = useCallback(async () => {
+  const reloadBusinesses = useCallback(async (preferredBusinessId?: string, preferredCashbookId?: string) => {
     try {
       const list = await api<Business[]>('/api/Business/all', token)
       const normalized = (list ?? []).map(item => ({
@@ -2709,7 +2721,15 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       }))
       setBusinesses(normalized)
       if (normalized.length) {
-        setBusinessId(curr => (normalized.some(b => b.id === curr) ? curr : normalized[0].id))
+        setBusinessId(curr => {
+          if (preferredBusinessId && normalized.some(b => b.id === preferredBusinessId)) {
+            return preferredBusinessId
+          }
+          return normalized.some(b => b.id === curr) ? curr : normalized[0].id
+        })
+        if (preferredCashbookId) {
+          setPreferredBookId(preferredCashbookId)
+        }
         setNeedsSetup(false)
       } else {
         setNeedsSetup(true)
@@ -2742,7 +2762,15 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           cashBookName: item.cashBookName ?? (item as unknown as { CashBookName: string }).CashBookName
         }))
         setBooks(fixed)
-        setBook(current => fixed.find(item => item.id === current?.id) ?? fixed[0] ?? null)
+        setBook(current => {
+          if (preferredBookId && fixed.some(item => item.id === preferredBookId)) {
+            return fixed.find(item => item.id === preferredBookId) ?? null
+          }
+          return fixed.find(item => item.id === current?.id) ?? fixed[0] ?? null
+        })
+        if (preferredBookId) {
+          setPreferredBookId(null)
+        }
       })
       .catch(e => setError(e instanceof Error ? e.message : 'Could not load cashbooks.'))
       .finally(() => setLoadingBooks(false))
@@ -3912,9 +3940,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             sessionStorage.removeItem('spendwise-invite-token')
             setPendingUrlInviteToken(null)
           }}
-          onAccepted={() => {
+          onAccepted={target => {
             sessionStorage.removeItem('spendwise-invite-token')
-            void reloadBusinesses()
+            void reloadBusinesses(target?.businessId, target?.cashbookId)
             void fetchUnreadInvites()
           }}
           onToast={showToast}

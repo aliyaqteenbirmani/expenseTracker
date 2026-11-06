@@ -91,20 +91,25 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
             string businessId,
             string userId)
         {
-            var hasAccess = await _permissionAccessService.HasBusinessOrOwnerAccessAsync(
-                Guid.Parse(businessId),
-                Guid.Parse(userId),
+            var bId = Guid.Parse(businessId);
+            var uId = Guid.Parse(userId);
+
+            var isOwnerOrBizMember = await _permissionAccessService.HasBusinessOrOwnerAccessAsync(
+                bId,
+                uId,
                 BusinessPermission.CASHBOOK_LIST_VIEW.ToString()
             );
 
-            if (!hasAccess)
+            var hasAnyCashbook = !isOwnerOrBizMember && await _permissionAccessService.HasAnyCashbookAccessInBusinessAsync(bId, uId);
+
+            if (!isOwnerOrBizMember && !hasAnyCashbook)
             {
                 return ApiResponse<List<CreateCashBookDto>>.FailureResponse(
                     "You do not have permission to view cashbooks for this business."
                 );
             }
 
-            var responseFromRepo = await _cashbookRepository.GetAllCashBooks(businessId);
+            var responseFromRepo = await _cashbookRepository.GetAllCashBooks(businessId, userId);
 
             if (!responseFromRepo.Success)
             {

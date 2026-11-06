@@ -1,4 +1,3 @@
-
 using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs.CashBookDtos;
 using SpendwiseSystem.Domain.Entities;
@@ -8,13 +7,9 @@ namespace CashBookSystem.Application.Interfaces
     public interface ICashBookRepository
     {
         Task<CashBookCommandResultDbo> AddCashBook(CreateCashBookDto dto, string userId, string createdBy);
-        Task<ApiResponseRaw> GetAllCashBooks(string businessId);
+        Task<ApiResponseRaw> GetAllCashBooks(string businessId, string? userId = null);
         Task<ApiResponseRaw> GetCashBookById(Guid id, string userId);
         Task<ApiResponseRaw> UpdateCashBook(Guid id, string CashBookName, string userId, string modifiedBy);
         Task<ApiResponseRaw> DeleteCashBook(Guid id);
     }
 }
-
-
-
-
