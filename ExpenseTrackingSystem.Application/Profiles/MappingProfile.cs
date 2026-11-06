@@ -18,8 +18,8 @@ namespace SpendwiseSystem.Application.Profiles
             CreateMap<UserDataForTokenGeneration, RefreshTokenWithUserDataDto>();
             CreateMap<CashTransactionDto, CashTransaction>();
             CreateMap<CashTransaction, CashTransactionDto>();
+            CreateMap<CashTransaction, AllCashTransactionDto>();
+            CreateMap<AllCashTransactionDto, CashTransaction>();
         }
     }
 }
-
-

@@ -1,4 +1,4 @@
-﻿using SpendwiseSystem.Application.Helper;
+using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs.CashTransactionDtos;
@@ -124,6 +124,14 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     ModifiedBy = modifiedBy
                 },
                 commandType: System.Data.CommandType.StoredProcedure);
+        }
+
+        public async Task<string?> GetCashBookNameAsync(Guid cashBookId)
+        {
+            return await _dapperContext.GetSingleAsync<string?>(
+                "SELECT TOP 1 Name FROM dbo.CashBooks WHERE Id = @CashBookId AND IsDeleted = 0",
+                new { CashBookId = cashBookId },
+                commandType: System.Data.CommandType.Text);
         }
     }
 }

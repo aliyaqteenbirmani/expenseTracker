@@ -3535,3 +3535,31 @@ input,select,textarea{transition:border-color .16s ease,box-shadow .16s ease}.lo
   padding: 1px 5px;
   border-radius: 4px;
 }
+
+
+/* Transaction Creator Badge */
+.txn-creator-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.txn-meta-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}

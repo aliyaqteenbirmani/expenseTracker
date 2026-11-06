@@ -1,4 +1,4 @@
-﻿using SpendwiseSystem.Domain.DBOs;
+using SpendwiseSystem.Domain.DBOs;
 using SpendwiseSystem.Domain.DTOs.CashTransactionDtos;
 using SpendwiseSystem.Domain.Entities;
 
@@ -14,6 +14,6 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<Guid?> GetCashBookIdByTransactionIdAsync(Guid id);
         Task<ApiResponseRaw> GetAllTransactionsOfCashBook(string CashBookId);
         Task<SPResponseFromDb> GetTransactionFileName(string id);
-
+        Task<string?> GetCashBookNameAsync(Guid cashBookId);
     }
 }

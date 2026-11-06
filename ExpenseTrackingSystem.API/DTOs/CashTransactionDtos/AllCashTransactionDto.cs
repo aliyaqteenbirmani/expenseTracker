@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -18,5 +18,7 @@ namespace SpendwiseSystem.Domain.DTOs.CashTransactionDtos
         public DateTime? TransactionDate { get; set; }
         public string FilePath { get; set; } = null;
         public string FileName { get; set; } = string.Empty;
+        public string CreatedBy { get; set; } = string.Empty;
+        public DateTime? CreatedOn { get; set; }
     }
 }

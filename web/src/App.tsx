@@ -39,6 +39,7 @@ import {
   TrendingUp,
   Trash2,
   Upload,
+  User,
   Utensils,
   UsersRound,
   Wallet,
@@ -57,12 +58,15 @@ import MonthlyBudgetCard from './MonthlyBudgetCard'
 import ReceiptsVaultPage from './ReceiptsVaultPage'
 import KeyboardShortcutsDialog from './KeyboardShortcutsDialog'
 import CategoryBreakdownCard from './CategoryBreakdownCard'
+import { realtimeService } from './realtimeService'
 import './App.css'
 
 const API = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'
 
 type Envelope<T> = { data?: T; Data?: T; message?: string; Message?: string }
 type User = {
+  id?: string
+  Id?: string
   firstName?: string
   FirstName?: string
   lastName?: string
@@ -84,6 +88,8 @@ export type Transaction = {
   transactionDate?: string
   fileName?: string
   filePath?: string
+  createdBy?: string
+  createdOn?: string
 }
 export type TransactionCategory = { label: string; Icon: LucideIcon }
 
@@ -1877,7 +1883,7 @@ function TransactionsPage({
   function exportSelectedCsv() {
     const escapeCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
     const rows = [
-      ['Date', 'Description', 'Category', 'Type', 'Amount', 'Currency', 'Cashbook', 'Transaction ID'],
+      ['Date', 'Description', 'Category', 'Type', 'Amount', 'Currency', 'Cashbook', 'Transaction ID', 'Recorded By'],
       ...selectedTransactions.map(transaction => [
         transaction.transactionDate?.slice(0, 10) ?? '',
         transaction.remarks ?? '',
@@ -1886,7 +1892,8 @@ function TransactionsPage({
         transaction.amount ?? 0,
         'PKR',
         cashbookName,
-        transaction.id
+        transaction.id,
+        transaction.createdBy || 'Unknown'
       ])
     ]
     const csvContent = '\uFEFF' + rows.map(r => r.map(escapeCell).join(',')).join('\r\n')
@@ -1971,13 +1978,13 @@ function TransactionsPage({
   function exportCsv() {
     const escapeCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
     const rows = [
-      ['Date', 'Description', 'Category', 'Type', 'Amount', 'Currency', 'Cashbook', 'Transaction ID'],
+      ['Date', 'Description', 'Category', 'Type', 'Amount', 'Currency', 'Cashbook', 'Transaction ID', 'Recorded By'],
       ...filteredTransactions.map(transaction => [
         transaction.transactionDate?.slice(0, 10) ?? '',
         transaction.remarks || (transaction.transactionType?.toLowerCase() === 'cashin' ? 'Cash received' : 'Cash expense'),
         getTransactionCategory(transaction).label,
         transaction.transactionType?.toLowerCase() === 'cashin' ? 'Income' : 'Expense',
-        Number(transaction.amount || 0), 'PKR', cashbookName, transaction.id,
+        Number(transaction.amount || 0), 'PKR', cashbookName, transaction.id, transaction.createdBy || 'Unknown'
       ]),
     ]
     const csv = '\uFEFF' + rows.map(row => row.map(escapeCell).join(',')).join('\r\n')
@@ -2231,20 +2238,27 @@ function TransactionsPage({
                     </span>
                     <span>
                       <strong>{transaction.remarks || (isIncome ? 'Cash received' : 'Cash expense')}</strong>
-                      <small>{category.label}</small>
-                      {hasAttachment && (
-                        <button
-                          type="button"
-                          className="txn-attachment-btn"
-                          title="View receipt attachment"
-                          onClick={e => {
-                            e.stopPropagation()
-                            onViewAttachment(transaction)
-                          }}
-                        >
-                          <Paperclip size={11} strokeWidth={2} /> Receipt
-                        </button>
-                      )}
+                      <div className="txn-meta-row">
+                        <small>{category.label}</small>
+                        {transaction.createdBy && (
+                          <span className="txn-creator-badge" title={`Recorded by ${transaction.createdBy}`}>
+                            <User size={10} strokeWidth={2} /> {transaction.createdBy}
+                          </span>
+                        )}
+                        {hasAttachment && (
+                          <button
+                            type="button"
+                            className="txn-attachment-btn"
+                            title="View receipt attachment"
+                            onClick={e => {
+                              e.stopPropagation()
+                              onViewAttachment(transaction)
+                            }}
+                          >
+                            <Paperclip size={11} strokeWidth={2} /> Receipt
+                          </button>
+                        )}
+                      </div>
                     </span>
                   </div>
                   <span>{date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString() : '—'}</span>
@@ -2523,6 +2537,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [showCreateCashbook, setShowCreateCashbook] = useState(false)
   const [showCreateBusiness, setShowCreateBusiness] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [notificationsRefreshTrigger, setNotificationsRefreshTrigger] = useState(0)
   const [showProfile, setShowProfile] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [unreadInvitesCount, setUnreadInvitesCount] = useState(0)
@@ -2706,6 +2721,74 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       setPendingUrlInviteToken(inviteParam)
     }
   }, [])
+
+  const bookRef = useRef(book)
+  bookRef.current = book
+  const businessIdRef = useRef(businessId)
+  businessIdRef.current = businessId
+
+  useEffect(() => {
+    if (!token) return
+
+    realtimeService.init(token, API, {
+      onInvitationReceived: payload => {
+        void fetchUnreadInvites()
+        setNotificationsRefreshTrigger(prev => prev + 1)
+        showToast(payload.message || `${payload.invitedByName} sent you an invitation!`)
+      },
+      onInvitationAccepted: payload => {
+        showToast(payload.message || `${payload.acceptedByName} accepted your invitation!`)
+        void reloadBusinesses()
+        void reloadCashbooks()
+      },
+      onWorkspacesChanged: () => {
+        void reloadBusinesses()
+        void reloadCashbooks()
+        void fetchUnreadInvites()
+      },
+      onCashbookCreated: payload => {
+        if (payload.businessId === businessIdRef.current) {
+          void reloadCashbooks()
+          showToast(payload.message || `${payload.createdByName} created cashbook '${payload.cashbookName}'`)
+        }
+      },
+      onTransactionCreated: payload => {
+        if (payload.cashBookId === bookRef.current?.id) {
+          void reloadTransactions(payload.cashBookId)
+          const currentId = user.id ?? (user as unknown as { Id?: string }).Id
+          if (payload.creatorUserId !== currentId) {
+            showToast(payload.message || `${payload.createdByName} added a transaction.`)
+          }
+        }
+      },
+      onTransactionUpdated: payload => {
+        if (payload.cashBookId === bookRef.current?.id) {
+          void reloadTransactions(payload.cashBookId)
+          const currentId = user.id ?? (user as unknown as { Id?: string }).Id
+          if (payload.modifierUserId !== currentId) {
+            showToast(payload.message || `${payload.modifiedByName} updated a transaction.`)
+          }
+        }
+      },
+      onTransactionDeleted: payload => {
+        if (payload.cashBookId === bookRef.current?.id) {
+          void reloadTransactions(payload.cashBookId)
+          const currentId = user.id ?? (user as unknown as { Id?: string }).Id
+          if (payload.deleterUserId !== currentId) {
+            showToast(payload.message || `${payload.deletedByName} deleted a transaction.`)
+          }
+        }
+      }
+    })
+  }, [token, fetchUnreadInvites, user])
+
+  useEffect(() => {
+    void realtimeService.setCashbook(book?.id ?? null)
+  }, [book?.id])
+
+  useEffect(() => {
+    void realtimeService.setBusiness(businessId || null)
+  }, [businessId])
 
   const reloadBusinesses = useCallback(async (preferredBusinessId?: string, preferredCashbookId?: string) => {
     try {
@@ -3718,7 +3801,13 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                             </span>
                             <span>
                               <strong>{t.remarks || (t.transactionType === 'CashIn' ? 'Cash received' : 'Cash expense')}</strong>
-                              <small>{getTransactionCategory(t).label}</small>
+                              <div className="txn-meta-row">
+                                <small>{getTransactionCategory(t).label}</small>
+                                {t.createdBy && (
+                                  <span className="txn-creator-badge" title={`Recorded by ${t.createdBy}`}>
+                                    <User size={10} strokeWidth={2} /> {t.createdBy}
+                                  </span>
+                                )}
                               {hasAttachment && (
                                 <button
                                   type="button"
@@ -3732,6 +3821,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                                   <Paperclip size={11} strokeWidth={2} /> Receipt
                                 </button>
                               )}
+                              </div>
                             </span>
                           </div>
                           <span>{t.transactionDate ? new Date(t.transactionDate).toLocaleDateString() : '—'}</span>
@@ -3923,9 +4013,11 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       {showNotifications && (
         <NotificationsPopover
           token={token}
+          refreshTrigger={notificationsRefreshTrigger}
           onClose={() => setShowNotifications(false)}
-          onInvitationProcessed={() => {
-            void reloadBusinesses()
+          onInvitationProcessed={target => {
+            void reloadBusinesses(target?.businessId, target?.cashbookId)
+            void reloadCashbooks()
             void fetchUnreadInvites()
           }}
           onToast={showToast}
@@ -4083,6 +4175,7 @@ function App() {
   })
 
   function logout() {
+    void realtimeService.disconnect()
     sessionStorage.removeItem('spendwise-user')
     setUser(null)
   }

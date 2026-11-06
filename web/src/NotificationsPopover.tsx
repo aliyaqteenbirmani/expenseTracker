@@ -4,7 +4,9 @@ import { Bell, Check, RefreshCw, UserCheck, X } from 'lucide-react'
 type Invitation = {
   id: string
   invitationType: string
+  businessId?: string
   businessName: string
+  cashbookId?: string
   cashbookName?: string
   invitedEmail: string
   invitedByName: string
@@ -16,11 +18,12 @@ type Invitation = {
 type Props = {
   token: string
   onClose: () => void
-  onInvitationProcessed: () => void
+  onInvitationProcessed: (target?: { businessId?: string; cashbookId?: string }) => void
   onToast: (message: string) => void
+  refreshTrigger?: number
 }
 
-export default function NotificationsPopover({ token, onClose, onInvitationProcessed, onToast }: Props) {
+export default function NotificationsPopover({ token, onClose, onInvitationProcessed, onToast, refreshTrigger }: Props) {
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -50,7 +53,7 @@ export default function NotificationsPopover({ token, onClose, onInvitationProce
 
   useEffect(() => {
     void loadPending()
-  }, [loadPending])
+  }, [loadPending, refreshTrigger])
 
   async function handleAction(id: string, action: 'accept' | 'reject') {
     setBusyId(id)
@@ -70,7 +73,8 @@ export default function NotificationsPopover({ token, onClose, onInvitationProce
       }
 
       onToast(action === 'accept' ? 'Invitation accepted! Workspace added.' : 'Invitation declined.')
-      onInvitationProcessed()
+      const acceptedItem = invitations.find(i => i.id === id)
+      onInvitationProcessed(acceptedItem ? { businessId: acceptedItem.businessId, cashbookId: acceptedItem.cashbookId } : undefined)
       await loadPending()
     } catch (e) {
       setError(e instanceof Error ? e.message : `Could not ${action} invitation.`)

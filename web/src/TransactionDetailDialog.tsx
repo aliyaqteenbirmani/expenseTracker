@@ -9,6 +9,7 @@ import {
   Paperclip,
   Pencil,
   Trash2,
+  User,
   Wallet,
   X
 } from 'lucide-react'
@@ -129,6 +130,15 @@ export default function TransactionDetailDialog({
                     {formattedTime} {relativeTime ? `(${relativeTime})` : ''}
                   </span>
                 )}
+              </div>
+            </div>
+
+            <div className="txn-meta-item">
+              <div className="txn-meta-icon"><User size={15} strokeWidth={1.8} /></div>
+              <div>
+                <small>RECORDED BY</small>
+                <strong>{transaction.createdBy || 'Unknown'}</strong>
+                <span className="txn-meta-sub">User who added this transaction</span>
               </div>
             </div>
 

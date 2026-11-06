@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 using SpendwiseSystem.API.Extensions;
 using SpendwiseSystem.API.Exceptions;
+using SpendwiseSystem.API.Hubs;
+using SpendwiseSystem.API.Services.Realtime;
 using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Application.Profiles;
@@ -40,6 +42,16 @@ builder.Services.AddAuthentication(options =>
     {
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
             OnChallenge = async context =>
             {
                 context.HandleResponse();
@@ -73,12 +85,15 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFlutterApp", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.SetIsOriginAllowed(_ => true)
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IRealtimeNotificationService, RealtimeNotificationService>();
 builder.Services.AddApplicationServices(builder.Configuration);
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.Configure<SpendwiseSystem.Application.Helper.AppLinkSettings>(
@@ -192,5 +207,6 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<AppHub>("/hubs/app");
 
 app.Run();

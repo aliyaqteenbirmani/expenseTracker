@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SpendwiseSystem.API.Services.Realtime;
 using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Services.CurrentUserService;
 using SpendwiseSystem.Application.Services.SpendwiseService;
@@ -15,11 +16,16 @@ namespace SpendwiseSystem.API.Controllers
     {
         private readonly ICashBookService _cashBookService;
         private readonly ICurrentUserService _currentUserService;
+        private readonly IRealtimeNotificationService _realtimeNotificationService;
 
-        public CashBookController(ICashBookService cashBookService, ICurrentUserService currentUserService)
+        public CashBookController(
+            ICashBookService cashBookService,
+            ICurrentUserService currentUserService,
+            IRealtimeNotificationService realtimeNotificationService)
         {
             _cashBookService = cashBookService;
             _currentUserService = currentUserService;
+            _realtimeNotificationService = realtimeNotificationService;
         }
 
         [HttpPost]
@@ -37,11 +43,17 @@ namespace SpendwiseSystem.API.Controllers
             if (!response.Success)
                 return Conflict(ApiResponses.Conflict());
 
-            // Fix: Cast or extract the correct type for SuccessWithData<T>
+            if (Guid.TryParse(dto.BusinessId, out var bId))
+            {
+                await _realtimeNotificationService.NotifyCashbookCreatedAsync(
+                    bId,
+                    dto.Id,
+                    dto.CashBookName ?? "Cashbook",
+                    createdBy ?? "A member");
+            }
+
             return Ok(ApiResponses.SuccessWithData(response.Data, "Cash book created successfully"));
         }
-
-
 
         [HttpGet("getall")]
         public async Task<ActionResult<List<CreateCashBookDto>>> GetAllCashBooks(string id)
@@ -98,18 +110,15 @@ namespace SpendwiseSystem.API.Controllers
         public async Task<ActionResult<CreateCashBookDto>> DelteCashBook(string id)
         {
             var userId = _currentUserService.UserId.ToString();
-            if(string.IsNullOrEmpty(userId))
+            if (string.IsNullOrEmpty(userId))
                 return Unauthorized(ApiResponses.Unauthorized());
 
-            var responseFromService = await _cashBookService.DeleteCashBook(id, userId);
+            var response = await _cashBookService.DeleteCashBook(id, userId);
 
-            if (!responseFromService.Success)
-                return BadRequest(ApiResponses.BadRequest());
+            if (!response.Success)
+                return BadRequest(ApiResponses.BadRequest(response.Message));
 
-            return Ok(ApiResponses.Success(responseFromService.Message));
+            return Ok(ApiResponses.SuccessWithData(response.Data, response.Message));
         }
     }
 }
-
-
-
