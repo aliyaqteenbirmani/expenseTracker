@@ -44,6 +44,9 @@ namespace SpendwiseSystem.API.Controllers
 
             var result = await _invitationService.CreateBusinessInvitationAsync(businessId, request, currentUserId);
             if (!result.Success)
+            {
+                if (result.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(result.Message));
                 return BadRequest(new ApiResponse<object>
                 {
                     Success = false,
@@ -51,6 +54,7 @@ namespace SpendwiseSystem.API.Controllers
                     StatusCode = StatusCodes.Status400BadRequest,
                     ErrorCode = result.ErrorCode
                 });
+            }
 
             // Real-time SignalR notification to invited user
             var businessInfo = await _invitationRepository.GetBusinessEmailInfoAsync(businessId);
@@ -81,6 +85,9 @@ namespace SpendwiseSystem.API.Controllers
 
             var result = await _invitationService.CreateCashbookInvitationAsync(businessId, cashbookId, request, currentUserId);
             if (!result.Success)
+            {
+                if (result.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(result.Message));
                 return BadRequest(new ApiResponse<object>
                 {
                     Success = false,
@@ -88,6 +95,7 @@ namespace SpendwiseSystem.API.Controllers
                     StatusCode = StatusCodes.Status400BadRequest,
                     ErrorCode = result.ErrorCode
                 });
+            }
 
             // Real-time SignalR notification to invited user
             var cashbookInfo = await _invitationRepository.GetCashbookEmailInfoAsync(businessId, cashbookId);

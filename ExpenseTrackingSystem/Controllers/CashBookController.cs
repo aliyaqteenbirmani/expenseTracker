@@ -82,6 +82,7 @@ namespace SpendwiseSystem.API.Controllers
 
             return response.StatusCode switch
             {
+                403 => StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(response.Message)),
                 404 => NotFound(ApiResponses.NotFound()),
                 400 => BadRequest(ApiResponses.BadRequest(response.Message)),
                 401 => Unauthorized(ApiResponses.Unauthorized(response.Message)),
@@ -101,7 +102,11 @@ namespace SpendwiseSystem.API.Controllers
             var response = await _cashBookService.UpdateCashBook(id, dto, userId, modifiedBy);
 
             if(!response.Success)
+            {
+                if (response.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(response.Message));
                 return BadRequest(ApiResponses.BadRequest(response.Message));
+            }
 
             return Ok(ApiResponses.SuccessWithData(response.Data, response.Message));
         }
@@ -116,7 +121,11 @@ namespace SpendwiseSystem.API.Controllers
             var response = await _cashBookService.DeleteCashBook(id, userId);
 
             if (!response.Success)
+            {
+                if (response.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(response.Message));
                 return BadRequest(ApiResponses.BadRequest(response.Message));
+            }
 
             return Ok(ApiResponses.SuccessWithData(response.Data, response.Message));
         }

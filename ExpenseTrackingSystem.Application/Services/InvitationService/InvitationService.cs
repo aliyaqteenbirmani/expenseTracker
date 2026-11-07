@@ -45,13 +45,10 @@ namespace SpendwiseSystem.Application.Services.InvitationService
                 return ApiResponse<Guid>.FailureResponse("Current user id is required.");
 
             if (!await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId))
-                return ApiResponse<Guid>.FailureResponse("Only the business owner can invite members to this cashbook.");
+                return ApiResponse<Guid>.ForbiddenResponse("Only the business owner can invite new members.");
 
             if (request == null)
                 return ApiResponse<Guid>.FailureResponse("Request is required.");
-
-            if (!await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId))
-                return ApiResponse<Guid>.FailureResponse("Only the business owner can invite new members.");
 
             if (string.IsNullOrWhiteSpace(request.InvitedEmail))
                 return ApiResponse<Guid>.FailureResponse("Invited email is required.");
@@ -118,6 +115,9 @@ namespace SpendwiseSystem.Application.Services.InvitationService
 
             if (request == null)
                 return ApiResponse<Guid>.FailureResponse("Request is required.");
+
+            if (!await _permissionAccessService.IsCashbookOwnerAsync(cashbookId, currentUserId))
+                return ApiResponse<Guid>.ForbiddenResponse("Only the cashbook owner can invite members to this cashbook.");
 
             if (string.IsNullOrWhiteSpace(request.InvitedEmail))
                 return ApiResponse<Guid>.FailureResponse("Invited email is required.");

@@ -31,7 +31,17 @@ namespace SpendwiseSystem.Domain.Entities
                 Data = default
             };
         }
+
+        public static ApiResponse<T> ForbiddenResponse(string message = "You do not have permission to perform this action.")
+        {
+            return new ApiResponse<T>
+            {
+                StatusCode = 403,
+                Success = false,
+                Message = message,
+                ErrorCode = "FORBIDDEN",
+                Data = default
+            };
+        }
     }
 }
-
-

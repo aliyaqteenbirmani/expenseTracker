@@ -40,7 +40,7 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(transactionDto.CashBookId, userId, CashbookPermission.TRANSACTION_CREATE.ToString());
 
             if(!hasAccess)
-                return ApiResponse<CashTransaction>.FailureResponse("You do not have permission to add a transaction to this cashbook.");
+                return ApiResponse<CashTransaction>.ForbiddenResponse("You do not have permission to add a transaction to this cashbook.");
 
             var resultFromRepo = await _transactionRepository.AddCashTransaction(transactionDto, createdBy);
 
@@ -92,7 +92,7 @@ namespace SpendwiseSystem.Application.Services.TransactionService
                 userId,
                 CashbookPermission.TRANSACTION_CREATE.ToString());
             if (!hasAccess)
-                return ApiResponse<CashTransaction>.FailureResponse("You do not have permission to add a transaction to this cashbook.");
+                return ApiResponse<CashTransaction>.ForbiddenResponse("You do not have permission to add a transaction to this cashbook.");
 
             var raw = await _transactionRepository.AddCashTransactionFromReceipt(transactionDto, createdBy, receiptDraftId, merchant, category);
             if (!raw.Success || string.IsNullOrWhiteSpace(raw.Data))
@@ -134,7 +134,7 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(cashbookId.Value, userId, CashbookPermission.TRANSACTION_DELETE.ToString());
 
             if(!hasAccess)
-                return ApiResponse<Guid>.FailureResponse("You do not have permission to delete this transaction.");
+                return ApiResponse<Guid>.ForbiddenResponse("You do not have permission to delete this transaction.");
 
             var responseFromRepo = await _transactionRepository.DeleteTransactionAsync(id, modifiedBy);
             if (!responseFromRepo.Success)
@@ -164,7 +164,7 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             {
                 var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(responseFromRepo.Data.CashBookId, userId, CashbookPermission.TRANSACTION_VIEW.ToString());
                 if (!hasAccess)
-                    return ApiResponse<CashTransactionDto>.FailureResponse("You do not have permission to view this transaction.");
+                    return ApiResponse<CashTransactionDto>.ForbiddenResponse("You do not have permission to view this transaction.");
 
                 var mappedTransaction = _mapper.Map<CashTransactionDto>(responseFromRepo.Data);
                 return new ApiResponse<CashTransactionDto>
@@ -197,7 +197,7 @@ namespace SpendwiseSystem.Application.Services.TransactionService
 
             var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(cashbookId.Value, userId, CashbookPermission.TRANSACTION_VIEW.ToString());
             if (!hasAccess)
-                return ApiResponse<CashTransactionFileDto>.FailureResponse("You do not have permission to view this transaction.");
+                return ApiResponse<CashTransactionFileDto>.ForbiddenResponse("You do not have permission to view this transaction.");
 
             var responseFromRepo = await _transactionRepository.GetTransactionFileName(id);
             if (responseFromRepo.Success)
@@ -232,7 +232,7 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(cashbookId.Value, userId, CashbookPermission.TRANSACTION_UPDATE.ToString());
 
             if(!hasAccess)
-                return ApiResponse<CTUpdateResponseDto>.FailureResponse("You do not have permission to edit this transaction.");
+                return ApiResponse<CTUpdateResponseDto>.ForbiddenResponse("You do not have permission to edit this transaction.");
 
             var responseFromRepo = await  _transactionRepository.UpdateCashTransaction(transactionUpdateDto, modifiedBy);
 
@@ -278,7 +278,7 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(Guid.Parse(CashBookId), userId, CashbookPermission.TRANSACTION_VIEW.ToString());
 
             if(!hasAccess)
-                return ApiResponse<List<AllCashTransactionDto>>.FailureResponse("You do not have permission to view transactions of this cashbook.");
+                return ApiResponse<List<AllCashTransactionDto>>.ForbiddenResponse("You do not have permission to view transactions of this cashbook.");
             var responseFromRepo = await _transactionRepository.GetAllTransactionsOfCashBook(CashBookId);
             if (responseFromRepo.Success)
             {

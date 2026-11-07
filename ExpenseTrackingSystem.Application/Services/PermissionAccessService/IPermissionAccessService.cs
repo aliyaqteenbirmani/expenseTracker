@@ -9,6 +9,7 @@ namespace SpendwiseSystem.Application.Services.PermissionAccessService
     public interface IPermissionAccessService
     {
         Task<bool> IsBusinessOwnerAsync(Guid businessId, Guid userId);
+        Task<bool> IsCashbookOwnerAsync(Guid cashbookId, Guid userId);
         Task<bool> HasBusinessPermissionAsync(Guid businessId, Guid userId, string permissionCode);
         Task<bool> HasCashbookPermissionAsync(Guid cashbookId, Guid userId, string permissionCode);
         Task<bool> HasAnyCashbookAccessInBusinessAsync(Guid businessId, Guid userId);

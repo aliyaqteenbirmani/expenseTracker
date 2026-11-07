@@ -31,6 +31,19 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             return result?.IsAllowed ?? false;
         }
 
+        public async Task<bool> IsCashbookOwnerAsync(Guid cashbookId, Guid userId)
+        {
+            var result = await _dapper.GetSingleAsync<PermissionCheckResult>(
+                "SP_IsCashbookOwner",
+                new
+                {
+                    CashBookId = cashbookId,
+                    UserId = userId
+                });
+
+            return result?.IsAllowed ?? false;
+        }
+
         public async Task<bool> HasBusinessPermissionAsync(Guid businessId, Guid userId, string permissionCode)
         {
             var result = await _dapper.GetSingleAsync<PermissionCheckResult>(

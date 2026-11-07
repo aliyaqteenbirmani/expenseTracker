@@ -81,11 +81,11 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
                 return ApiResponse<Guid>.FailureResponse("Current user id is required.");
 
             if (currentUserId == userId)
-                return ApiResponse<Guid>.FailureResponse("Members cannot modify their own permissions.");
+                return ApiResponse<Guid>.ForbiddenResponse("Members cannot modify their own permissions.");
 
             var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
             if (!isOwner)
-                return ApiResponse<Guid>.FailureResponse("Only the business owner can manage member permissions.");
+                return ApiResponse<Guid>.ForbiddenResponse("Only the business owner can manage member permissions.");
 
             if (request == null)
                 return ApiResponse<Guid>.FailureResponse("Request is required.");
@@ -135,11 +135,11 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
                 return ApiResponse<Guid>.FailureResponse("Current user id is required.");
 
             if (currentUserId == userId)
-                return ApiResponse<Guid>.FailureResponse("Members cannot modify their own permissions.");
+                return ApiResponse<Guid>.ForbiddenResponse("Members cannot modify their own permissions.");
 
-            var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
+            var isOwner = await _permissionAccessService.IsCashbookOwnerAsync(cashbookId, currentUserId);
             if (!isOwner)
-                return ApiResponse<Guid>.FailureResponse("Only the business owner can manage member permissions.");
+                return ApiResponse<Guid>.ForbiddenResponse("Only the cashbook owner can manage member permissions.");
 
             if (request == null)
                 return ApiResponse<Guid>.FailureResponse("Request is required.");
@@ -188,7 +188,7 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
             {
                 var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
                 if (!isOwner)
-                    return ApiResponse<Guid>.FailureResponse("Only the business owner can remove other members.");
+                    return ApiResponse<Guid>.ForbiddenResponse("Only the business owner can remove other members.");
             }
 
             var result = await _memberManagementRepository.RemoveBusinessMemberAsync(
@@ -219,9 +219,9 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
 
             if (currentUserId != userId)
             {
-                var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
+                var isOwner = await _permissionAccessService.IsCashbookOwnerAsync(cashbookId, currentUserId);
                 if (!isOwner)
-                    return ApiResponse<Guid>.FailureResponse("Only the business owner can remove other members.");
+                    return ApiResponse<Guid>.ForbiddenResponse("Only the cashbook owner can remove members from this cashbook.");
             }
 
             var result = await _memberManagementRepository.RemoveCashbookMemberAsync(
@@ -261,6 +261,12 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
                 businessId,
                 cashbookId,
                 currentUserId);
+
+            if (cashbookId.HasValue && await _permissionAccessService.IsCashbookOwnerAsync(cashbookId.Value, currentUserId))
+            {
+                access.IsOwner = true;
+                access.CashbookPermissions = Enum.GetNames<SpendwiseSystem.Domain.Enums.CashbookPermission>().ToList();
+            }
 
             return ApiResponse<UserWorkspaceAccessDto>.SuccessResponse(
                 "User access retrieved successfully.",

@@ -428,6 +428,9 @@ namespace SpendwiseSystem.API.Controllers
                     FileUploadHelper.DeleteUploadedFile(resultFromService.Data.FileName);
                 }
 
+                if (resultFromService.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(resultFromService.Message));
+
                 return BadRequest(ApiResponses.BadRequest(resultFromService.Message));
             }
             catch
@@ -465,6 +468,9 @@ namespace SpendwiseSystem.API.Controllers
                 return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
             }
 
+            if (responseFromService.StatusCode == StatusCodes.Status403Forbidden)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(responseFromService.Message));
+
             return BadRequest(ApiResponses.BadRequest(responseFromService.Message));
         }
 
@@ -496,7 +502,10 @@ namespace SpendwiseSystem.API.Controllers
                 return Ok(ApiResponses.Success(responseFromService.Message));
             }
 
-            return BadRequest(ApiResponses.BadRequest());
+            if (responseFromService.StatusCode == StatusCodes.Status403Forbidden)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(responseFromService.Message));
+
+            return BadRequest(ApiResponses.BadRequest(responseFromService.Message));
         }
 
         [HttpGet("{id:guid}")]
@@ -515,7 +524,10 @@ namespace SpendwiseSystem.API.Controllers
                 return Ok(ApiResponses.SuccessWithData(responseFromService.Data, responseFromService.Message));
             }
 
-            return BadRequest(ApiResponses.BadRequest());
+            if (responseFromService.StatusCode == StatusCodes.Status403Forbidden)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(responseFromService.Message));
+
+            return BadRequest(ApiResponses.BadRequest(responseFromService.Message));
         }
 
         [HttpPut("update")]
@@ -575,7 +587,10 @@ namespace SpendwiseSystem.API.Controllers
                     FileUploadHelper.DeleteUploadedFile(resultFromService.Data.FileName);
                 }
 
-                return BadRequest(ApiResponses.BadRequest());
+                if (resultFromService.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(resultFromService.Message));
+
+                return BadRequest(ApiResponses.BadRequest(resultFromService.Message));
             }
             catch
             {
@@ -595,7 +610,11 @@ namespace SpendwiseSystem.API.Controllers
             var responseFromService = await _transactionService.GetCashTransactionFile(id, userId ?? Guid.Empty);
 
             if (!responseFromService.Success)
-                return BadRequest(ApiResponses.BadRequest());
+            {
+                if (responseFromService.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(responseFromService.Message));
+                return BadRequest(ApiResponses.BadRequest(responseFromService.Message));
+            }
 
             var filePath = FileUploadHelper.GetFileUrl(new List<string?> { responseFromService.Data.FileName }, Request).FirstOrDefault();
             responseFromService.Data.FilePath = filePath;

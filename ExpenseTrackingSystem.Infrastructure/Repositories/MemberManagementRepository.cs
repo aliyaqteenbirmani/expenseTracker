@@ -203,15 +203,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     WHERE cm.CashBookId = @CashBookId AND cm.UserId = @UserId AND cm.Status = 'Active' AND cm.IsDeleted = 0";
 
                 var cbPerms = await _dapper.GetListAsyncTable<string>(cbSql, new { CashBookId = cashbookId.Value, UserId = currentUserId });
-                var cbList = cbPerms?.ToList() ?? new List<string>();
-                if (cbList.Any())
-                {
-                    if (!cbList.Contains("CASHBOOK_VIEW", StringComparer.OrdinalIgnoreCase))
-                        cbList.Add("CASHBOOK_VIEW");
-                    if (!cbList.Contains("TRANSACTION_VIEW", StringComparer.OrdinalIgnoreCase))
-                        cbList.Add("TRANSACTION_VIEW");
-                }
-                result.CashbookPermissions = cbList;
+                result.CashbookPermissions = cbPerms?.ToList() ?? new List<string>();
             }
 
             return result;

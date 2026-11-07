@@ -36,7 +36,11 @@ namespace SpendwiseSystem.API.Controllers
                 currentUserId);
 
             if (!result.Success)
+            {
+                if (result.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(result.Message));
                 return BadRequest(result);
+            }
 
             return Ok(result);
         }
@@ -55,7 +59,11 @@ namespace SpendwiseSystem.API.Controllers
                 currentUserId);
 
             if (!result.Success)
+            {
+                if (result.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(result.Message));
                 return BadRequest(result);
+            }
 
             return Ok(result);
         }
@@ -78,7 +86,11 @@ namespace SpendwiseSystem.API.Controllers
                 currentUserId);
 
             if (!result.Success)
+            {
+                if (result.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(result.Message));
                 return BadRequest(result);
+            }
 
             return Ok(result);
         }
@@ -103,7 +115,11 @@ namespace SpendwiseSystem.API.Controllers
                 currentUserId);
 
             if (!result.Success)
+            {
+                if (result.StatusCode == StatusCodes.Status403Forbidden)
+                    return StatusCode(StatusCodes.Status403Forbidden, ApiResponses.Forbidden(result.Message));
                 return BadRequest(result);
+            }
 
             return Ok(result);
         }

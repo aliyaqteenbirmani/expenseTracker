@@ -25,6 +25,14 @@ namespace SpendwiseSystem.Application.Services.PermissionAccessService
             return await _permissionAccessRepository.IsBusinessOwnerAsync(businessId, userId);
         }
 
+        public async Task<bool> IsCashbookOwnerAsync(Guid cashbookId, Guid userId)
+        {
+            if (cashbookId == Guid.Empty || userId == Guid.Empty)
+                return false;
+
+            return await _permissionAccessRepository.IsCashbookOwnerAsync(cashbookId, userId);
+        }
+
         public async Task<bool> HasBusinessPermissionAsync(Guid businessId, Guid userId, string permissionCode)
         {
             if (businessId == Guid.Empty || userId == Guid.Empty || string.IsNullOrWhiteSpace(permissionCode))
@@ -74,25 +82,29 @@ namespace SpendwiseSystem.Application.Services.PermissionAccessService
 
         public async Task<bool> HasCashbookOrOwnerAccessAsync(Guid cashbookId, Guid userId, string permissionCode)
         {
-            var businessId = await GetBusinessIdByCashbookIdAsync(cashbookId);
-
-            if (!businessId.HasValue || businessId.Value == Guid.Empty)
+            if (cashbookId == Guid.Empty || userId == Guid.Empty || string.IsNullOrWhiteSpace(permissionCode))
                 return false;
 
-            if (await IsBusinessOwnerAsync(businessId.Value, userId))
+            // 1. Check if user is the cashbook owner (creator or business owner)
+            if (await IsCashbookOwnerAsync(cashbookId, userId))
                 return true;
 
+            // 2. Check explicitly assigned member permission
             if (await HasCashbookPermissionAsync(cashbookId, userId, permissionCode))
                 return true;
 
-            // Business-level members with view permissions can view cashbooks and their transactions
+            // 3. Business-level members with view permissions can view cashbooks and their transactions
             if (string.Equals(permissionCode, CashbookPermission.CASHBOOK_VIEW.ToString(), StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(permissionCode, CashbookPermission.TRANSACTION_VIEW.ToString(), StringComparison.OrdinalIgnoreCase))
             {
-                if (await HasBusinessPermissionAsync(businessId.Value, userId, BusinessPermission.BUSINESS_VIEW.ToString()) ||
-                    await HasBusinessPermissionAsync(businessId.Value, userId, BusinessPermission.CASHBOOK_LIST_VIEW.ToString()))
+                var businessId = await GetBusinessIdByCashbookIdAsync(cashbookId);
+                if (businessId.HasValue && businessId.Value != Guid.Empty)
                 {
-                    return true;
+                    if (await HasBusinessPermissionAsync(businessId.Value, userId, BusinessPermission.BUSINESS_VIEW.ToString()) ||
+                        await HasBusinessPermissionAsync(businessId.Value, userId, BusinessPermission.CASHBOOK_LIST_VIEW.ToString()))
+                    {
+                        return true;
+                    }
                 }
             }
 
