@@ -1,6 +1,7 @@
-﻿using SpendwiseSystem.Domain.DTOs.BusinessDtos;
+using SpendwiseSystem.Domain.DTOs.BusinessDtos;
 using SpendwiseSystem.Domain.DTOs.CashBookDtos;
 using SpendwiseSystem.Domain.DTOs.InvitationRequestDto;
+using SpendwiseSystem.Domain.DTOs.MemberDto;
 using SpendwiseSystem.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -24,14 +25,14 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
         Task<ApiResponse<Guid>> UpdateBusinessMemberPermissionsAsync(
             Guid businessId,
             Guid userId,
-            UpdateBusinessMemberPermissionsRequest request,
+            SpendwiseSystem.Domain.DTOs.InvitationRequestDto.UpdateBusinessMemberPermissionsRequest request,
             Guid currentUserId);
 
         Task<ApiResponse<Guid>> UpdateCashbookMemberPermissionsAsync(
             Guid businessId,
             Guid cashbookId,
             Guid userId,
-            UpdateCashbookMemberPermissionsRequest request,
+            SpendwiseSystem.Domain.DTOs.InvitationRequestDto.UpdateCashbookMemberPermissionsRequest request,
             Guid currentUserId);
 
         Task<ApiResponse<Guid>> RemoveBusinessMemberAsync(
@@ -43,6 +44,11 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
             Guid businessId,
             Guid cashbookId,
             Guid userId,
+            Guid currentUserId);
+
+        Task<ApiResponse<UserWorkspaceAccessDto>> GetUserWorkspaceAccessAsync(
+            Guid businessId,
+            Guid? cashbookId,
             Guid currentUserId);
     }
 }

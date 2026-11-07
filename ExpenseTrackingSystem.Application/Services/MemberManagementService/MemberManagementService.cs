@@ -1,20 +1,26 @@
-﻿using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Services.PermissionAccessService;
 using SpendwiseSystem.Domain.DTOs.BusinessDtos;
 using SpendwiseSystem.Domain.DTOs.CashBookDtos;
 using SpendwiseSystem.Domain.DTOs.InvitationRequestDto;
+using SpendwiseSystem.Domain.DTOs.MemberDto;
 using SpendwiseSystem.Domain.Entities;
+using SpendwiseSystem.Domain.Enums;
 
 namespace SpendwiseSystem.Application.Services.MemberManagementService
 {
     public class MemberManagementService : IMemberManagementService
     {
         private readonly IMemberManagementRepository _memberManagementRepository;
+        private readonly IPermissionAccessService _permissionAccessService;
 
-        public MemberManagementService(IMemberManagementRepository memberManagementRepository)
+        public MemberManagementService(
+            IMemberManagementRepository memberManagementRepository,
+            IPermissionAccessService permissionAccessService)
         {
             _memberManagementRepository = memberManagementRepository;
+            _permissionAccessService = permissionAccessService;
         }
-
 
         public async Task<ApiResponse<List<BusinessMemberDto>>> GetBusinessMembersAsync(
             Guid businessId,
@@ -62,7 +68,7 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
         public async Task<ApiResponse<Guid>> UpdateBusinessMemberPermissionsAsync(
             Guid businessId,
             Guid userId,
-            UpdateBusinessMemberPermissionsRequest request,
+            SpendwiseSystem.Domain.DTOs.InvitationRequestDto.UpdateBusinessMemberPermissionsRequest request,
             Guid currentUserId)
         {
             if (businessId == Guid.Empty)
@@ -73,6 +79,13 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
 
             if (currentUserId == Guid.Empty)
                 return ApiResponse<Guid>.FailureResponse("Current user id is required.");
+
+            if (currentUserId == userId)
+                return ApiResponse<Guid>.FailureResponse("Members cannot modify their own permissions.");
+
+            var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
+            if (!isOwner)
+                return ApiResponse<Guid>.FailureResponse("Only the business owner can manage member permissions.");
 
             if (request == null)
                 return ApiResponse<Guid>.FailureResponse("Request is required.");
@@ -91,7 +104,6 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
             if (!PermissionValidationHelper.AreValidBusinessPermissions(businessPermissions))
                 return ApiResponse<Guid>.FailureResponse("One or more invalid business permissions provided.");
 
-            // Convert int permissions to string codes for repository
             var permissionCodes = businessPermissions.Select(x => x.ToString()).ToList();
 
             var result = await _memberManagementRepository.UpdateBusinessMemberPermissionsAsync(
@@ -107,7 +119,7 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
             Guid businessId,
             Guid cashbookId,
             Guid userId,
-            UpdateCashbookMemberPermissionsRequest request,
+            SpendwiseSystem.Domain.DTOs.InvitationRequestDto.UpdateCashbookMemberPermissionsRequest request,
             Guid currentUserId)
         {
             if (businessId == Guid.Empty)
@@ -121,6 +133,13 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
 
             if (currentUserId == Guid.Empty)
                 return ApiResponse<Guid>.FailureResponse("Current user id is required.");
+
+            if (currentUserId == userId)
+                return ApiResponse<Guid>.FailureResponse("Members cannot modify their own permissions.");
+
+            var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
+            if (!isOwner)
+                return ApiResponse<Guid>.FailureResponse("Only the business owner can manage member permissions.");
 
             if (request == null)
                 return ApiResponse<Guid>.FailureResponse("Request is required.");
@@ -165,6 +184,13 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
             if (currentUserId == Guid.Empty)
                 return ApiResponse<Guid>.FailureResponse("Current user id is required.");
 
+            if (currentUserId != userId)
+            {
+                var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
+                if (!isOwner)
+                    return ApiResponse<Guid>.FailureResponse("Only the business owner can remove other members.");
+            }
+
             var result = await _memberManagementRepository.RemoveBusinessMemberAsync(
                 businessId,
                 userId,
@@ -191,6 +217,13 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
             if (currentUserId == Guid.Empty)
                 return ApiResponse<Guid>.FailureResponse("Current user id is required.");
 
+            if (currentUserId != userId)
+            {
+                var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
+                if (!isOwner)
+                    return ApiResponse<Guid>.FailureResponse("Only the business owner can remove other members.");
+            }
+
             var result = await _memberManagementRepository.RemoveCashbookMemberAsync(
                 businessId,
                 cashbookId,
@@ -198,6 +231,40 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
                 currentUserId);
 
             return result;
+        }
+
+        public async Task<ApiResponse<UserWorkspaceAccessDto>> GetUserWorkspaceAccessAsync(
+            Guid businessId,
+            Guid? cashbookId,
+            Guid currentUserId)
+        {
+            if (businessId == Guid.Empty)
+                return ApiResponse<UserWorkspaceAccessDto>.FailureResponse("Business id is required.");
+
+            if (currentUserId == Guid.Empty)
+                return ApiResponse<UserWorkspaceAccessDto>.FailureResponse("Current user id is required.");
+
+            var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
+            if (isOwner)
+            {
+                return ApiResponse<UserWorkspaceAccessDto>.SuccessResponse(
+                    "User access retrieved successfully.",
+                    new UserWorkspaceAccessDto
+                    {
+                        IsOwner = true,
+                        BusinessPermissions = Enum.GetNames<BusinessPermission>().ToList(),
+                        CashbookPermissions = Enum.GetNames<CashbookPermission>().ToList()
+                    });
+            }
+
+            var access = await _memberManagementRepository.GetUserWorkspaceAccessAsync(
+                businessId,
+                cashbookId,
+                currentUserId);
+
+            return ApiResponse<UserWorkspaceAccessDto>.SuccessResponse(
+                "User access retrieved successfully.",
+                access);
         }
     }
 }

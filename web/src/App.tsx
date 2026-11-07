@@ -33,6 +33,7 @@ import {
   RefreshCw,
   Search,
   Settings,
+  Shield,
   ShoppingCart,
   Sparkles,
   TrendingDown,
@@ -78,7 +79,12 @@ type User = {
   refreshToken?: string
   RefreshToken?: string
 }
-type Business = { id: string; name: string; category?: string; description?: string; fileUrl?: string; fileName?: string }
+type Business = { id: string; name: string; category?: string; description?: string; fileUrl?: string; fileName?: string; isOwner?: boolean }
+export type UserWorkspaceAccess = {
+  isOwner: boolean
+  businessPermissions: string[]
+  cashbookPermissions: string[]
+}
 export type Cashbook = { id: string; cashBookName?: string; name?: string; businessId: string }
 export type Transaction = {
   id: string
@@ -1702,26 +1708,36 @@ function TransactionDeleteDialog({ token, transaction, onClose, onDeleted }: { t
 function TransactionRowActions({
   token,
   transaction,
+  canEdit = true,
+  canDelete = true,
   onRefresh,
   onToast
 }: {
   token: string
   transaction: Transaction
+  canEdit?: boolean
+  canDelete?: boolean
   onRefresh: () => Promise<void>
   onToast: (message: string) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  if (!canEdit && !canDelete) return null
+
   return (
     <>
       <div className="history-row-actions">
-        <button disabled={!transaction.id} title="Edit transaction" aria-label="Edit transaction" onClick={() => setEditing(true)}>
-          <Pencil size={15} strokeWidth={1.8} />
-        </button>
-        <button disabled={!transaction.id} title="Delete transaction" aria-label="Delete transaction" onClick={() => setDeleting(true)}>
-          <Trash2 size={15} strokeWidth={1.8} />
-        </button>
+        {canEdit && (
+          <button disabled={!transaction.id} title="Edit transaction" aria-label="Edit transaction" onClick={() => setEditing(true)}>
+            <Pencil size={15} strokeWidth={1.8} />
+          </button>
+        )}
+        {canDelete && (
+          <button disabled={!transaction.id} title="Delete transaction" aria-label="Delete transaction" onClick={() => setDeleting(true)}>
+            <Trash2 size={15} strokeWidth={1.8} />
+          </button>
+        )}
       </div>
       {editing && (
         <TransactionEditDialog
@@ -1755,6 +1771,9 @@ function TransactionsPage({
   cashbookName,
   books,
   selectedBookId,
+  canCreate = true,
+  canEdit = true,
+  canDelete = true,
   onSelectBook,
   onBack,
   onAdd,
@@ -1770,6 +1789,9 @@ function TransactionsPage({
   cashbookName: string
   books?: Cashbook[]
   selectedBookId?: string
+  canCreate?: boolean
+  canEdit?: boolean
+  canDelete?: boolean
   onSelectBook?: (book: Cashbook) => void
   onBack: () => void
   onAdd: () => void
@@ -2040,14 +2062,22 @@ function TransactionsPage({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {onAddReceipt && (
-            <button className="button secondary-action" onClick={onAddReceipt}>
-              <Sparkles size={15} strokeWidth={1.8} /> Scan receipt
-            </button>
+          {canCreate ? (
+            <>
+              {onAddReceipt && (
+                <button className="button secondary-action" onClick={onAddReceipt}>
+                  <Sparkles size={15} strokeWidth={1.8} /> Scan receipt
+                </button>
+              )}
+              <button className="button primary" onClick={onAdd}>
+                <Plus size={15} strokeWidth={1.8} /> Add transaction
+              </button>
+            </>
+          ) : (
+            <span className="txn-view-only-tag" style={{ padding: '6px 12px' }}>
+              <Shield size={13} strokeWidth={1.8} /> View-only cashbook
+            </span>
           )}
-          <button className="button primary" onClick={onAdd}>
-            <Plus size={15} strokeWidth={1.8} /> Add transaction
-          </button>
         </div>
       </div>
 
@@ -2265,7 +2295,7 @@ function TransactionsPage({
                   <span><em className={'pill ' + (isIncome ? 'income-pill' : 'expense-pill')}>{isIncome ? 'Income' : 'Expense'}</em></span>
                   <strong className={isIncome ? 'income-amount' : ''}>{isIncome ? '+' : '−'} Rs. {Number(transaction.amount || 0).toLocaleString('en-PK')}</strong>
                   <div onClick={e => e.stopPropagation()}>
-                    <TransactionRowActions token={token} transaction={transaction} onRefresh={onRefresh} onToast={onToast} />
+                    <TransactionRowActions token={token} transaction={transaction} canEdit={canEdit} canDelete={canDelete} onRefresh={onRefresh} onToast={onToast} />
                   </div>
                 </div>
               )
@@ -2556,6 +2586,40 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [loadingBooks, setLoadingBooks] = useState(false)
   const [loadingTransactions, setLoadingTransactions] = useState(false)
   const [needsSetup, setNeedsSetup] = useState(false)
+
+  const [userAccess, setUserAccess] = useState<UserWorkspaceAccess>({
+    isOwner: true,
+    businessPermissions: [],
+    cashbookPermissions: []
+  })
+
+  useEffect(() => {
+    if (!businessId) {
+      setUserAccess({ isOwner: true, businessPermissions: [], cashbookPermissions: [] })
+      return
+    }
+    const cbQuery = book?.id ? `?cashbookId=${encodeURIComponent(book.id)}` : ''
+    api<UserWorkspaceAccess>(`/api/MemberManagement/businesses/${encodeURIComponent(businessId)}/access${cbQuery}`, token)
+      .then(res => {
+        if (res) setUserAccess(res)
+      })
+      .catch(() => {
+        const currentBiz = businesses.find(b => b.id === businessId)
+        setUserAccess({
+          isOwner: currentBiz?.isOwner ?? true,
+          businessPermissions: [],
+          cashbookPermissions: []
+        })
+      })
+  }, [businessId, book?.id, token, businesses])
+
+  const isOwner = userAccess.isOwner
+  const canCreateCashbook = isOwner || userAccess.businessPermissions.includes('CASHBOOK_CREATE')
+  const canEditCashbook = isOwner || userAccess.businessPermissions.includes('CASHBOOK_UPDATE')
+  const canDeleteCashbook = isOwner || userAccess.businessPermissions.includes('CASHBOOK_DELETE')
+  const canCreateTransaction = isOwner || userAccess.cashbookPermissions.includes('TRANSACTION_CREATE')
+  const canEditTransaction = isOwner || userAccess.cashbookPermissions.includes('TRANSACTION_UPDATE')
+  const canDeleteTransaction = isOwner || userAccess.cashbookPermissions.includes('TRANSACTION_DELETE')
 
   const fullName = `${user.firstName ?? user.FirstName ?? ''} ${user.lastName ?? user.LastName ?? ''}`.trim() || user.email || user.Email || 'there'
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -3545,6 +3609,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               selectedBook={book}
               businessName={selectedBusiness?.name ?? 'Workspace'}
               activeBookTransactionsCount={transactions.length}
+              canCreate={canCreateCashbook}
+              canEdit={canEditCashbook}
+              canDelete={canDeleteCashbook}
               onSelectBook={b => {
                 setBook(b)
                 showToast(`Switched to "${b.cashBookName ?? b.name ?? 'Cashbook'}"`)
@@ -3582,6 +3649,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
               books={books}
               selectedBookId={book?.id}
+              canCreate={canCreateTransaction}
+              canEdit={canEditTransaction}
+              canDelete={canDeleteTransaction}
               onSelectBook={b => setBook(b)}
               onBack={() => setShowAllTransactions(false)}
               onAdd={() => setShowManualTransaction(true)}
@@ -3603,12 +3673,20 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   <p className="muted">Here’s what’s happening with your money today.</p>
                 </div>
                 <div className="heading-actions">
-                  <button className="button secondary-action" disabled={!book} onClick={() => setShowManualTransaction(true)}>
-                    <Plus size={15} strokeWidth={1.8} /> Add transaction
-                  </button>
-                  <button className="button primary" disabled={!book} onClick={() => setShowReceipt(true)}>
-                    <Plus size={15} strokeWidth={1.8} /> Add receipt
-                  </button>
+                  {canCreateTransaction ? (
+                    <>
+                      <button className="button secondary-action" disabled={!book} onClick={() => setShowManualTransaction(true)}>
+                        <Plus size={15} strokeWidth={1.8} /> Add transaction
+                      </button>
+                      <button className="button primary" disabled={!book} onClick={() => setShowReceipt(true)}>
+                        <Plus size={15} strokeWidth={1.8} /> Add receipt
+                      </button>
+                    </>
+                  ) : (
+                    <span className="txn-view-only-tag" style={{ padding: '7px 12px' }}>
+                      <Shield size={13} strokeWidth={1.8} /> View only cashbook
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -3834,7 +3912,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                             {t.transactionType === 'CashIn' ? '+' : '−'} Rs. {Number(t.amount).toLocaleString('en-PK')}
                           </strong>
                           <div onClick={e => e.stopPropagation()}>
-                            <TransactionRowActions token={token} transaction={t} onRefresh={() => reloadTransactions()} onToast={showToast} />
+                            <TransactionRowActions token={token} transaction={t} canEdit={canEditTransaction} canDelete={canDeleteTransaction} onRefresh={() => reloadTransactions()} onToast={showToast} />
                           </div>
                         </div>
                       )

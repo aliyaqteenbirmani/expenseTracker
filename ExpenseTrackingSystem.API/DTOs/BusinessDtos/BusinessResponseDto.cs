@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,5 +14,6 @@ namespace SpendwiseSystem.Domain.DTOs.BusinessDtos
         public string Description { get; set; } = string.Empty;
         public string FileName { get; set; } = string.Empty;
         public string FileUrl { get; set; } = string.Empty;
+        public bool IsOwner { get; set; }
     }
 }

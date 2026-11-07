@@ -1,391 +1,400 @@
-﻿using Microsoft.Extensions.Logging;
-using SpendwiseSystem.Application.Helper;
-using SpendwiseSystem.Application.Interfaces;
-using SpendwiseSystem.Application.Services.InvitationEmailService;
-using SpendwiseSystem.Application.Services.InvitationLinkBuilder;
-using SpendwiseSystem.Domain.DTOs.InvitationRequestDto;
-using SpendwiseSystem.Domain.Entities;
-using SpendwiseSystem.Domain.Enums;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SpendwiseSystem.Application.Services.InvitationService
-{
-    public class InvitationService : IInvitationService
-    {
-        private readonly IInvitationRepository _invitationRepository;
-        private readonly IInvitationEmailService _invitationEmailService;
-        private readonly IInvitationLinkBuilder _invitationLinkBuilder;
-        private readonly ILogger<InvitationService> _logger;
-
-        public InvitationService(IInvitationRepository invitationRepository, IInvitationEmailService invitationEmailService, ILogger<InvitationService> logger, IInvitationLinkBuilder invitationLinkBuilder)
-        {
-            _invitationRepository = invitationRepository;
-            _invitationEmailService = invitationEmailService;
-            _logger = logger;
-            _invitationLinkBuilder = invitationLinkBuilder;
-        }
-
-        public async Task<ApiResponse<Guid>> CreateBusinessInvitationAsync(
-                    Guid businessId,
-                    CreateBusinessInvitationRequest request,
-                    Guid currentUserId)
-        {
-            if (businessId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Business id is required.");
-
-            if (currentUserId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
-
-            if (request == null)
-                return ApiResponse<Guid>.FailureResponse("Request is required.");
-
-            if (string.IsNullOrWhiteSpace(request.InvitedEmail))
-                return ApiResponse<Guid>.FailureResponse("Invited email is required.");
-
-            if (request.Permissions == null || !request.Permissions.Any())
-                return ApiResponse<Guid>.FailureResponse("At least one permission is required.");
-
-            request.InvitedEmail = request.InvitedEmail.Trim().ToLower();
-
-            request.Permissions = request.Permissions
-                .Where(x => x >= 0)
-                .Distinct()
-                .ToList();
-
-            var businessPermissions = request.Permissions
-                .Select(x => (BusinessPermission)x)
-                .ToList();
-
-            if (!PermissionValidationHelper.AreValidBusinessPermissions(businessPermissions))
-                return ApiResponse<Guid>.FailureResponse("One or more invalid business permissions provided.");
-
-            var inviteToken = TokenUtils.GenerateSecureToken();
-            var tokenExpiresOn = request.ExpiresOn ?? DateTime.UtcNow.AddDays(7); 
-
-            var result = await _invitationRepository.CreateBusinessInvitationAsync(
-                businessId,
-                request.InvitedEmail,
-                currentUserId,
-                request.ExpiresOn,
-                tokenExpiresOn,
-                inviteToken,
-                request.Remarks?.Trim(),
-                businessPermissions.Select(p => p.ToString()).ToList()); // <-- Fix: convert to List<string>
-
-            if (!result.Success)
-                return result;
-
-            var emailResult = await SendBusinessInvitationEmailIfPossibleAsync(
-                    businessId,
-                    currentUserId,
-                    request.InvitedEmail,
-                    request.Permissions.Select(p => ((BusinessPermission)p).ToString()).ToList(), // <-- Fix: convert to List<string>
-                    request.ExpiresOn,
-                    request.Remarks?.Trim(),
-                    inviteToken);
-            result.Message = AppendEmailStatus(result.Message, emailResult);
-            return result;
-        }
-
-        public async Task<ApiResponse<Guid>> CreateCashbookInvitationAsync(
-            Guid businessId,
-            Guid cashbookId,
-            CreateCashbookInvitationRequest request,
-            Guid currentUserId)
-        {
-            if (businessId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Business id is required.");
-
-            if (cashbookId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Cashbook id is required.");
-
-            if (currentUserId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
-
-            if (request == null)
-                return ApiResponse<Guid>.FailureResponse("Request is required.");
-
-            if (string.IsNullOrWhiteSpace(request.InvitedEmail))
-                return ApiResponse<Guid>.FailureResponse("Invited email is required.");
-
-            if (request.Permissions == null || !request.Permissions.Any())
-                return ApiResponse<Guid>.FailureResponse("At least one permission is required.");
-
-            request.InvitedEmail = request.InvitedEmail.Trim().ToLower();
-
-            request.Permissions = request.Permissions
-                .Where(x => x >= 0)
-                .Distinct()
-                .ToList();
-
-            var cashbookPermissions = request.Permissions
-    .Select(x => (CashbookPermission)x)
-    .ToList();
-
-            if (!PermissionValidationHelper.AreValidCashbookPermissions(cashbookPermissions))
-                return ApiResponse<Guid>.FailureResponse("One or more invalid cashbook permissions provided.");
-
-            var inviteToken = TokenUtils.GenerateSecureToken();
-            var tokenExpiresOn = request.ExpiresOn ?? DateTime.UtcNow.AddDays(7);
-
-            var result = await _invitationRepository.CreateCashbookInvitationAsync(
-                businessId,
-                cashbookId,
-                request.InvitedEmail,
-                currentUserId,
-                request.ExpiresOn,
-                tokenExpiresOn,
-                inviteToken,
-                request.Remarks?.Trim(),
-                cashbookPermissions.Select(p => p.ToString()).ToList());
-
-            if (!result.Success)
-                return result;
-
-            var emailResult = await SendCashbookInvitationEmailIfPossibleAsync(
-                    businessId,
-                    cashbookId,
-                    currentUserId,
-                    request.InvitedEmail,
-                    cashbookPermissions.Select(p => p.ToString()).ToList(),
-                    request.ExpiresOn,
-                    request.Remarks?.Trim(),
-                    inviteToken);
-            result.Message = AppendEmailStatus(result.Message, emailResult);
-            return result;
-        }
-
-        public async Task<ApiResponse<List<InvitationListItem>>> GetMyPendingInvitationsAsync(
-            Guid currentUserId,
-            string currentUserEmail)
-        {
-            if (currentUserId == Guid.Empty)
-                return ApiResponse<List<InvitationListItem>>.FailureResponse("Current user id is required.");
-
-            if (string.IsNullOrWhiteSpace(currentUserEmail))
-                return ApiResponse<List<InvitationListItem>>.FailureResponse("Current user email is required.");
-
-            currentUserEmail = currentUserEmail.Trim().ToLower();
-
-            var result = await _invitationRepository.GetMyPendingInvitationsAsync(
-                currentUserId,
-                currentUserEmail);
-
-            return ApiResponse<List<InvitationListItem>>.SuccessResponse(
-                "Pending invitations fetched successfully.",
-                result);
-        }
-
-        public async Task<ApiResponse<List<InvitationListItem>>> GetSentInvitationsAsync(
-            Guid currentUserId, string? status)
-        {
-            string? formattedStatus = null;
-            if (!string.IsNullOrWhiteSpace(status) && !status.Trim().Equals("All", StringComparison.OrdinalIgnoreCase))
-            {
-                var textInfo = CultureInfo.InvariantCulture.TextInfo;
-                formattedStatus = textInfo.ToTitleCase(status.Trim().ToLowerInvariant());
-            }
-
-            var result = await _invitationRepository.GetSentInvitationsAsync(currentUserId, formattedStatus);
-            return ApiResponse<List<InvitationListItem>>.SuccessResponse(
-                "Sent invitations fetched successfully.",
-                result);
-        }
-        public async Task<ApiResponse<Guid>> AcceptInvitationAsync(
-            Guid invitationId,
-            Guid currentUserId,
-            string currentUserEmail)
-        {
-            if (invitationId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Invitation id is required.");
-
-            if (currentUserId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
-
-            if (string.IsNullOrWhiteSpace(currentUserEmail))
-                return ApiResponse<Guid>.FailureResponse("Current user email is required.");
-
-            currentUserEmail = currentUserEmail.Trim().ToLower();
-
-            var result = await _invitationRepository.AcceptInvitationAsync(
-                invitationId,
-                currentUserId,
-                currentUserEmail);
-
-            return result;
-        }
-
-        public async Task<ApiResponse<Guid>> RejectInvitationAsync(
-            Guid invitationId,
-            RejectInvitationRequest request,
-            Guid currentUserId,
-            string currentUserEmail)
-        {
-            if (invitationId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Invitation id is required.");
-
-            if (currentUserId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
-
-            if (string.IsNullOrWhiteSpace(currentUserEmail))
-                return ApiResponse<Guid>.FailureResponse("Current user email is required.");
-
-            currentUserEmail = currentUserEmail.Trim().ToLower();
-
-            var result = await _invitationRepository.RejectInvitationAsync(
-                invitationId,
-                currentUserId,
-                currentUserEmail,
-                request?.Remarks?.Trim());
-
-            return result;
-        }
-
-        public async Task<ApiResponse<Guid>> RevokeInvitationAsync(
-            Guid invitationId,
-            Guid currentUserId)
-        {
-            if (invitationId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Invitation id is required.");
-
-            if (currentUserId == Guid.Empty)
-                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
-
-            var result = await _invitationRepository.RevokeInvitationAsync(
-                invitationId,
-                currentUserId);
-
-            return result;
-        }
-
-        private async Task<ApiResponse<bool>> SendBusinessInvitationEmailIfPossibleAsync(
-            Guid businessId,
-            Guid currentUserId,
-            string invitedEmail,
-            List<string> permissions,
-            DateTime? expiresOn,
-            string? remarks,
-            string inviteToken)
-        {
-            try
-            {
-                var businessInfo = await _invitationRepository.GetBusinessEmailInfoAsync(businessId);
-                var inviterInfo = await _invitationRepository.GetUserEmailInfoAsync(currentUserId);
-
-                if (businessInfo != null && inviterInfo != null)
-                {
-                    var invitationLink = _invitationLinkBuilder.BuildInvitationLink(inviteToken);
-                    var emailInfo = await _invitationEmailService.SendBusinessInvitationEmailAsync(
-                        invitedEmail,
-                        inviterInfo.FullName,
-                        businessInfo.BusinessName,
-                        permissions,
-                        expiresOn,
-                        remarks,
-                        invitationLink);
-                    if (!emailInfo.Success)
-                        _logger.LogWarning("Business invitation email delivery failed for {InvitedEmail}, business {BusinessId}: {ErrorCode}", invitedEmail, businessId, emailInfo.ErrorCode);
-
-                    return emailInfo;
-                }
-                _logger.LogWarning("Could not load business invitation email details for {InvitedEmail}, business {BusinessId}", invitedEmail, businessId);
-                return ApiResponse<bool>.FailureResponse("Invitation email could not be prepared.");
-            }
-            catch(Exception ex) 
-            {
-                _logger.LogError(ex, "Failed to send business invitation email to {InvitedEmail} for business {BusinessId}", invitedEmail, businessId);
-                return ApiResponse<bool>.FailureResponse("Invitation email could not be sent.");
-            }
-        }
-
-        private async Task<ApiResponse<bool>> SendCashbookInvitationEmailIfPossibleAsync(
-            Guid businessId,
-            Guid cashbookId,
-            Guid currentUserId,
-            string invitedEmail,
-            List<string> permissions,
-            DateTime? expiresOn,
-            string? remarks,
-            string inviteToken)
-        {
-            try
-            {
-                var cashbookInfo = await _invitationRepository.GetCashbookEmailInfoAsync(businessId, cashbookId);
-                var inviterInfo = await _invitationRepository.GetUserEmailInfoAsync(currentUserId);
-
-                if (cashbookInfo == null || inviterInfo == null)
-                {
-                    _logger.LogWarning("Could not load cashbook invitation email details for {InvitedEmail}, cashbook {CashbookId}", invitedEmail, cashbookId);
-                    return ApiResponse<bool>.FailureResponse("Invitation email could not be prepared.");
-                }
-
-                var invitationLink = _invitationLinkBuilder.BuildInvitationLink(inviteToken);
-
-                var emailResult = await _invitationEmailService.SendCashbookInvitationEmailAsync(
-                    invitedEmail,
-                    inviterInfo.FullName,
-                    cashbookInfo.BusinessName,
-                    cashbookInfo.CashbookName,
-                    permissions,
-                    expiresOn,
-                    remarks,
-                    invitationLink);
-
-                if (!emailResult.Success)
-                    _logger.LogWarning("Cashbook invitation email delivery failed for {InvitedEmail}, cashbook {CashbookId}: {ErrorCode}", invitedEmail, cashbookId, emailResult.ErrorCode);
-
-                return emailResult;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send cashbook invitation email to {InvitedEmail} for cashbook {CashbookId} in business {BusinessId}", invitedEmail, cashbookId, businessId);
-                return ApiResponse<bool>.FailureResponse("Invitation email could not be sent.");
-            }
-        }
-
-        private static string AppendEmailStatus(string invitationMessage, ApiResponse<bool> emailResult)
-        {
-            var status = emailResult?.Success == true && emailResult.Data
-                ? "Invitation email sent successfully."
-                : "Invitation was created, but the email could not be sent. You can retry sending it later.";
-
-            return string.IsNullOrWhiteSpace(invitationMessage)
-                ? status
-                : $"{invitationMessage.TrimEnd()} {status}";
-        }
-
-
-        public async Task<ApiResponse<List<InvitationByTokenDto>>> GetInvitationByTokenAsync(string token)
-        {
-            if (string.IsNullOrWhiteSpace(token))
-                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation token is required.");
-
-            token = token.Trim();
-
-            var invitation = await _invitationRepository.GetInvitationByTokenAsync(token);
-
-            if (invitation == null)
-                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation not found.");
-
-            if (!string.Equals(invitation.Status, "Pending", StringComparison.OrdinalIgnoreCase))
-                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse(
-                    $"Invitation is already {invitation.Status.ToLower()}.");
-
-            if (invitation.TokenExpiresOn.HasValue && invitation.TokenExpiresOn.Value <= DateTime.UtcNow)
-                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation link has expired.");
-
-            if (invitation.IsTokenConsumed)
-                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation link is no longer valid.");
-            var data = new List<InvitationByTokenDto> { invitation };
-
-            return ApiResponse<List<InvitationByTokenDto>>.SuccessResponse(
-                "Invitation fetched successfully.",
-                data);
-        }
-    }
-}
+﻿using Microsoft.Extensions.Logging;
+using SpendwiseSystem.Application.Helper;
+using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Services.InvitationEmailService;
+using SpendwiseSystem.Application.Services.InvitationLinkBuilder;
+using SpendwiseSystem.Application.Services.PermissionAccessService;
+using SpendwiseSystem.Domain.DTOs.InvitationRequestDto;
+using SpendwiseSystem.Domain.Entities;
+using SpendwiseSystem.Domain.Enums;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace SpendwiseSystem.Application.Services.InvitationService
+{
+    public class InvitationService : IInvitationService
+    {
+        private readonly IInvitationRepository _invitationRepository;
+        private readonly IInvitationEmailService _invitationEmailService;
+        private readonly IInvitationLinkBuilder _invitationLinkBuilder;
+        private readonly ILogger<InvitationService> _logger;
+        private readonly IPermissionAccessService _permissionAccessService;
+
+        public InvitationService(IInvitationRepository invitationRepository, IInvitationEmailService invitationEmailService, ILogger<InvitationService> logger, IInvitationLinkBuilder invitationLinkBuilder, IPermissionAccessService permissionAccessService)
+        {
+            _invitationRepository = invitationRepository;
+            _invitationEmailService = invitationEmailService;
+            _logger = logger;
+            _invitationLinkBuilder = invitationLinkBuilder;
+            _permissionAccessService = permissionAccessService;
+        }
+
+        public async Task<ApiResponse<Guid>> CreateBusinessInvitationAsync(
+                    Guid businessId,
+                    CreateBusinessInvitationRequest request,
+                    Guid currentUserId)
+        {
+            if (businessId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Business id is required.");
+
+            if (currentUserId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
+
+            if (!await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId))
+                return ApiResponse<Guid>.FailureResponse("Only the business owner can invite members to this cashbook.");
+
+            if (request == null)
+                return ApiResponse<Guid>.FailureResponse("Request is required.");
+
+            if (!await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId))
+                return ApiResponse<Guid>.FailureResponse("Only the business owner can invite new members.");
+
+            if (string.IsNullOrWhiteSpace(request.InvitedEmail))
+                return ApiResponse<Guid>.FailureResponse("Invited email is required.");
+
+            if (request.Permissions == null || !request.Permissions.Any())
+                return ApiResponse<Guid>.FailureResponse("At least one permission is required.");
+
+            request.InvitedEmail = request.InvitedEmail.Trim().ToLower();
+
+            request.Permissions = request.Permissions
+                .Where(x => x >= 0)
+                .Distinct()
+                .ToList();
+
+            var businessPermissions = request.Permissions
+                .Select(x => (BusinessPermission)x)
+                .ToList();
+
+            if (!PermissionValidationHelper.AreValidBusinessPermissions(businessPermissions))
+                return ApiResponse<Guid>.FailureResponse("One or more invalid business permissions provided.");
+
+            var inviteToken = TokenUtils.GenerateSecureToken();
+            var tokenExpiresOn = request.ExpiresOn ?? DateTime.UtcNow.AddDays(7); 
+
+            var result = await _invitationRepository.CreateBusinessInvitationAsync(
+                businessId,
+                request.InvitedEmail,
+                currentUserId,
+                request.ExpiresOn,
+                tokenExpiresOn,
+                inviteToken,
+                request.Remarks?.Trim(),
+                businessPermissions.Select(p => p.ToString()).ToList()); // <-- Fix: convert to List<string>
+
+            if (!result.Success)
+                return result;
+
+            var emailResult = await SendBusinessInvitationEmailIfPossibleAsync(
+                    businessId,
+                    currentUserId,
+                    request.InvitedEmail,
+                    request.Permissions.Select(p => ((BusinessPermission)p).ToString()).ToList(), // <-- Fix: convert to List<string>
+                    request.ExpiresOn,
+                    request.Remarks?.Trim(),
+                    inviteToken);
+            result.Message = AppendEmailStatus(result.Message, emailResult);
+            return result;
+        }
+
+        public async Task<ApiResponse<Guid>> CreateCashbookInvitationAsync(
+            Guid businessId,
+            Guid cashbookId,
+            CreateCashbookInvitationRequest request,
+            Guid currentUserId)
+        {
+            if (businessId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Business id is required.");
+
+            if (cashbookId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Cashbook id is required.");
+
+            if (currentUserId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
+
+            if (request == null)
+                return ApiResponse<Guid>.FailureResponse("Request is required.");
+
+            if (string.IsNullOrWhiteSpace(request.InvitedEmail))
+                return ApiResponse<Guid>.FailureResponse("Invited email is required.");
+
+            if (request.Permissions == null || !request.Permissions.Any())
+                return ApiResponse<Guid>.FailureResponse("At least one permission is required.");
+
+            request.InvitedEmail = request.InvitedEmail.Trim().ToLower();
+
+            request.Permissions = request.Permissions
+                .Where(x => x >= 0)
+                .Distinct()
+                .ToList();
+
+            var cashbookPermissions = request.Permissions
+    .Select(x => (CashbookPermission)x)
+    .ToList();
+
+            if (!PermissionValidationHelper.AreValidCashbookPermissions(cashbookPermissions))
+                return ApiResponse<Guid>.FailureResponse("One or more invalid cashbook permissions provided.");
+
+            var inviteToken = TokenUtils.GenerateSecureToken();
+            var tokenExpiresOn = request.ExpiresOn ?? DateTime.UtcNow.AddDays(7);
+
+            var result = await _invitationRepository.CreateCashbookInvitationAsync(
+                businessId,
+                cashbookId,
+                request.InvitedEmail,
+                currentUserId,
+                request.ExpiresOn,
+                tokenExpiresOn,
+                inviteToken,
+                request.Remarks?.Trim(),
+                cashbookPermissions.Select(p => p.ToString()).ToList());
+
+            if (!result.Success)
+                return result;
+
+            var emailResult = await SendCashbookInvitationEmailIfPossibleAsync(
+                    businessId,
+                    cashbookId,
+                    currentUserId,
+                    request.InvitedEmail,
+                    cashbookPermissions.Select(p => p.ToString()).ToList(),
+                    request.ExpiresOn,
+                    request.Remarks?.Trim(),
+                    inviteToken);
+            result.Message = AppendEmailStatus(result.Message, emailResult);
+            return result;
+        }
+
+        public async Task<ApiResponse<List<InvitationListItem>>> GetMyPendingInvitationsAsync(
+            Guid currentUserId,
+            string currentUserEmail)
+        {
+            if (currentUserId == Guid.Empty)
+                return ApiResponse<List<InvitationListItem>>.FailureResponse("Current user id is required.");
+
+            if (string.IsNullOrWhiteSpace(currentUserEmail))
+                return ApiResponse<List<InvitationListItem>>.FailureResponse("Current user email is required.");
+
+            currentUserEmail = currentUserEmail.Trim().ToLower();
+
+            var result = await _invitationRepository.GetMyPendingInvitationsAsync(
+                currentUserId,
+                currentUserEmail);
+
+            return ApiResponse<List<InvitationListItem>>.SuccessResponse(
+                "Pending invitations fetched successfully.",
+                result);
+        }
+
+        public async Task<ApiResponse<List<InvitationListItem>>> GetSentInvitationsAsync(
+            Guid currentUserId, string? status)
+        {
+            string? formattedStatus = null;
+            if (!string.IsNullOrWhiteSpace(status) && !status.Trim().Equals("All", StringComparison.OrdinalIgnoreCase))
+            {
+                var textInfo = CultureInfo.InvariantCulture.TextInfo;
+                formattedStatus = textInfo.ToTitleCase(status.Trim().ToLowerInvariant());
+            }
+
+            var result = await _invitationRepository.GetSentInvitationsAsync(currentUserId, formattedStatus);
+            return ApiResponse<List<InvitationListItem>>.SuccessResponse(
+                "Sent invitations fetched successfully.",
+                result);
+        }
+        public async Task<ApiResponse<Guid>> AcceptInvitationAsync(
+            Guid invitationId,
+            Guid currentUserId,
+            string currentUserEmail)
+        {
+            if (invitationId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Invitation id is required.");
+
+            if (currentUserId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
+
+            if (string.IsNullOrWhiteSpace(currentUserEmail))
+                return ApiResponse<Guid>.FailureResponse("Current user email is required.");
+
+            currentUserEmail = currentUserEmail.Trim().ToLower();
+
+            var result = await _invitationRepository.AcceptInvitationAsync(
+                invitationId,
+                currentUserId,
+                currentUserEmail);
+
+            return result;
+        }
+
+        public async Task<ApiResponse<Guid>> RejectInvitationAsync(
+            Guid invitationId,
+            RejectInvitationRequest request,
+            Guid currentUserId,
+            string currentUserEmail)
+        {
+            if (invitationId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Invitation id is required.");
+
+            if (currentUserId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
+
+            if (string.IsNullOrWhiteSpace(currentUserEmail))
+                return ApiResponse<Guid>.FailureResponse("Current user email is required.");
+
+            currentUserEmail = currentUserEmail.Trim().ToLower();
+
+            var result = await _invitationRepository.RejectInvitationAsync(
+                invitationId,
+                currentUserId,
+                currentUserEmail,
+                request?.Remarks?.Trim());
+
+            return result;
+        }
+
+        public async Task<ApiResponse<Guid>> RevokeInvitationAsync(
+            Guid invitationId,
+            Guid currentUserId)
+        {
+            if (invitationId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Invitation id is required.");
+
+            if (currentUserId == Guid.Empty)
+                return ApiResponse<Guid>.FailureResponse("Current user id is required.");
+
+            var result = await _invitationRepository.RevokeInvitationAsync(
+                invitationId,
+                currentUserId);
+
+            return result;
+        }
+
+        private async Task<ApiResponse<bool>> SendBusinessInvitationEmailIfPossibleAsync(
+            Guid businessId,
+            Guid currentUserId,
+            string invitedEmail,
+            List<string> permissions,
+            DateTime? expiresOn,
+            string? remarks,
+            string inviteToken)
+        {
+            try
+            {
+                var businessInfo = await _invitationRepository.GetBusinessEmailInfoAsync(businessId);
+                var inviterInfo = await _invitationRepository.GetUserEmailInfoAsync(currentUserId);
+
+                if (businessInfo != null && inviterInfo != null)
+                {
+                    var invitationLink = _invitationLinkBuilder.BuildInvitationLink(inviteToken);
+                    var emailInfo = await _invitationEmailService.SendBusinessInvitationEmailAsync(
+                        invitedEmail,
+                        inviterInfo.FullName,
+                        businessInfo.BusinessName,
+                        permissions,
+                        expiresOn,
+                        remarks,
+                        invitationLink);
+                    if (!emailInfo.Success)
+                        _logger.LogWarning("Business invitation email delivery failed for {InvitedEmail}, business {BusinessId}: {ErrorCode}", invitedEmail, businessId, emailInfo.ErrorCode);
+
+                    return emailInfo;
+                }
+                _logger.LogWarning("Could not load business invitation email details for {InvitedEmail}, business {BusinessId}", invitedEmail, businessId);
+                return ApiResponse<bool>.FailureResponse("Invitation email could not be prepared.");
+            }
+            catch(Exception ex) 
+            {
+                _logger.LogError(ex, "Failed to send business invitation email to {InvitedEmail} for business {BusinessId}", invitedEmail, businessId);
+                return ApiResponse<bool>.FailureResponse("Invitation email could not be sent.");
+            }
+        }
+
+        private async Task<ApiResponse<bool>> SendCashbookInvitationEmailIfPossibleAsync(
+            Guid businessId,
+            Guid cashbookId,
+            Guid currentUserId,
+            string invitedEmail,
+            List<string> permissions,
+            DateTime? expiresOn,
+            string? remarks,
+            string inviteToken)
+        {
+            try
+            {
+                var cashbookInfo = await _invitationRepository.GetCashbookEmailInfoAsync(businessId, cashbookId);
+                var inviterInfo = await _invitationRepository.GetUserEmailInfoAsync(currentUserId);
+
+                if (cashbookInfo == null || inviterInfo == null)
+                {
+                    _logger.LogWarning("Could not load cashbook invitation email details for {InvitedEmail}, cashbook {CashbookId}", invitedEmail, cashbookId);
+                    return ApiResponse<bool>.FailureResponse("Invitation email could not be prepared.");
+                }
+
+                var invitationLink = _invitationLinkBuilder.BuildInvitationLink(inviteToken);
+
+                var emailResult = await _invitationEmailService.SendCashbookInvitationEmailAsync(
+                    invitedEmail,
+                    inviterInfo.FullName,
+                    cashbookInfo.BusinessName,
+                    cashbookInfo.CashbookName,
+                    permissions,
+                    expiresOn,
+                    remarks,
+                    invitationLink);
+
+                if (!emailResult.Success)
+                    _logger.LogWarning("Cashbook invitation email delivery failed for {InvitedEmail}, cashbook {CashbookId}: {ErrorCode}", invitedEmail, cashbookId, emailResult.ErrorCode);
+
+                return emailResult;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send cashbook invitation email to {InvitedEmail} for cashbook {CashbookId} in business {BusinessId}", invitedEmail, cashbookId, businessId);
+                return ApiResponse<bool>.FailureResponse("Invitation email could not be sent.");
+            }
+        }
+
+        private static string AppendEmailStatus(string invitationMessage, ApiResponse<bool> emailResult)
+        {
+            var status = emailResult?.Success == true && emailResult.Data
+                ? "Invitation email sent successfully."
+                : "Invitation was created, but the email could not be sent. You can retry sending it later.";
+
+            return string.IsNullOrWhiteSpace(invitationMessage)
+                ? status
+                : $"{invitationMessage.TrimEnd()} {status}";
+        }
+
+
+        public async Task<ApiResponse<List<InvitationByTokenDto>>> GetInvitationByTokenAsync(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation token is required.");
+
+            token = token.Trim();
+
+            var invitation = await _invitationRepository.GetInvitationByTokenAsync(token);
+
+            if (invitation == null)
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation not found.");
+
+            if (!string.Equals(invitation.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse(
+                    $"Invitation is already {invitation.Status.ToLower()}.");
+
+            if (invitation.TokenExpiresOn.HasValue && invitation.TokenExpiresOn.Value <= DateTime.UtcNow)
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation link has expired.");
+
+            if (invitation.IsTokenConsumed)
+                return ApiResponse<List<InvitationByTokenDto>>.FailureResponse("Invitation link is no longer valid.");
+            var data = new List<InvitationByTokenDto> { invitation };
+
+            return ApiResponse<List<InvitationByTokenDto>>.SuccessResponse(
+                "Invitation fetched successfully.",
+                data);
+        }
+    }
+}

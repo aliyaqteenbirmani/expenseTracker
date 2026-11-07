@@ -8,6 +8,7 @@ import {
   Layers,
   Paperclip,
   Pencil,
+  Shield,
   Trash2,
   User,
   Wallet,
@@ -19,6 +20,8 @@ type Props = {
   transaction: Transaction
   cashbookName?: string
   businessName?: string
+  canEdit?: boolean
+  canDelete?: boolean
   onClose: () => void
   onEdit: (transaction: Transaction) => void
   onDelete: (transaction: Transaction) => void
@@ -29,6 +32,8 @@ export default function TransactionDetailDialog({
   transaction,
   cashbookName = 'Cashbook',
   businessName = 'Workspace',
+  canEdit = true,
+  canDelete = true,
   onClose,
   onEdit,
   onDelete,
@@ -98,136 +103,127 @@ export default function TransactionDetailDialog({
         <div className="dialog-content transaction-detail-content">
           {/* Prominent Amount & Category Banner */}
           <div className={`txn-detail-hero ${isIncome ? 'income' : 'expense'}`}>
-            <div className="txn-detail-amount-wrap">
-              <span className="txn-detail-sign">{isIncome ? '+' : '−'}</span>
-              <span className="txn-detail-currency">Rs.</span>
-              <span className="txn-detail-amount">
-                {Number(transaction.amount || 0).toLocaleString('en-PK')}
-              </span>
+            <div className="txn-detail-hero-icon">
+              <CategoryIcon size={24} strokeWidth={1.8} />
             </div>
-
-            <div className="txn-detail-badges">
-              <span className={`pill ${isIncome ? 'income-pill' : 'expense-pill'}`}>
-                {isIncome ? 'Income' : 'Expense'}
+            <div className="txn-detail-hero-info">
+              <span className="txn-detail-type-badge">
+                {isIncome ? 'Cash In (Income / Refund)' : 'Cash Out (Expense)'}
               </span>
-              <span className="category-tag">
-                <CategoryIcon size={12} strokeWidth={2} style={{ marginRight: 4 }} />
-                {category.label}
-              </span>
+              <h1 className="txn-detail-amount">
+                {isIncome ? '+' : '-'}Rs. {(transaction.amount ?? 0).toLocaleString('en-PK')}
+              </h1>
+              <div className="txn-detail-category-label">
+                Category: <strong>{category.label}</strong>
+              </div>
             </div>
           </div>
 
-          {/* Core Metadata Grid */}
-          <div className="txn-meta-grid">
-            <div className="txn-meta-item">
-              <div className="txn-meta-icon"><Calendar size={15} strokeWidth={1.8} /></div>
-              <div>
-                <small>DATE & TIME</small>
+          {/* Metadata Cards Grid */}
+          <div className="txn-detail-grid">
+            <div className="txn-meta-card">
+              <span className="txn-meta-card-icon">
+                <Calendar size={16} strokeWidth={1.8} />
+              </span>
+              <div className="txn-meta-card-content">
+                <label>Transaction Date</label>
                 <strong>{formattedDate}</strong>
                 {formattedTime && (
-                  <span className="txn-meta-sub">
-                    <Clock size={11} strokeWidth={1.8} style={{ display: 'inline', marginRight: 3 }} />
+                  <small className="muted">
+                    <Clock size={11} strokeWidth={1.6} style={{ display: 'inline', verticalAlign: -1, marginRight: 3 }} />
                     {formattedTime} {relativeTime ? `(${relativeTime})` : ''}
-                  </span>
+                  </small>
                 )}
               </div>
             </div>
 
-            <div className="txn-meta-item">
-              <div className="txn-meta-icon"><User size={15} strokeWidth={1.8} /></div>
-              <div>
-                <small>RECORDED BY</small>
-                <strong>{transaction.createdBy || 'Unknown'}</strong>
-                <span className="txn-meta-sub">User who added this transaction</span>
-              </div>
-            </div>
-
-            <div className="txn-meta-item">
-              <div className="txn-meta-icon"><Wallet size={15} strokeWidth={1.8} /></div>
-              <div>
-                <small>CASHBOOK</small>
+            <div className="txn-meta-card">
+              <span className="txn-meta-card-icon">
+                <Wallet size={16} strokeWidth={1.8} />
+              </span>
+              <div className="txn-meta-card-content">
+                <label>Cashbook & Workspace</label>
                 <strong>{cashbookName}</strong>
-                <span className="txn-meta-sub">In workspace: {businessName}</span>
+                <small className="muted">{businessName}</small>
               </div>
             </div>
 
-            <div className="txn-meta-item">
-              <div className="txn-meta-icon"><Layers size={15} strokeWidth={1.8} /></div>
-              <div>
-                <small>TRANSACTION ID</small>
-                <div className="txn-id-row">
-                  <code>{transaction.id || 'N/A'}</code>
-                  {transaction.id && (
-                    <button
-                      type="button"
-                      className="txn-copy-btn"
-                      title="Copy transaction ID"
-                      onClick={() => copyText(transaction.id, 'id')}
-                    >
-                      {copiedField === 'id' ? <Check size={12} color="#18835c" /> : <Copy size={12} />}
-                    </button>
-                  )}
+            <div className="txn-meta-card txn-meta-card-author">
+              <span className="txn-meta-card-icon">
+                <User size={16} strokeWidth={1.8} />
+              </span>
+              <div className="txn-meta-card-content">
+                <label>Recorded By</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <strong>{transaction.createdBy || 'Workspace Member'}</strong>
+                  <span className="txn-creator-badge-inline">Author</span>
                 </div>
+                <small className="muted">Logged in database record</small>
+              </div>
+            </div>
+
+            <div className="txn-meta-card">
+              <span className="txn-meta-card-icon">
+                <Layers size={16} strokeWidth={1.8} />
+              </span>
+              <div className="txn-meta-card-content">
+                <label>Transaction ID</label>
+                <div className="txn-id-row">
+                  <code>{transaction.id?.slice(0, 8)}…{transaction.id?.slice(-4)}</code>
+                  <button
+                    type="button"
+                    className="txn-copy-id-btn"
+                    title="Copy Full ID"
+                    onClick={() => copyText(transaction.id, 'id')}
+                  >
+                    {copiedField === 'id' ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                </div>
+                <small className="muted">Reference ID</small>
               </div>
             </div>
           </div>
 
-          {/* Remarks / Description Card */}
-          <div className="txn-remarks-card">
-            <div className="txn-remarks-header">
-              <small>NOTE / REMARKS</small>
-              {transaction.remarks && (
-                <button
-                  type="button"
-                  className="txn-copy-btn"
-                  title="Copy note"
-                  onClick={() => copyText(transaction.remarks ?? '', 'remarks')}
-                >
-                  {copiedField === 'remarks' ? (
-                    <span style={{ color: '#18835c', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                      <Check size={12} /> Copied
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                      <Copy size={12} /> Copy
-                    </span>
-                  )}
-                </button>
+          {/* Remarks & Notes */}
+          <div className="txn-notes-section">
+            <label className="txn-section-label">Notes & Description</label>
+            <div className="txn-notes-box">
+              {transaction.remarks ? (
+                <p>{transaction.remarks}</p>
+              ) : (
+                <p className="muted" style={{ fontStyle: 'italic' }}>
+                  No remarks or note entered for this transaction.
+                </p>
               )}
             </div>
-            <p className="txn-remarks-text">
-              {transaction.remarks || <em className="muted">No description or remarks provided.</em>}
-            </p>
           </div>
 
-          {/* Receipt Attachment Card */}
-          <div className="txn-attachment-card">
-            <div className="txn-attachment-header">
-              <span className="txn-attachment-title">
-                <Paperclip size={15} strokeWidth={1.8} />
-                <strong>Receipt Attachment</strong>
-              </span>
-              {hasAttachment && (
+          {/* Receipt Attachment Section */}
+          <div className="txn-attachment-section">
+            <label className="txn-section-label">
+              <Paperclip size={13} strokeWidth={1.8} /> Receipt / Bill Attachment
+            </label>
+            {hasAttachment ? (
+              <div className="txn-attachment-card">
+                <div className="txn-attachment-info">
+                  <span className="attachment-file-pill">
+                    <Paperclip size={13} />
+                    {transaction.fileName || 'Attached Receipt'}
+                  </span>
+                  <p className="muted" style={{ margin: '4px 0 0', fontSize: 11 }}>
+                    Uploaded receipt image or invoice proof.
+                  </p>
+                </div>
                 <button
                   type="button"
                   className="button secondary-action"
-                  style={{ minHeight: 30, height: 30, padding: '0 10px', fontSize: 11 }}
-                  onClick={() => onViewAttachment(transaction)}
+                  onClick={() => {
+                    onClose()
+                    onViewAttachment(transaction)
+                  }}
                 >
-                  <ExternalLink size={12} strokeWidth={1.8} /> View full receipt
+                  <ExternalLink size={14} strokeWidth={1.8} /> View Receipt
                 </button>
-              )}
-            </div>
-
-            {hasAttachment ? (
-              <div className="txn-attachment-info">
-                <div className="txn-attachment-pill">
-                  <span className="file-badge">FILE</span>
-                  <span className="file-name">{transaction.fileName || 'Attached Receipt'}</span>
-                </div>
-                <p className="txn-attachment-hint">
-                  Click &ldquo;View full receipt&rdquo; to preview, zoom, or download the original copy.
-                </p>
               </div>
             ) : (
               <div className="txn-no-attachment">
@@ -240,27 +236,35 @@ export default function TransactionDetailDialog({
 
           {/* Footer Actions */}
           <div className="txn-detail-actions">
-            <button
-              type="button"
-              className="button danger-outline"
-              onClick={() => {
-                onClose()
-                onDelete(transaction)
-              }}
-            >
-              <Trash2 size={14} strokeWidth={1.8} /> Delete
-            </button>
-            <div style={{ display: 'flex', gap: 8 }}>
+            {canDelete ? (
               <button
                 type="button"
-                className="button secondary-action"
+                className="button danger-outline"
                 onClick={() => {
                   onClose()
-                  onEdit(transaction)
+                  onDelete(transaction)
                 }}
               >
-                <Pencil size={14} strokeWidth={1.8} /> Edit
+                <Trash2 size={14} strokeWidth={1.8} /> Delete
               </button>
+            ) : (
+              <span className="txn-view-only-tag" title="You do not have permission to delete transactions">
+                <Shield size={12} strokeWidth={1.8} /> Read only
+              </span>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {canEdit && (
+                <button
+                  type="button"
+                  className="button secondary-action"
+                  onClick={() => {
+                    onClose()
+                    onEdit(transaction)
+                  }}
+                >
+                  <Pencil size={14} strokeWidth={1.8} /> Edit
+                </button>
+              )}
               <button type="button" className="button primary" onClick={onClose}>
                 Done
               </button>

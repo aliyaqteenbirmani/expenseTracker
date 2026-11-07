@@ -18,6 +18,9 @@ type Props = {
   selectedBook: Cashbook | null
   businessName: string
   activeBookTransactionsCount: number
+  canCreate?: boolean
+  canEdit?: boolean
+  canDelete?: boolean
   onSelectBook: (book: Cashbook) => void
   onOpenTransactions: (book: Cashbook) => void
   onAddCashbook: () => void
@@ -32,6 +35,9 @@ export default function CashbooksPage({
   selectedBook,
   businessName,
   activeBookTransactionsCount,
+  canCreate = true,
+  canEdit = true,
+  canDelete = true,
   onSelectBook,
   onOpenTransactions,
   onAddCashbook,
@@ -58,94 +64,93 @@ export default function CashbooksPage({
 
   return (
     <section className="cashbooks-page">
-      {/* Header */}
-      <div className="cashbooks-heading">
+      {/* Heading Header */}
+      <div className="history-heading">
         <div>
           <button className="history-back" onClick={onBack}>
-            <ArrowLeft size={13} strokeWidth={2} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
-            Back to Overview
+            <ArrowLeft size={14} strokeWidth={2} /> Back to overview
           </button>
-          <div className="eyebrow">{businessName.toUpperCase()} · ACCOUNTS</div>
-          <h1>
-            Cashbooks <span>({books.length})</span>
-          </h1>
+          <div className="eyebrow">WORKSPACE CASHBOOKS</div>
+          <h1>Cashbooks Management</h1>
           <p className="muted">
-            Manage your financial cashbooks, view transaction activity, and switch active books.
+            Manage and switch between books for <strong>{businessName}</strong>.
           </p>
         </div>
-        <div className="heading-actions">
+        {canCreate && (
           <button className="button primary" onClick={onAddCashbook}>
             <Plus size={16} strokeWidth={2} /> Create cashbook
           </button>
+        )}
+      </div>
+
+      {/* Summary KPI Cards */}
+      <div className="cashbooks-kpi-grid">
+        <div className="cashbook-kpi-card">
+          <div className="kpi-icon icon-books">
+            <LayoutGrid size={18} strokeWidth={1.8} />
+          </div>
+          <div className="kpi-info">
+            <small>TOTAL CASHBOOKS</small>
+            <strong>{books.length}</strong>
+          </div>
+        </div>
+
+        <div className="cashbook-kpi-card">
+          <div className="kpi-icon icon-active">
+            <BookOpen size={18} strokeWidth={1.8} />
+          </div>
+          <div className="kpi-info">
+            <small>CURRENT ACTIVE BOOK</small>
+            <strong title={selectedBook?.cashBookName ?? selectedBook?.name ?? 'None'}>
+              {selectedBook?.cashBookName ?? selectedBook?.name ?? 'None selected'}
+            </strong>
+          </div>
+        </div>
+
+        <div className="cashbook-kpi-card">
+          <div className="kpi-icon icon-txns">
+            <ReceiptText size={18} strokeWidth={1.8} />
+          </div>
+          <div className="kpi-info">
+            <small>ENTRIES IN ACTIVE BOOK</small>
+            <strong>{activeBookTransactionsCount}</strong>
+          </div>
         </div>
       </div>
 
-      {/* Quick Summary Cards */}
-      <div className="cashbooks-stats-grid">
-        <article className="cashbooks-stat-card">
-          <div className="stat-icon-wrapper green">
-            <LayoutGrid size={18} strokeWidth={2} />
-          </div>
-          <div>
-            <small>TOTAL CASHBOOKS</small>
-            <strong>{books.length}</strong>
-            <p>Configured in {businessName}</p>
-          </div>
-        </article>
-
-        <article className="cashbooks-stat-card">
-          <div className="stat-icon-wrapper blue">
-            <BookOpen size={18} strokeWidth={2} />
-          </div>
-          <div>
-            <small>CURRENTLY ACTIVE</small>
-            <strong className="text-truncate">
-              {selectedBook?.cashBookName ?? selectedBook?.name ?? 'None selected'}
-            </strong>
-            <p className="active-tag">
-              <span className="dot" /> Live dashboard view
-            </p>
-          </div>
-        </article>
-
-        <article className="cashbooks-stat-card">
-          <div className="stat-icon-wrapper purple">
-            <ReceiptText size={18} strokeWidth={2} />
-          </div>
-          <div>
-            <small>ACTIVE BOOK ACTIVITY</small>
-            <strong>{activeBookTransactionsCount}</strong>
-            <p>Transactions in active book</p>
-          </div>
-        </article>
-      </div>
-
-      {/* Search & Filter Toolbar */}
+      {/* Filter and Search Bar */}
       <div className="cashbooks-toolbar">
-        <div className="cashbooks-search-bar">
-          <Search size={15} strokeWidth={2} />
+        <div className="cashbooks-search-box">
+          <Search size={15} strokeWidth={1.8} />
           <input
             type="text"
             placeholder="Search cashbooks by name…"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          {search && (
-            <button className="cashbooks-clear-btn" onClick={() => setSearch('')}>
-              Clear
-            </button>
-          )}
         </div>
 
-        <div className="type-chips" role="group" aria-label="Cashbook filter">
-          <button className={filter === 'all' ? 'selected' : ''} onClick={() => setFilter('all')}>
+        <div className="cashbooks-filter-pills">
+          <button
+            type="button"
+            className={filter === 'all' ? 'active' : ''}
+            onClick={() => setFilter('all')}
+          >
             All ({books.length})
           </button>
-          <button className={filter === 'active' ? 'selected' : ''} onClick={() => setFilter('active')}>
-            Active (1)
+          <button
+            type="button"
+            className={filter === 'active' ? 'active' : ''}
+            onClick={() => setFilter('active')}
+          >
+            Active
           </button>
-          <button className={filter === 'other' ? 'selected' : ''} onClick={() => setFilter('other')}>
-            Other ({Math.max(0, books.length - 1)})
+          <button
+            type="button"
+            className={filter === 'other' ? 'active' : ''}
+            onClick={() => setFilter('other')}
+          >
+            Other books
           </button>
         </div>
       </div>
@@ -203,26 +208,32 @@ export default function CashbooksPage({
                     )}
                   </div>
 
-                  <div className="cashbook-card-icon-actions">
-                    <button
-                      type="button"
-                      className="book-action"
-                      title="Rename cashbook"
-                      aria-label={`Rename ${bookName}`}
-                      onClick={() => onEditCashbook(b)}
-                    >
-                      <Pencil size={14} strokeWidth={1.8} />
-                    </button>
-                    <button
-                      type="button"
-                      className="book-action delete-action"
-                      title="Delete cashbook"
-                      aria-label={`Delete ${bookName}`}
-                      onClick={() => onDeleteCashbook(b)}
-                    >
-                      <Trash2 size={14} strokeWidth={1.8} />
-                    </button>
-                  </div>
+                  {(canEdit || canDelete) && (
+                    <div className="cashbook-card-icon-actions">
+                      {canEdit && (
+                        <button
+                          type="button"
+                          className="book-action"
+                          title="Rename cashbook"
+                          aria-label={`Rename ${bookName}`}
+                          onClick={() => onEditCashbook(b)}
+                        >
+                          <Pencil size={14} strokeWidth={1.8} />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          className="book-action delete-action"
+                          title="Delete cashbook"
+                          aria-label={`Delete ${bookName}`}
+                          onClick={() => onDeleteCashbook(b)}
+                        >
+                          <Trash2 size={14} strokeWidth={1.8} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -242,9 +253,11 @@ export default function CashbooksPage({
               Clear search
             </button>
           ) : (
-            <button className="button primary" onClick={onAddCashbook}>
-              <Plus size={15} strokeWidth={2} /> Create your first cashbook
-            </button>
+            canCreate && (
+              <button className="button primary" onClick={onAddCashbook}>
+                <Plus size={15} strokeWidth={2} /> Create your first cashbook
+              </button>
+            )
           )}
         </div>
       )}

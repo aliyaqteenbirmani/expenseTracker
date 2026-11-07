@@ -3563,3 +3563,73 @@ input,select,textarea{transition:border-color .16s ease,box-shadow .16s ease}.lo
   flex-wrap: wrap;
   margin-top: 3px;
 }
+
+
+/* Member permissions and role gating styles */
+.member-self-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 8.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.member-readonly-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+.member-restricted-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #eef7f2;
+  border: 1px solid #d1e7db;
+  color: #1a5c3a;
+  font-size: 11px;
+  font-weight: 750;
+  width: fit-content;
+}
+.member-restricted-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #4b6355;
+  margin: 0;
+}
+.member-rules-box {
+  background: #f8faf8;
+  border: 1px solid #e2ebe4;
+  border-radius: 9px;
+  padding: 12px 14px;
+}
+.member-rules-box strong {
+  display: block;
+  font-size: 11px;
+  color: #173827;
+  margin-bottom: 6px;
+}
+.member-rules-box ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 10px;
+  color: #556c5f;
+  line-height: 1.6;
+}
+.txn-view-only-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #f1f5f3;
+  color: #617b6d;
+  font-size: 10px;
+  font-weight: 700;
+}

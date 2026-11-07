@@ -1,5 +1,6 @@
-﻿using SpendwiseSystem.Domain.DTOs.BusinessDtos;
+using SpendwiseSystem.Domain.DTOs.BusinessDtos;
 using SpendwiseSystem.Domain.DTOs.CashBookDtos;
+using SpendwiseSystem.Domain.DTOs.MemberDto;
 using SpendwiseSystem.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -36,6 +37,11 @@ namespace SpendwiseSystem.Application.Interfaces
             Guid businessId,
             Guid cashbookId,
             Guid userId,
+            Guid currentUserId);
+
+        Task<UserWorkspaceAccessDto> GetUserWorkspaceAccessAsync(
+            Guid businessId,
+            Guid? cashbookId,
             Guid currentUserId);
     }
 }

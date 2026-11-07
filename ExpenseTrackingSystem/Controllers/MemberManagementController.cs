@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SpendwiseSystem.Application.Helper;
@@ -150,5 +150,23 @@ namespace SpendwiseSystem.API.Controllers
             return Ok(result);
         }
 
+        [HttpGet("businesses/{businessId:guid}/access")]
+        public async Task<IActionResult> GetUserWorkspaceAccess(Guid businessId, [FromQuery] Guid? cashbookId)
+        {
+            var currentUserId = _currentService.UserId ?? Guid.Empty;
+
+            if (currentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var result = await _memberManagementService.GetUserWorkspaceAccessAsync(
+                businessId,
+                cashbookId,
+                currentUserId);
+
+            if (!result.Success)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
     }
 }
