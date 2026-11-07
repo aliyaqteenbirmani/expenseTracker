@@ -1,5 +1,19 @@
 import { useState } from 'react'
-import { BriefcaseBusiness, KeyRound, LogOut, Mail, Phone, ShieldCheck, User as UserIcon, X } from 'lucide-react'
+import { ResponsiveDialog } from '@/components/app/ResponsiveDialog'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  User as UserIcon,
+  Mail,
+  Building2,
+  KeyRound,
+  LogOut,
+  Loader2,
+  CheckCircle2,
+  ShieldCheck,
+} from 'lucide-react'
 
 type User = {
   firstName?: string
@@ -30,7 +44,7 @@ export default function UserProfileDialog({
   workspaceCount,
   onClose,
   onLogout,
-  onToast
+  onToast,
 }: Props) {
   const [resetRequested, setResetRequested] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -40,8 +54,7 @@ export default function UserProfileDialog({
   const firstName = user.firstName ?? user.FirstName ?? ''
   const lastName = user.lastName ?? user.LastName ?? ''
   const fullName = `${firstName} ${lastName}`.trim() || 'Spendwise User'
-  const phone = user.phone ?? user.Phone ?? 'Not provided'
-  const gender = String(user.gender ?? user.Gender ?? 'Not specified')
+  const initials = fullName.slice(0, 2).toUpperCase()
 
   const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'
 
@@ -50,15 +63,16 @@ export default function UserProfileDialog({
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(`${apiBase}/api/Auth/forgot-password?email=${encodeURIComponent(email)}`, {
-        method: 'POST'
-      })
+      const res = await fetch(
+        `${apiBase}/api/Auth/forgot-password?email=${encodeURIComponent(email)}`,
+        { method: 'POST' }
+      )
       if (res.ok) {
         setResetRequested(true)
         onToast('Password reset instructions sent to your email.')
       } else {
         const data = await res.json().catch(() => ({}))
-        setError(data.message || 'Could not send password reset request.')
+        setError(data.message || data.Message || 'Could not send reset link.')
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error requesting password reset.')
@@ -68,113 +82,124 @@ export default function UserProfileDialog({
   }
 
   return (
-    <div className="overlay" onMouseDown={e => e.target === e.currentTarget && onClose()}>
-      <section className="dialog user-profile-dialog" style={{ maxWidth: 440 }}>
-        <header>
+    <ResponsiveDialog
+      open={true}
+      onOpenChange={(open) => !open && onClose()}
+      title={
+        <div className="flex items-center gap-2">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <UserIcon className="size-4" />
+          </div>
           <div>
-            <div className="eyebrow">MY ACCOUNT</div>
-            <h2>User Profile</h2>
-          </div>
-          <button className="close" onClick={onClose} aria-label="Close dialog">
-            <X size={16} strokeWidth={1.8} />
-          </button>
-        </header>
-
-        <div className="dialog-content profile-dialog-content">
-          <div className="profile-header-card">
-            <div className="profile-big-avatar">
-              {fullName.slice(0, 1).toUpperCase()}
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Account
             </div>
-            <div className="profile-header-meta">
-              <strong>{fullName}</strong>
-              <small>{email}</small>
-              <span className="profile-badge">
-                <ShieldCheck size={12} /> Active Member
-              </span>
-            </div>
-          </div>
-
-          <div className="profile-details-list">
-            <div className="profile-detail-row">
-              <span className="detail-label">
-                <UserIcon size={14} /> Full Name
-              </span>
-              <strong className="detail-value">{fullName}</strong>
-            </div>
-
-            <div className="profile-detail-row">
-              <span className="detail-label">
-                <Mail size={14} /> Email
-              </span>
-              <strong className="detail-value">{email}</strong>
-            </div>
-
-            <div className="profile-detail-row">
-              <span className="detail-label">
-                <Phone size={14} /> Phone
-              </span>
-              <strong className="detail-value">{phone}</strong>
-            </div>
-
-            <div className="profile-detail-row">
-              <span className="detail-label">
-                <BriefcaseBusiness size={14} /> Workspaces
-              </span>
-              <strong className="detail-value">{workspaceCount} active</strong>
-            </div>
-
-            {gender !== 'Not specified' && (
-              <div className="profile-detail-row">
-                <span className="detail-label">Gender</span>
-                <strong className="detail-value">{gender}</strong>
-              </div>
-            )}
-          </div>
-
-          {error && <div className="error-banner">{error}</div>}
-
-          <div className="profile-security-box">
-            <div className="sec-header">
-              <KeyRound size={16} />
-              <div>
-                <strong>Security & Password</strong>
-                <p className="muted" style={{ margin: 0, fontSize: 11 }}>
-                  Need to change your password? We will email you a secure link.
-                </p>
-              </div>
-            </div>
-            {resetRequested ? (
-              <div className="success-banner" style={{ marginTop: 8 }}>
-                Check your inbox for password reset instructions.
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="button secondary-action full"
-                style={{ marginTop: 10 }}
-                disabled={busy}
-                onClick={requestPasswordReset}
-              >
-                <KeyRound size={14} />
-                {busy ? 'Sending request…' : 'Request Password Reset Link'}
-              </button>
-            )}
-          </div>
-
-          <div className="profile-dialog-actions" style={{ marginTop: 18, display: 'flex', gap: 10 }}>
-            <button
-              type="button"
-              className="button danger full"
-              onClick={() => {
-                onClose()
-                onLogout()
-              }}
-            >
-              <LogOut size={15} /> Sign out
-            </button>
+            <div className="text-base font-semibold">User Profile</div>
           </div>
         </div>
-      </section>
-    </div>
+      }
+      description="Manage your account profile, security credentials and linked workspaces."
+    >
+      <div className="space-y-5 pt-2">
+        {/* User Card */}
+        <div className="flex items-center gap-3 rounded-xl border border-border/80 bg-muted/30 p-3.5">
+          <Avatar className="size-12 rounded-xl">
+            <AvatarFallback className="rounded-xl bg-primary text-primary-foreground font-semibold text-sm">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 space-y-0.5">
+            <div className="flex items-center gap-2">
+              <h4 className="font-semibold text-sm text-foreground">{fullName}</h4>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-inflow/30 text-inflow bg-inflow-muted">
+                Active
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Mail className="size-3" />
+              <span>{email}</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Metrics */}
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="rounded-lg border border-border/80 p-3 space-y-1">
+            <span className="text-muted-foreground text-[11px] flex items-center gap-1">
+              <Building2 className="size-3" /> Workspaces
+            </span>
+            <p className="font-mono text-base font-semibold">{workspaceCount}</p>
+          </div>
+          <div className="rounded-lg border border-border/80 p-3 space-y-1">
+            <span className="text-muted-foreground text-[11px] flex items-center gap-1">
+              <ShieldCheck className="size-3" /> Security
+            </span>
+            <p className="font-medium text-xs text-foreground">JWT Authenticated</p>
+          </div>
+        </div>
+
+        {/* Password Reset Section */}
+        <div className="rounded-xl border border-border/80 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold flex items-center gap-1.5">
+                <KeyRound className="size-3.5 text-primary" /> Password & Security
+              </span>
+              <p className="text-[11px] text-muted-foreground">
+                Receive an email reset link to update your credentials.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy || resetRequested}
+              onClick={requestPasswordReset}
+              className="text-xs h-8"
+            >
+              {busy ? (
+                <Loader2 className="size-3 animate-spin mr-1" />
+              ) : resetRequested ? (
+                <CheckCircle2 className="size-3 text-inflow mr-1" />
+              ) : null}
+              <span>{resetRequested ? 'Sent!' : 'Reset password'}</span>
+            </Button>
+          </div>
+
+          {resetRequested && (
+            <Alert className="py-2 text-xs border-inflow/30 bg-inflow-muted/50 text-inflow">
+              <CheckCircle2 className="size-4" />
+              <AlertDescription>
+                Check your inbox at <strong>{email}</strong> for instructions.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {error && (
+            <Alert variant="destructive" className="py-2 text-xs">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        {/* Actions Footer */}
+        <div className="flex items-center justify-between pt-2 border-t">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive h-8 text-xs gap-1.5"
+            onClick={() => {
+              onClose()
+              onLogout()
+            }}
+          >
+            <LogOut className="size-3.5" />
+            <span>Sign out</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={onClose} className="h-8 text-xs">
+            Close
+          </Button>
+        </div>
+      </div>
+    </ResponsiveDialog>
   )
 }

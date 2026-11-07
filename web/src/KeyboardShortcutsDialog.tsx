@@ -1,21 +1,23 @@
+import { ResponsiveDialog } from '@/components/app/ResponsiveDialog'
+import { Button } from '@/components/ui/button'
 import {
-  BookOpen,
-  ChartNoAxesCombined,
   Keyboard,
   LayoutDashboard,
-  Plus,
-  Receipt,
   ReceiptText,
-  Search,
-  Settings,
-  Sparkles,
+  BookOpen,
   UsersRound,
-  X
+  Receipt,
+  ChartNoAxesCombined,
+  Settings,
+  Search,
+  Plus,
 } from 'lucide-react'
 
 type Props = {
   onClose: () => void
-  onNavigate: (destination: 'overview' | 'transactions' | 'cashbooks' | 'receipts' | 'reports' | 'members' | 'settings') => void
+  onNavigate: (
+    destination: 'overview' | 'transactions' | 'cashbooks' | 'receipts' | 'reports' | 'members' | 'settings'
+  ) => void
   onAction: (action: 'add-transaction' | 'add-receipt' | 'focus-search') => void
 }
 
@@ -36,148 +38,133 @@ export default function KeyboardShortcutsDialog({ onClose, onNavigate, onAction 
   const actionShortcuts = [
     {
       keys: [modifierKey, 'K'],
-      label: 'Quick Search transactions',
+      label: 'Command palette & search',
       icon: Search,
-      action: 'focus-search' as const
+      action: 'focus-search' as const,
+    },
+    {
+      keys: [modifierKey, 'B'],
+      label: 'Toggle sidebar open / collapsed',
+      icon: LayoutDashboard,
     },
     {
       keys: ['N'],
       label: 'New Transaction entry',
       icon: Plus,
-      action: 'add-transaction' as const
+      action: 'add-transaction' as const,
     },
     {
       keys: ['R'],
       label: 'Scan / Upload Receipt',
       icon: Receipt,
-      action: 'add-receipt' as const
+      action: 'add-receipt' as const,
     },
-  ]
-
-  const globalShortcuts = [
-    {
-      keys: ['?'],
-      label: 'Toggle Keyboard Shortcuts',
-      desc: 'Or press ' + modifierKey + ' + /'
-    },
-    {
-      keys: ['Esc'],
-      label: 'Close Active Modal / Drawer',
-      desc: 'Dismisses open dialogs'
-    }
   ]
 
   return (
-    <div className="overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="dialog shortcuts-dialog" onClick={e => e.stopPropagation()}>
-        <header>
+    <ResponsiveDialog
+      open={true}
+      onOpenChange={(open) => !open && onClose()}
+      title={
+        <div className="flex items-center gap-2">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Keyboard className="size-4" />
+          </div>
           <div>
-            <div className="eyebrow">POWER USER GUIDE</div>
-            <h2>
-              <Keyboard size={18} strokeWidth={2} style={{ display: 'inline', verticalAlign: -2, marginRight: 6 }} />
-              Keyboard Shortcuts
-            </h2>
-          </div>
-          <button className="close" onClick={onClose} aria-label="Close shortcuts dialog">
-            <X size={18} strokeWidth={1.8} />
-          </button>
-        </header>
-
-        <div className="dialog-content shortcuts-content">
-          <p className="shortcuts-intro muted">
-            Navigate Spendwise and perform financial actions instantly without lifting your hands off the keyboard.
-          </p>
-
-          <div className="shortcuts-section">
-            <h4 className="shortcuts-heading">QUICK ACTIONS</h4>
-            <div className="shortcuts-list">
-              {actionShortcuts.map(item => {
-                const Icon = item.icon
-                return (
-                  <div
-                    key={item.label}
-                    className="shortcut-row interactive"
-                    onClick={() => {
-                      onClose()
-                      onAction(item.action)
-                    }}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div className="shortcut-meta">
-                      <span className="shortcut-icon"><Icon size={14} strokeWidth={1.8} /></span>
-                      <span className="shortcut-label">{item.label}</span>
-                    </div>
-                    <div className="shortcut-keys">
-                      {item.keys.map((k, i) => (
-                        <span key={i}>
-                          <kbd className="shortcut-kbd">{k}</kbd>
-                          {i < item.keys.length - 1 && <span className="key-plus">+</span>}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Productivity
             </div>
-          </div>
-
-          <div className="shortcuts-section">
-            <h4 className="shortcuts-heading">NAVIGATION (PRESS G THEN KEY)</h4>
-            <div className="shortcuts-grid">
-              {navigationShortcuts.map(item => {
-                const Icon = item.icon
-                return (
-                  <div
-                    key={item.label}
-                    className="shortcut-row interactive"
-                    onClick={() => {
-                      onClose()
-                      onNavigate(item.dest)
-                    }}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <div className="shortcut-meta">
-                      <span className="shortcut-icon"><Icon size={14} strokeWidth={1.8} /></span>
-                      <span className="shortcut-label">{item.label}</span>
-                    </div>
-                    <div className="shortcut-keys">
-                      <kbd className="shortcut-kbd">{item.keys[0]}</kbd>
-                      <span className="key-then">then</span>
-                      <kbd className="shortcut-kbd">{item.keys[1]}</kbd>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="shortcuts-section">
-            <h4 className="shortcuts-heading">GENERAL</h4>
-            <div className="shortcuts-list">
-              {globalShortcuts.map(item => (
-                <div key={item.label} className="shortcut-row">
-                  <div className="shortcut-meta">
-                    <span className="shortcut-label">{item.label}</span>
-                    {item.desc && <small className="muted" style={{ marginLeft: 8, fontSize: 11 }}>{item.desc}</small>}
-                  </div>
-                  <div className="shortcut-keys">
-                    {item.keys.map((k, i) => (
-                      <kbd key={i} className="shortcut-kbd">{k}</kbd>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="shortcuts-footer-tip">
-            <Sparkles size={14} strokeWidth={1.8} />
-            <span>Pro tip: Press <code>?</code> anywhere outside of a text input to open this cheatsheet.</span>
+            <div className="text-base font-semibold">Keyboard Shortcuts</div>
           </div>
         </div>
+      }
+      description="Navigate across Spendwise and trigger rapid actions with single-stroke keys."
+    >
+      <div className="space-y-5 pt-2">
+        {/* Navigation Section */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Navigation Shortcuts
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {navigationShortcuts.map((item) => {
+              const Icon = item.icon
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    onClose()
+                    onNavigate(item.dest)
+                  }}
+                  className="flex items-center justify-between p-2 rounded-lg border border-border/80 bg-muted/20 hover:bg-muted/50 transition-colors text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className="size-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-foreground">{item.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {item.keys.map((k) => (
+                      <kbd
+                        key={k}
+                        className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground"
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Action Section */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Quick Actions
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {actionShortcuts.map((item) => {
+              const Icon = item.icon
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    if (item.action) {
+                      onClose()
+                      onAction(item.action)
+                    }
+                  }}
+                  className="flex items-center justify-between p-2 rounded-lg border border-border/80 bg-muted/20 hover:bg-muted/50 transition-colors text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className="size-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-foreground">{item.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {item.keys.map((k) => (
+                      <kbd
+                        key={k}
+                        className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground"
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2 border-t">
+          <Button variant="outline" size="sm" onClick={onClose} className="h-8 text-xs">
+            Done
+          </Button>
+        </div>
       </div>
-    </div>
+    </ResponsiveDialog>
   )
 }

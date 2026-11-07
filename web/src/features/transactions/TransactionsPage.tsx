@@ -1,0 +1,158 @@
+import { useState } from 'react'
+import { PageHeader } from '@/components/app/PageHeader'
+import { Button } from '@/components/ui/button'
+import { Gate } from '@/components/app/Gate'
+import { TransactionsDataTable } from './TransactionsDataTable'
+import {
+  ArrowLeft,
+  Plus,
+  RefreshCw,
+  BookOpen,
+} from 'lucide-react'
+import type { Cashbook, Transaction } from '@/App'
+import { cn } from '@/lib/utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+interface TransactionsPageProps {
+  transactions: Transaction[]
+  token: string
+  cashbookName: string
+  books: Cashbook[]
+  selectedBookId?: string
+  canCreate?: boolean
+  canEdit?: boolean
+  canDelete?: boolean
+  onSelectBook: (book: Cashbook) => void
+  onBack: () => void
+  onAdd: () => void
+  onAddReceipt: () => void
+  onRefresh: () => void
+  onToast: (msg: string) => void
+  onViewAttachment: (txn: Transaction) => void
+  onOpenDetail: (txn: Transaction) => void
+  onEditTransaction?: (txn: Transaction) => void
+  onDeleteTransaction?: (txn: Transaction) => void
+  initialSearch?: string
+}
+
+export function TransactionsPage({
+  transactions,
+  cashbookName,
+  books,
+  selectedBookId,
+  canCreate = true,
+  canEdit = true,
+  canDelete = true,
+  onSelectBook,
+  onBack,
+  onAdd,
+  onAddReceipt,
+  onRefresh,
+  onToast,
+  onViewAttachment,
+  onOpenDetail,
+  onEditTransaction,
+  onDeleteTransaction,
+}: TransactionsPageProps) {
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await onRefresh()
+      onToast('Transactions refreshed')
+    } finally {
+      setTimeout(() => setRefreshing(false), 400)
+    }
+  }
+
+  return (
+    <div className="space-y-6 pb-12">
+      <PageHeader
+        title="Transactions Ledger"
+        description={`Showing all records for ${cashbookName}. Filter, search, inspect and audit entries.`}
+        breadcrumb={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="-ml-2 h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span>Back to Overview</span>
+          </Button>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {books.length > 1 && (
+              <Select
+                value={selectedBookId}
+                onValueChange={(val) => {
+                  const b = books.find((x) => x.id === val)
+                  if (b) onSelectBook(b)
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs w-44">
+                  <BookOpen className="size-3.5 mr-1 text-muted-foreground" />
+                  <SelectValue placeholder="Select cashbook" />
+                </SelectTrigger>
+                <SelectContent>
+                  {books.map((b) => (
+                    <SelectItem key={b.id} value={b.id} className="text-xs">
+                      {b.cashBookName ?? b.name ?? 'Cashbook'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw className={cn('size-3.5 mr-1.5', refreshing && 'animate-spin')} />
+              <span>Refresh</span>
+            </Button>
+
+            <Gate
+              allow={canCreate}
+              reason="Add restricted — ask the cashbook owner for access"
+            >
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onAddReceipt}>
+                <Plus className="size-3.5 mr-1" />
+                <span>Add Receipt</span>
+              </Button>
+              <Button size="sm" className="h-8 text-xs" onClick={onAdd}>
+                <Plus className="size-3.5 mr-1" />
+                <span>Add Transaction</span>
+              </Button>
+            </Gate>
+          </div>
+        }
+      />
+
+      <TransactionsDataTable
+        transactions={transactions}
+        canCreate={canCreate}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        onAddTransaction={onAdd}
+        onEditTransaction={onEditTransaction}
+        onDeleteTransaction={onDeleteTransaction}
+        onSelectTransaction={onOpenDetail}
+        onViewAttachment={onViewAttachment}
+        onToast={onToast}
+        pageSize={25}
+      />
+    </div>
+  )
+}
