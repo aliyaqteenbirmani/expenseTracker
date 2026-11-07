@@ -6,10 +6,10 @@ import {
   Copy,
   ExternalLink,
   Layers,
+  Lock,
   Paperclip,
   Pencil,
-  Shield,
-  Trash2,
+    Trash2,
   User,
   Wallet,
   X
@@ -248,12 +248,12 @@ export default function TransactionDetailDialog({
                 <Trash2 size={14} strokeWidth={1.8} /> Delete
               </button>
             ) : (
-              <span className="txn-view-only-tag" title="You do not have permission to delete transactions">
-                <Shield size={12} strokeWidth={1.8} /> Read only
+              <span className="txn-view-only-tag" title="Owner has restricted transaction deletion for this cashbook">
+                <Lock size={12} strokeWidth={1.8} /> Delete restricted
               </span>
             )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              {canEdit && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {canEdit ? (
                 <button
                   type="button"
                   className="button secondary-action"
@@ -264,6 +264,10 @@ export default function TransactionDetailDialog({
                 >
                   <Pencil size={14} strokeWidth={1.8} /> Edit
                 </button>
+              ) : (
+                <span className="txn-view-only-tag" title="Owner has restricted transaction editing for this cashbook">
+                  <Lock size={12} strokeWidth={1.8} /> Edit restricted
+                </span>
               )}
               <button type="button" className="button primary" onClick={onClose}>
                 Done

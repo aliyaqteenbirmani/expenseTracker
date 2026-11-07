@@ -3633,3 +3633,718 @@ input,select,textarea{transition:border-color .16s ease,box-shadow .16s ease}.lo
   font-size: 10px;
   font-weight: 700;
 }
+
+
+/* ========================================================
+   ENHANCED OWNER-CONTROLLED PERMISSIONS & MEMBERS STYLING
+   ======================================================== */
+
+.user-role-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+}
+.user-role-badge-pill.owner {
+  background: linear-gradient(135deg, #fef7da, #fdf0ba);
+  color: #8c6307;
+  border: 1px solid #fae288;
+}
+.user-role-badge-pill.member {
+  background: linear-gradient(135deg, #eef5fc, #e1edf9);
+  color: #1e5f98;
+  border: 1px solid #c9def3;
+}
+
+.invite-scope-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: #f4f7f4;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid #e1e9e2;
+  margin-top: 4px;
+}
+.scope-pill-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: #556c5d;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.scope-pill-btn.active {
+  background: #ffffff;
+  color: #1a6f47;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+.invite-perms-fieldset {
+  border: 1px solid #e0eae2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fbfdfb;
+}
+.fieldset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.fieldset-header legend {
+  font-size: 10.5px;
+  font-weight: 750;
+  color: #274737;
+  padding: 0;
+}
+.invite-presets {
+  display: flex;
+  gap: 4px;
+}
+.invite-presets button {
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid #dbe7dd;
+  background: #ffffff;
+  color: #316447;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.invite-presets button:hover {
+  background: #eef6f0;
+  border-color: #aed1b7;
+}
+
+.invite-perm-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.invite-perm-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e2ebe4;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.invite-perm-card:hover {
+  border-color: #bad3c2;
+  background: #f9fcf9;
+}
+.invite-perm-card.checked {
+  border-color: #7dc497;
+  background: #f4fbf6;
+}
+.invite-perm-card input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: #1f8552;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+.invite-perm-card .perm-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.invite-perm-card .perm-info strong {
+  font-size: 10.5px;
+  color: #243e31;
+}
+.invite-perm-card .perm-info small {
+  font-size: 8.5px;
+  color: #72877a;
+  line-height: 1.3;
+}
+
+.security-notice-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #f3f8f5;
+  border: 1px solid #d5e8dc;
+  font-size: 9.5px;
+  color: #275239;
+  line-height: 1.4;
+}
+.security-notice-callout .notice-icon {
+  color: #1f8552;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* My Permissions Dashboard (Non-Owner View) */
+.my-permissions-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+.my-role-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #f0f6fa;
+  border: 1px solid #d2e4f2;
+  color: #1a5688;
+}
+.my-role-banner strong {
+  display: block;
+  font-size: 11px;
+}
+.my-role-banner p {
+  margin: 1px 0 0;
+  font-size: 9px;
+  color: #4f789e;
+}
+.my-capabilities-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.section-subhead {
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #63776a;
+  margin-bottom: 2px;
+}
+.capability-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2ebe4;
+  background: #ffffff;
+}
+.capability-row.granted {
+  background: #f7fcf8;
+  border-color: #d1e8d7;
+}
+.capability-row.denied {
+  background: #fcfcfc;
+  border-color: #ebebeb;
+  opacity: 0.85;
+}
+.capability-status-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.text-emerald {
+  color: #1a8f55;
+}
+.capability-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+}
+.capability-details strong {
+  font-size: 11px;
+  color: #213c2f;
+}
+.capability-details small {
+  font-size: 8.5px;
+  color: #71887a;
+}
+.capability-pill {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 8.5px;
+  font-weight: 750;
+}
+.capability-pill.pill-granted {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+.capability-pill.pill-denied {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+.owner-authority-footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 10px;
+  border-radius: 7px;
+  background: #fafaf9;
+  border: 1px solid #ecebe9;
+  font-size: 9px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* Cashbook & Search Selectors */
+.cashbook-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 10px;
+}
+.selector-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #3b5647;
+  white-space: nowrap;
+}
+.cashbook-dropdown {
+  width: 100%;
+  border: 1px solid #dbe6de;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 11.5px;
+  font-weight: 650;
+  background: #ffffff;
+  color: #1c3d2e;
+  outline: none;
+}
+.cashbook-dropdown:focus {
+  border-color: #248455;
+  box-shadow: 0 0 0 2px rgba(36, 132, 85, 0.12);
+}
+
+.member-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 0 12px;
+  position: relative;
+}
+.member-search-input {
+  width: 100%;
+  border: 1px solid #dce5de;
+  border-radius: 8px;
+  padding: 7px 11px 7px 28px;
+  font-size: 11px;
+  color: #203e30;
+  outline: none;
+  background: #ffffff;
+}
+.member-search-input:focus {
+  border-color: #248455;
+}
+.member-search-bar .search-icon {
+  position: absolute;
+  left: 9px;
+  color: #7b9083;
+}
+.search-clear-btn {
+  position: absolute;
+  right: 8px;
+  border: 0;
+  background: #e9eee9;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: #556c5d;
+  cursor: pointer;
+}
+
+/* Member Rows & Cards */
+.member-row-card {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 10px;
+  border-radius: 10px;
+  border: 1px solid #edf2ed;
+  background: #ffffff;
+  margin-bottom: 7px;
+  transition: all 0.15s ease;
+}
+.member-row-card:hover {
+  border-color: #d7e4d9;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.03);
+}
+.member-row-card.is-self {
+  background: #fcfdfc;
+  border-left: 3px solid #288b5a;
+}
+.member-row-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.member-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.member-name-row strong {
+  font-size: 11.5px;
+  color: #1e3a2c;
+}
+.member-email-text {
+  font-size: 9.5px;
+  color: #778b7d;
+}
+.member-row-editor {
+  margin-top: 8px;
+  padding-left: 45px;
+}
+.member-edit-perms-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid #d4e5d8;
+  background: #f6fbf7;
+  color: #1b6f46;
+  font-size: 9.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.member-edit-perms-btn:hover {
+  background: #ebf6ee;
+  border-color: #aed4b9;
+}
+
+/* Modern Inline Permission Editor */
+.member-perm-editor-box {
+  background: #f9fbf9;
+  border: 1px solid #d6e6da;
+  border-radius: 9px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+.perm-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.perm-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1d5f3d;
+  font-size: 11px;
+}
+.perm-editor-close-btn {
+  border: 0;
+  background: transparent;
+  color: #748b7c;
+  cursor: pointer;
+  padding: 2px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+}
+.perm-editor-close-btn:hover {
+  background: #e7eee8;
+  color: #213c2f;
+}
+.perm-presets-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.preset-label {
+  font-size: 9px;
+  font-weight: 750;
+  color: #637b6d;
+}
+.preset-chip {
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #d4e2d7;
+  background: #ffffff;
+  color: #295b40;
+  font-size: 8.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+.preset-chip:hover {
+  background: #eef6f0;
+  border-color: #abd2b7;
+}
+.perm-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 3px 0;
+}
+.perm-card-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  border: 1px solid #e1ebe3;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.perm-card-item.selected {
+  background: #f1f9f3;
+  border-color: #84c79c;
+}
+.perm-card-item input[type="checkbox"] {
+  accent-color: #1f8552;
+  cursor: pointer;
+}
+.perm-card-text {
+  display: flex;
+  flex-direction: column;
+}
+.perm-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #213c2f;
+}
+.perm-card-desc {
+  font-size: 8px;
+  color: #748b7d;
+}
+.perm-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+.perm-editor-success {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  padding: 5px 9px;
+  border-radius: 6px;
+}
+.perm-editor-error {
+  font-size: 9.5px;
+  color: #b91c1c;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  padding: 5px 9px;
+  border-radius: 6px;
+}
+
+/* Color-coded Permission Chips */
+.perm-chip-view {
+  background: #ecfdf5 !important;
+  color: #065f46 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+.perm-chip-create {
+  background: #eff6ff !important;
+  color: #1e40af !important;
+  border: 1px solid #bfdbfe !important;
+}
+.perm-chip-update {
+  background: #fffbeb !important;
+  color: #92400e !important;
+  border: 1px solid #fde68a !important;
+}
+.perm-chip-delete {
+  background: #fff1f2 !important;
+  color: #9f1239 !important;
+  border: 1px solid #fecdd3 !important;
+}
+.perm-chip-default {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+/* Invitations Received & Sent Cards */
+.invitation-row-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 9px;
+  border: 1px solid #edf2ed;
+  background: #ffffff;
+  margin-bottom: 7px;
+}
+.invitation-row-card.sent-card {
+  background: #fafcfa;
+}
+.invite-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.invite-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.invite-title-row strong {
+  font-size: 11px;
+  color: #1e3a2c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.invite-badge {
+  font-size: 8px;
+  font-weight: 750;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #fef3c7;
+  color: #92400e;
+}
+.invite-status-tag {
+  font-size: 8px;
+  font-weight: 750;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.invite-status-tag.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.invite-status-tag.accepted {
+  background: #dcfce7;
+  color: #166534;
+}
+.invite-status-tag.revoked {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.invite-perms-preview {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.preview-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #63776a;
+}
+.preview-perm-chip {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f0f5f1;
+  color: #275239;
+  border: 1px solid #dce8df;
+}
+.button-accept {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 0;
+  background: #198754;
+  color: #ffffff;
+  font-size: 9.5px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.button-accept:hover {
+  background: #157347;
+}
+.button-decline {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid #e5d7d5;
+  background: #ffffff;
+  color: #9c3f35;
+  font-size: 9.5px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.button-decline:hover {
+  background: #fdf5f4;
+  border-color: #c98b83;
+}
+.sent-filter-chips {
+  display: flex;
+  gap: 4px;
+}
+.sent-st-chip {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2ebe4;
+  background: #ffffff;
+  color: #62776c;
+  font-size: 9px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.sent-st-chip.active {
+  background: #1c7c4f;
+  border-color: #1c7c4f;
+  color: #ffffff;
+}
+.sent-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.revoke-invitation-btn {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid #f3d4cf;
+  background: #ffffff;
+  color: #b91c1c;
+  font-size: 9px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.revoke-invitation-btn:hover {
+  background: #fee2e2;
+}

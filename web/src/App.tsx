@@ -6,6 +6,7 @@ import {
   Bell,
   BookOpen,
   BriefcaseBusiness,
+  Crown,
   CalendarDays,
   ChartNoAxesCombined,
   Check,
@@ -22,6 +23,7 @@ import {
   KeyRound,
   Keyboard,
   LayoutDashboard,
+  Lock,
   LogOut,
   Mail,
   Menu,
@@ -1723,7 +1725,13 @@ function TransactionRowActions({
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  if (!canEdit && !canDelete) return null
+  if (!canEdit && !canDelete) {
+    return (
+      <span className="txn-view-only-tag" style={{ padding: '2px 7px', fontSize: '8px' }} title="Read only: You do not have edit or delete permissions in this cashbook">
+        <Lock size={9} strokeWidth={2} /> Read only
+      </span>
+    )
+  }
 
   return (
     <>
@@ -2074,8 +2082,8 @@ function TransactionsPage({
               </button>
             </>
           ) : (
-            <span className="txn-view-only-tag" style={{ padding: '6px 12px' }}>
-              <Shield size={13} strokeWidth={1.8} /> View-only cashbook
+            <span className="txn-view-only-tag" style={{ padding: '6px 12px' }} title="Owner has set this cashbook to view-only mode for your account">
+              <Lock size={13} strokeWidth={1.8} /> View only (No Add permission)
             </span>
           )}
         </div>
@@ -3670,7 +3678,18 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                     {new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase()}
                   </div>
                   <h1>Good morning, {fullName.split(' ')[0]} <span>✦</span></h1>
-                  <p className="muted">Here’s what’s happening with your money today.</p>
+                  <p className="muted">
+                    Here’s what’s happening with your money today.
+                    {book && (
+                      <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        · <strong>{book.cashBookName ?? book.name}</strong>
+                        <span className={`user-role-badge-pill ${isOwner ? 'owner' : 'member'}`} style={{ padding: '2px 7px', fontSize: '8.5px' }}>
+                          {isOwner ? <Crown size={10} strokeWidth={2.2} /> : <Shield size={10} strokeWidth={2.2} />}
+                          {isOwner ? 'Owner' : 'Member'}
+                        </span>
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div className="heading-actions">
                   {canCreateTransaction ? (
@@ -3683,8 +3702,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                       </button>
                     </>
                   ) : (
-                    <span className="txn-view-only-tag" style={{ padding: '7px 12px' }}>
-                      <Shield size={13} strokeWidth={1.8} /> View only cashbook
+                    <span className="txn-view-only-tag" style={{ padding: '7px 12px' }} title="Owner has set this cashbook to view-only mode for your account">
+                      <Lock size={13} strokeWidth={1.8} /> View only (No Add permission)
                     </span>
                   )}
                 </div>
