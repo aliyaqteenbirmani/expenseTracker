@@ -84,19 +84,24 @@ export function ReceiptsVaultPage({
 
   const downloadFile = (e: React.MouseEvent, t: Transaction) => {
     e.stopPropagation()
-    const url = `${apiBase}/api/transactions/${t.id}/attachment`
+    if (t.filePath) {
+      window.open(t.filePath, '_blank')
+      onToast('Opening receipt')
+      return
+    }
+    const url = `${apiBase}/api/Transaction/getfile?id=${encodeURIComponent(t.id)}`
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.blob())
-      .then((blob) => {
-        const blobUrl = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = blobUrl
-        link.download = t.fileName || `receipt_${t.id}.jpg`
-        link.click()
-        window.URL.revokeObjectURL(blobUrl)
-        onToast('Receipt downloaded')
+      .then((r) => r.json())
+      .then((res) => {
+        const file = res?.data?.filePath
+        if (file) {
+          window.open(file, '_blank')
+          onToast('Opening receipt')
+        } else {
+          onToast('Attachment not found')
+        }
       })
-      .catch(() => onToast('Could not download file.'))
+      .catch(() => onToast('Could not load receipt file.'))
   }
 
   return (

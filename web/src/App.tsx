@@ -448,12 +448,27 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
       setLoadingTransactions(true)
       try {
         const list = await api<Transaction[]>(
-          `/api/Transaction/CashBook/${encodeURIComponent(activeId)}`,
+          `/api/Transaction/getall?CashBookId=${encodeURIComponent(activeId)}`,
           token
         )
-        const sorted = (list ?? []).sort((a, b) =>
-          (b.transactionDate ?? '').localeCompare(a.transactionDate ?? '')
-        )
+        const sorted = (list ?? [])
+          .map((item) => ({
+            ...item,
+            id: item.id ?? (item as unknown as { Id?: string }).Id ?? '',
+            amount: Number(item.amount ?? (item as unknown as { Amount?: number }).Amount ?? 0),
+            transactionType:
+              item.transactionType ??
+              (item as unknown as { TransactionType?: string }).TransactionType ??
+              'CashOut',
+            remarks: item.remarks ?? (item as unknown as { Remarks?: string }).Remarks ?? '',
+            transactionDate:
+              item.transactionDate ?? (item as unknown as { TransactionDate?: string }).TransactionDate,
+            createdBy: item.createdBy ?? (item as unknown as { CreatedBy?: string }).CreatedBy,
+            fileName: item.fileName ?? (item as unknown as { FileName?: string }).FileName,
+            filePath: item.filePath ?? (item as unknown as { FilePath?: string }).FilePath,
+            createdOn: item.createdOn ?? (item as unknown as { CreatedOn?: string }).CreatedOn,
+          }))
+          .sort((a, b) => (b.transactionDate ?? '').localeCompare(a.transactionDate ?? ''))
         setTransactions(sorted)
       } catch (e) {
         showToast(e instanceof Error ? e.message : 'Could not refresh transactions.')
@@ -475,17 +490,24 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
       }
       try {
         const list = await api<Cashbook[]>(
-          `/api/CashBook/business/${encodeURIComponent(bId)}`,
+          `/api/CashBook/getall?id=${encodeURIComponent(bId)}`,
           token
         )
         const normalized = (list ?? []).map((item) => ({
           ...item,
           id: item.id ?? (item as Cashbook & { Id: string }).Id,
-          businessId: item.businessId ?? (item as Cashbook & { BusinessId: string }).BusinessId,
+          cashBookName:
+            item.cashBookName ??
+            (item as Cashbook & { CashBookName?: string }).CashBookName ??
+            item.name ??
+            (item as Cashbook & { Name?: string }).Name ??
+            'Cashbook',
+          businessId: item.businessId ?? (item as Cashbook & { BusinessId: string }).BusinessId ?? bId,
         }))
         setBooks(normalized)
         const selected =
           (preferredCashbookId && normalized.find((b) => b.id === preferredCashbookId)) ||
+          normalized.find((b) => b.id === book?.id) ||
           normalized[0] ||
           null
         setBook(selected)
@@ -498,7 +520,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
         showToast(e instanceof Error ? e.message : 'Could not load cashbooks.')
       }
     },
-    [businessId, token, reloadTransactions, showToast]
+    [businessId, book?.id, token, reloadTransactions, showToast]
   )
 
   const reloadBusinesses = useCallback(
@@ -712,7 +734,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
 
   const handleDeleteTransaction = async (txn: Transaction) => {
     try {
-      await api(`/api/Transaction/delete?id=${encodeURIComponent(txn.id)}`, token, {
+      await api(`/api/Transaction/${encodeURIComponent(txn.id)}`, token, {
         method: 'DELETE',
       })
       showToast('Transaction permanently deleted')
