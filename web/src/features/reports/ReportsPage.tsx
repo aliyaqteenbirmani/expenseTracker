@@ -4,7 +4,12 @@ import { StatCard } from '@/components/app/StatCard'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  MotionTabs,
+  MotionTabsContent,
+  MotionTabsList,
+  MotionTabsTrigger,
+} from '@/components/motion/motion-tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   DropdownMenu,
@@ -84,6 +89,7 @@ export function ReportsPage({
   onToast,
 }: ReportsPageProps) {
   const [period, setPeriod] = useState<'30' | '90' | 'year' | 'all'>('30')
+  const [activeTab, setActiveTab] = useState('cashflow')
   const [showStatement, setShowStatement] = useState(false)
 
   // Filter transactions by period
@@ -338,17 +344,21 @@ export function ReportsPage({
       </div>
 
       {/* Tabs Layout */}
-      <Tabs defaultValue="cashflow" className="space-y-4">
-        <TabsList className="h-9">
-          <TabsTrigger value="cashflow" className="text-xs px-3">
+      <MotionTabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
+        <MotionTabsList className="h-9">
+          <MotionTabsTrigger value="cashflow" className="text-xs px-3">
             Income vs Expense Comparison
-          </TabsTrigger>
-          <TabsTrigger value="categories" className="text-xs px-3">
+          </MotionTabsTrigger>
+          <MotionTabsTrigger value="categories" className="text-xs px-3">
             Category Breakdown
-          </TabsTrigger>
-        </TabsList>
+          </MotionTabsTrigger>
+        </MotionTabsList>
 
-        <TabsContent value="cashflow" className="space-y-4">
+        <MotionTabsContent value="cashflow" className="space-y-4">
           <Card className="p-6 border-border/80 shadow-xs">
             <CardHeader className="p-0 pb-4">
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -397,9 +407,9 @@ export function ReportsPage({
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </MotionTabsContent>
 
-        <TabsContent value="categories" className="space-y-4">
+        <MotionTabsContent value="categories" className="space-y-4">
           <Card className="border-border/80 shadow-xs">
             <CardHeader className="p-6 pb-3">
               <CardTitle className="text-base font-semibold">Spending by Category</CardTitle>
@@ -444,8 +454,8 @@ export function ReportsPage({
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </MotionTabsContent>
+      </MotionTabs>
 
       {/* Financial Statement Modal */}
       <FinancialStatementModal

@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { motion } from 'motion/react'
+import { spring } from '@/lib/motion'
 import { PageHeader } from '@/components/app/PageHeader'
 import { StatCard } from '@/components/app/StatCard'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
@@ -14,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { MotionToggleGroup } from '@/components/motion/motion-toggle-group'
 import {
   BookOpen,
   ArrowLeft,
@@ -143,24 +145,16 @@ export function CashbooksPage({
           />
         </div>
 
-        <ToggleGroup
-          value={[filter]}
-          onValueChange={(vals) => {
-            const chosen = Array.isArray(vals) ? vals[0] : vals
-            if (chosen) setFilter(chosen as 'all' | 'active' | 'other')
-          }}
-          className="border border-border/80 rounded-lg p-0.5"
-        >
-          <ToggleGroupItem value="all" className="text-xs h-7 px-2.5">
-            All ({books.length})
-          </ToggleGroupItem>
-          <ToggleGroupItem value="active" className="text-xs h-7 px-2.5">
-            Active
-          </ToggleGroupItem>
-          <ToggleGroupItem value="other" className="text-xs h-7 px-2.5">
-            Other
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <MotionToggleGroup
+          value={filter}
+          onValueChange={(val) => setFilter(val as 'all' | 'active' | 'other')}
+          items={[
+            { value: 'all', label: `All (${books.length})` },
+            { value: 'active', label: 'Active' },
+            { value: 'other', label: 'Other' },
+          ]}
+          size="sm"
+        />
       </div>
 
       {/* Cashbooks Cards Grid */}
@@ -192,10 +186,17 @@ export function CashbooksPage({
               <Card
                 key={b.id}
                 className={cn(
-                  'relative flex flex-col justify-between p-5 border-border/80 shadow-xs transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
-                  isActive && 'ring-2 ring-primary/40 bg-gradient-to-t from-primary/5 to-card'
+                  'relative flex flex-col justify-between p-5 border-border/80 shadow-xs transition-[box-shadow,transform] duration-(--duration-fast) ease-out hover:shadow-md hover:-translate-y-0.5',
+                  isActive && 'bg-gradient-to-t from-primary/5 to-card'
                 )}
               >
+                {isActive && (
+                  <motion.div
+                    layoutId="active-cashbook"
+                    transition={spring.snappy}
+                    className="absolute inset-0 rounded-xl ring-2 ring-primary/40 pointer-events-none"
+                  />
+                )}
                 <CardHeader className="p-0 pb-3 flex flex-row items-start justify-between space-y-0">
                   <div className="flex items-center gap-3">
                     <div

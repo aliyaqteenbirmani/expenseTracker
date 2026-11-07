@@ -211,7 +211,7 @@ export function ReceiptsVaultPage({
             return (
               <Card
                 key={t.id}
-                className="group relative overflow-hidden border-border/80 shadow-xs transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+                className="group relative overflow-hidden border-border/80 shadow-xs transition-[box-shadow,transform] duration-(--duration-fast) ease-out hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
                 onClick={() => onViewAttachment(t)}
               >
                 {/* Thumbnail Header */}

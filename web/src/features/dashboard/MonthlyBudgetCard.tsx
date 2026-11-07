@@ -15,6 +15,7 @@ import type { Transaction } from '@/App'
 import { BudgetConfigDialog } from './BudgetConfigDialog'
 import { formatMoney } from '@/lib/format'
 import { Gate } from '@/components/app/Gate'
+import { AnimatedNumber } from '@/components/motion/animated-number'
 import { cn } from '@/lib/utils'
 
 interface MonthlyBudgetCardProps {
@@ -142,7 +143,7 @@ export function MonthlyBudgetCard({
           <div className="flex items-baseline justify-between">
             <div>
               <p className="text-2xl font-semibold font-mono tabular-nums tracking-tight">
-                {formatMoney(spentSoFar)}
+                <AnimatedNumber value={spentSoFar} formatFn={(v) => formatMoney(v)} />
               </p>
               <p className="text-xs text-muted-foreground">
                 spent of <span className="font-mono">{formatMoney(effectiveBudget)}</span> limit
@@ -159,7 +160,7 @@ export function MonthlyBudgetCard({
                   : 'border-inflow/30 bg-inflow-muted/50 text-inflow'
               )}
             >
-              {percentUsed}% used
+              <AnimatedNumber value={percentUsed} />% used
             </Badge>
           </div>
 
@@ -167,7 +168,7 @@ export function MonthlyBudgetCard({
           <div className="space-y-1">
             <Progress value={Math.min(100, percentUsed)} className="h-2">
               <div
-                className={cn('h-full rounded-full transition-all duration-500', progressColorClass)}
+                className={cn('h-full rounded-full transition-[width] duration-(--duration-slow) ease-out', progressColorClass)}
                 style={{ width: `${Math.min(100, percentUsed)}%` }}
               />
             </Progress>

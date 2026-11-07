@@ -61,6 +61,10 @@ import { EmptyState } from '@/components/app/EmptyState'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatRelativeDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { motion, AnimatePresence } from 'motion/react'
+import { spring } from '@/lib/motion'
+import { useDelayedFlag } from '@/hooks/use-delayed-flag'
+import { AnimatedNumber } from '@/components/motion/animated-number'
 
 interface TransactionsDataTableProps {
   transactions: Transaction[]
@@ -101,6 +105,8 @@ export function TransactionsDataTable({
   const [typeFilter, setTypeFilter] = useState<'all' | 'cashin' | 'cashout'>('all')
   const [rowSelection, setRowSelection] = useState({})
   const [deleteCandidate, setDeleteCandidate] = useState<Transaction | null>(null)
+  const showSkeleton = useDelayedFlag(loading, 150)
+  const selectedCount = Object.keys(rowSelection).length
 
   const filteredData = useMemo(() => {
     return transactions.filter((t) => {
@@ -490,7 +496,7 @@ export function TransactionsDataTable({
             ))}
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {showSkeleton ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i} className="h-14">
                   <TableCell className="w-10">
@@ -522,7 +528,7 @@ export function TransactionsDataTable({
                   key={row.id}
                   data-state={row.getIsSelected() && 'selected'}
                   onClick={() => onSelectTransaction?.(row.original)}
-                  className="cursor-pointer hover:bg-muted/50 transition-colors h-14"
+                  className="cursor-pointer hover:bg-muted/50 transition-colors duration-(--duration-instant) h-14"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="py-2.5 text-xs">
@@ -598,6 +604,43 @@ export function TransactionsDataTable({
           </div>
         )}
       </div>
+
+      {/* Floating Bulk Selection Action Bar */}
+      <AnimatePresence>
+        {selectedCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={spring.smooth}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-xl border border-border/80 bg-popover px-4 py-2 text-xs shadow-xl text-popover-foreground backdrop-blur-md"
+          >
+            <span className="font-semibold flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-primary animate-pulse" />
+              <AnimatedNumber value={selectedCount} />
+              <span>selected</span>
+            </span>
+            <div className="h-4 w-px bg-border/80" />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={exportCSV}
+            >
+              <Download className="size-3 mr-1" />
+              <span>Export Selected</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setRowSelection({})}
+            >
+              Deselect All
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Alert Dialog */}
       <AlertDialog

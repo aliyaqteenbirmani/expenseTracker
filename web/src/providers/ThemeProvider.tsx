@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
-type Theme = 'dark' | 'light' | 'system'
+export type Theme = 'dark' | 'light' | 'system'
 
 type ThemeProviderProps = {
   children: React.ReactNode
@@ -11,11 +11,13 @@ type ThemeProviderProps = {
 type ThemeProviderState = {
   theme: Theme
   setTheme: (theme: Theme) => void
+  switchTheme: (next: Theme, e?: React.MouseEvent) => void
 }
 
 const initialState: ThemeProviderState = {
   theme: 'system',
   setTheme: () => null,
+  switchTheme: () => null,
 }
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
@@ -36,8 +38,7 @@ export function ThemeProvider({
     root.classList.remove('light', 'dark')
 
     if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
-        .matches
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
         ? 'dark'
         : 'light'
 
@@ -48,12 +49,64 @@ export function ThemeProvider({
     root.classList.add(theme)
   }, [theme])
 
-  const value = {
-    theme,
-    setTheme: (newTheme: Theme) => {
+  const applyTheme = useCallback(
+    (newTheme: Theme) => {
       localStorage.setItem(storageKey, newTheme)
       setTheme(newTheme)
     },
+    [storageKey]
+  )
+
+  const switchTheme = useCallback(
+    (next: Theme, e?: React.MouseEvent) => {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const doc = document as unknown as {
+        startViewTransition?: (cb: () => void) => { ready: Promise<void> }
+      }
+
+      if (!doc.startViewTransition || reduce || !e) {
+        applyTheme(next)
+        return
+      }
+
+      const x = e.clientX
+      const y = e.clientY
+      const r = Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y)
+      )
+
+      const transition = doc.startViewTransition(() => {
+        applyTheme(next)
+      })
+
+      transition.ready
+        .then(() => {
+          document.documentElement.animate(
+            {
+              clipPath: [
+                `circle(0px at ${x}px ${y}px)`,
+                `circle(${r}px at ${x}px ${y}px)`,
+              ],
+            },
+            {
+              duration: 450,
+              easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              pseudoElement: '::view-transition-new(root)',
+            }
+          )
+        })
+        .catch(() => {
+          // Fallback if view transition fails
+        })
+    },
+    [applyTheme]
+  )
+
+  const value = {
+    theme,
+    setTheme: applyTheme,
+    switchTheme,
   }
 
   return (

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { MotionToggleGroup } from '@/components/motion/motion-toggle-group'
 import {
   ChartContainer,
   ChartTooltip,
@@ -38,6 +38,11 @@ const chartConfig: ChartConfig = {
 
 export function CashFlowChart({ transactions, className }: CashFlowChartProps) {
   const [range, setRange] = useState<'7' | '30' | '90'>('30')
+  const hasAnimatedRef = useRef(false)
+
+  useEffect(() => {
+    hasAnimatedRef.current = true
+  }, [])
 
   const chartData = useMemo(() => {
     const days = Number(range)
@@ -112,24 +117,16 @@ export function CashFlowChart({ transactions, className }: CashFlowChartProps) {
               <span className="font-semibold text-outflow">{formatMoney(totals.outflow)}</span>
             </div>
           </div>
-          <ToggleGroup
-            value={[range]}
-            onValueChange={(vals) => {
-              const chosen = Array.isArray(vals) ? vals[0] : vals
-              if (chosen) setRange(chosen as '7' | '30' | '90')
-            }}
-            className="border border-border/80 rounded-lg p-0.5"
-          >
-            <ToggleGroupItem value="7" className="text-xs h-7 px-2.5">
-              7D
-            </ToggleGroupItem>
-            <ToggleGroupItem value="30" className="text-xs h-7 px-2.5">
-              30D
-            </ToggleGroupItem>
-            <ToggleGroupItem value="90" className="text-xs h-7 px-2.5">
-              90D
-            </ToggleGroupItem>
-          </ToggleGroup>
+          <MotionToggleGroup
+            value={range}
+            onValueChange={(val) => setRange(val as '7' | '30' | '90')}
+            items={[
+              { value: '7', label: '7D' },
+              { value: '30', label: '30D' },
+              { value: '90', label: '90D' },
+            ]}
+            size="sm"
+          />
         </div>
       </CardHeader>
 
@@ -169,7 +166,7 @@ export function CashFlowChart({ transactions, className }: CashFlowChartProps) {
                   className="text-[11px] font-mono fill-muted-foreground"
                 />
                 <ChartTooltip
-                  cursor={{ stroke: 'var(--color-border)', strokeWidth: 1 }}
+                  cursor={{ strokeDasharray: '3 3', stroke: 'var(--color-border)', strokeWidth: 1 }}
                   content={
                     <ChartTooltipContent
                       labelFormatter={(val) => formatDate(val)}
@@ -189,6 +186,9 @@ export function CashFlowChart({ transactions, className }: CashFlowChartProps) {
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#fillInflow)"
+                  isAnimationActive={!hasAnimatedRef.current}
+                  animationDuration={600}
+                  animationEasing="ease-out"
                 />
                 <Area
                   type="monotone"
@@ -197,6 +197,9 @@ export function CashFlowChart({ transactions, className }: CashFlowChartProps) {
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#fillOutflow)"
+                  isAnimationActive={!hasAnimatedRef.current}
+                  animationDuration={600}
+                  animationEasing="ease-out"
                 />
               </AreaChart>
             </ResponsiveContainer>

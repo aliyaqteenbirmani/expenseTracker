@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ThemeProvider } from '@/providers/ThemeProvider'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { MotionConfig } from 'motion/react'
+import { AnimatedPage } from '@/components/motion/animated-outlet'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
@@ -793,147 +795,149 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
         />
 
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
-          {currentView === 'overview' && (
-            <DashboardPage
-              cashbook={book}
-              transactions={transactions}
-              loading={loadingTransactions}
-              canCreateTransaction={canCreateTransaction}
-              canEditTransaction={canEditTransaction}
-              canDeleteTransaction={canDeleteTransaction}
-              isOwner={isOwner}
-              onAddTransaction={(type) => {
-                setManualTxnInitialType(type || 'cashout')
-                setShowManualTransaction(true)
-              }}
-              onAddReceipt={() => setShowReceipt(true)}
-              onEditTransaction={(txn) => setEditingTransaction(txn)}
-              onDeleteTransaction={handleDeleteTransaction}
-              onSelectTransaction={(txn) => setViewTransactionDetail(txn)}
-              onViewAttachment={(txn) => setViewAttachment(txn)}
-              onViewAllTransactions={() => setCurrentView('transactions')}
-              onToast={showToast}
-            />
-          )}
+          <AnimatedPage currentKey={currentView}>
+            {currentView === 'overview' && (
+              <DashboardPage
+                cashbook={book}
+                transactions={transactions}
+                loading={loadingTransactions}
+                canCreateTransaction={canCreateTransaction}
+                canEditTransaction={canEditTransaction}
+                canDeleteTransaction={canDeleteTransaction}
+                isOwner={isOwner}
+                onAddTransaction={(type) => {
+                  setManualTxnInitialType(type || 'cashout')
+                  setShowManualTransaction(true)
+                }}
+                onAddReceipt={() => setShowReceipt(true)}
+                onEditTransaction={(txn) => setEditingTransaction(txn)}
+                onDeleteTransaction={handleDeleteTransaction}
+                onSelectTransaction={(txn) => setViewTransactionDetail(txn)}
+                onViewAttachment={(txn) => setViewAttachment(txn)}
+                onViewAllTransactions={() => setCurrentView('transactions')}
+                onToast={showToast}
+              />
+            )}
 
-          {currentView === 'transactions' && (
-            <TransactionsPage
-              transactions={transactions}
-              token={token}
-              cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
-              books={books}
-              selectedBookId={book?.id}
-              canCreate={canCreateTransaction}
-              canEdit={canEditTransaction}
-              canDelete={canDeleteTransaction}
-              onSelectBook={(cb) => {
-                setBook(cb)
-                void reloadTransactions(cb.id)
-              }}
-              onBack={() => setCurrentView('overview')}
-              onAdd={() => setShowManualTransaction(true)}
-              onAddReceipt={() => setShowReceipt(true)}
-              onRefresh={() => reloadTransactions()}
-              onToast={showToast}
-              onViewAttachment={(txn) => setViewAttachment(txn)}
-              onOpenDetail={(txn) => setViewTransactionDetail(txn)}
-              onEditTransaction={(txn) => setEditingTransaction(txn)}
-              onDeleteTransaction={handleDeleteTransaction}
-            />
-          )}
+            {currentView === 'transactions' && (
+              <TransactionsPage
+                transactions={transactions}
+                token={token}
+                cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
+                books={books}
+                selectedBookId={book?.id}
+                canCreate={canCreateTransaction}
+                canEdit={canEditTransaction}
+                canDelete={canDeleteTransaction}
+                onSelectBook={(cb) => {
+                  setBook(cb)
+                  void reloadTransactions(cb.id)
+                }}
+                onBack={() => setCurrentView('overview')}
+                onAdd={() => setShowManualTransaction(true)}
+                onAddReceipt={() => setShowReceipt(true)}
+                onRefresh={() => reloadTransactions()}
+                onToast={showToast}
+                onViewAttachment={(txn) => setViewAttachment(txn)}
+                onOpenDetail={(txn) => setViewTransactionDetail(txn)}
+                onEditTransaction={(txn) => setEditingTransaction(txn)}
+                onDeleteTransaction={handleDeleteTransaction}
+              />
+            )}
 
-          {currentView === 'cashbooks' && (
-            <CashbooksPage
-              books={books}
-              selectedBook={book}
-              businessName={selectedBusiness?.name ?? 'Workspace'}
-              activeBookTransactionsCount={transactions.length}
-              canCreate={canCreateCashbook}
-              canEdit={canEditCashbook}
-              canDelete={canDeleteCashbook}
-              onSelectBook={(cb) => {
-                setBook(cb)
-                void reloadTransactions(cb.id)
-              }}
-              onOpenTransactions={(cb) => {
-                setBook(cb)
-                void reloadTransactions(cb.id)
-                setCurrentView('transactions')
-              }}
-              onAddCashbook={() => setShowCreateCashbook(true)}
-              onEditCashbook={(cb) => setManageCashbook({ book: cb, mode: 'edit' })}
-              onDeleteCashbook={(cb) => setManageCashbook({ book: cb, mode: 'delete' })}
-              onBack={() => setCurrentView('overview')}
-              onToast={showToast}
-            />
-          )}
+            {currentView === 'cashbooks' && (
+              <CashbooksPage
+                books={books}
+                selectedBook={book}
+                businessName={selectedBusiness?.name ?? 'Workspace'}
+                activeBookTransactionsCount={transactions.length}
+                canCreate={canCreateCashbook}
+                canEdit={canEditCashbook}
+                canDelete={canDeleteCashbook}
+                onSelectBook={(cb) => {
+                  setBook(cb)
+                  void reloadTransactions(cb.id)
+                }}
+                onOpenTransactions={(cb) => {
+                  setBook(cb)
+                  void reloadTransactions(cb.id)
+                  setCurrentView('transactions')
+                }}
+                onAddCashbook={() => setShowCreateCashbook(true)}
+                onEditCashbook={(cb) => setManageCashbook({ book: cb, mode: 'edit' })}
+                onDeleteCashbook={(cb) => setManageCashbook({ book: cb, mode: 'delete' })}
+                onBack={() => setCurrentView('overview')}
+                onToast={showToast}
+              />
+            )}
 
-          {currentView === 'members' && (
-            <MembersPage
-              token={token}
-              business={{ id: businessId, name: selectedBusiness?.name ?? 'Workspace' }}
-              books={books}
-              isOwner={isOwner}
-              currentUserId={user.id ?? (user as unknown as { Id?: string }).Id}
-              onBack={() => setCurrentView('overview')}
-              onToast={showToast}
-            />
-          )}
+            {currentView === 'members' && (
+              <MembersPage
+                token={token}
+                business={{ id: businessId, name: selectedBusiness?.name ?? 'Workspace' }}
+                books={books}
+                isOwner={isOwner}
+                currentUserId={user.id ?? (user as unknown as { Id?: string }).Id}
+                onBack={() => setCurrentView('overview')}
+                onToast={showToast}
+              />
+            )}
 
-          {currentView === 'receipts' && (
-            <ReceiptsVaultPage
-              transactions={transactions}
-              token={token}
-              cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
-              businessName={selectedBusiness?.name ?? 'Workspace'}
-              books={books}
-              selectedBookId={book?.id}
-              onSelectBook={(cb) => {
-                setBook(cb)
-                void reloadTransactions(cb.id)
-              }}
-              onBack={() => setCurrentView('overview')}
-              onUploadReceipt={() => setShowReceipt(true)}
-              onViewAttachment={(txn) => setViewAttachment(txn)}
-              onOpenDetail={(txn) => setViewTransactionDetail(txn)}
-              onToast={showToast}
-            />
-          )}
+            {currentView === 'receipts' && (
+              <ReceiptsVaultPage
+                transactions={transactions}
+                token={token}
+                cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
+                businessName={selectedBusiness?.name ?? 'Workspace'}
+                books={books}
+                selectedBookId={book?.id}
+                onSelectBook={(cb) => {
+                  setBook(cb)
+                  void reloadTransactions(cb.id)
+                }}
+                onBack={() => setCurrentView('overview')}
+                onUploadReceipt={() => setShowReceipt(true)}
+                onViewAttachment={(txn) => setViewAttachment(txn)}
+                onOpenDetail={(txn) => setViewTransactionDetail(txn)}
+                onToast={showToast}
+              />
+            )}
 
-          {currentView === 'reports' && (
-            <ReportsPage
-              transactions={transactions}
-              cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
-              businessName={selectedBusiness?.name ?? 'Workspace'}
-              books={books}
-              selectedBookId={book?.id}
-              onSelectBook={(cb) => {
-                setBook(cb)
-                void reloadTransactions(cb.id)
-              }}
-              onBack={() => setCurrentView('overview')}
-              onToast={showToast}
-            />
-          )}
+            {currentView === 'reports' && (
+              <ReportsPage
+                transactions={transactions}
+                cashbookName={book?.cashBookName ?? book?.name ?? 'Cashbook'}
+                businessName={selectedBusiness?.name ?? 'Workspace'}
+                books={books}
+                selectedBookId={book?.id}
+                onSelectBook={(cb) => {
+                  setBook(cb)
+                  void reloadTransactions(cb.id)
+                }}
+                onBack={() => setCurrentView('overview')}
+                onToast={showToast}
+              />
+            )}
 
-          {currentView === 'settings' && selectedBusiness && (
-            <BusinessSettings
-              token={token}
-              business={selectedBusiness}
-              onBack={() => setCurrentView('overview')}
-              onUpdated={(updated) => {
-                setBusinesses((items) =>
-                  items.map((item) => (item.id === updated.id ? updated : item))
-                )
-              }}
-              onDeleted={() => {
-                void reloadBusinesses()
-                setCurrentView('overview')
-              }}
-              onToast={showToast}
-              api={api}
-            />
-          )}
+            {currentView === 'settings' && selectedBusiness && (
+              <BusinessSettings
+                token={token}
+                business={selectedBusiness}
+                onBack={() => setCurrentView('overview')}
+                onUpdated={(updated) => {
+                  setBusinesses((items) =>
+                    items.map((item) => (item.id === updated.id ? updated : item))
+                  )
+                }}
+                onDeleted={() => {
+                  void reloadBusinesses()
+                  setCurrentView('overview')
+                }}
+                onToast={showToast}
+                api={api}
+              />
+            )}
+          </AnimatedPage>
         </main>
       </SidebarInset>
 
@@ -1125,16 +1129,26 @@ export default function App() {
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="spendwise-theme">
-      <TooltipProvider>
-        <div className="min-h-screen bg-background text-foreground antialiased">
-          {user ? (
-            <DashboardApp user={user} onLogout={handleLogout} />
-          ) : (
-            <AuthPage onLogin={setUser} api={api} />
-          )}
-        </div>
-        <Toaster richColors position="bottom-right" closeButton />
-      </TooltipProvider>
+      <MotionConfig reducedMotion="user">
+        <TooltipProvider>
+          <div className="min-h-screen bg-background text-foreground antialiased">
+            {user ? (
+              <DashboardApp user={user} onLogout={handleLogout} />
+            ) : (
+              <AuthPage onLogin={setUser} api={api} />
+            )}
+          </div>
+          <Toaster
+            position="bottom-right"
+            richColors
+            closeButton
+            expand={false}
+            visibleToasts={4}
+            gap={8}
+            duration={4000}
+          />
+        </TooltipProvider>
+      </MotionConfig>
     </ThemeProvider>
   )
 }

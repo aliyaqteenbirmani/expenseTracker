@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { MotionTabs, MotionTabsList, MotionTabsTrigger } from '@/components/motion/motion-tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   Table,
@@ -328,19 +328,19 @@ export function MembersPage({
               </Select>
             )}
 
-            <Tabs
+            <MotionTabs
               value={scope}
               onValueChange={(v) => setScope(v as 'cashbook' | 'business')}
             >
-              <TabsList className="h-8">
-                <TabsTrigger value="cashbook" className="text-xs px-3">
+              <MotionTabsList className="h-8">
+                <MotionTabsTrigger value="cashbook" className="text-xs px-3">
                   Cashbook Scope
-                </TabsTrigger>
-                <TabsTrigger value="business" className="text-xs px-3">
+                </MotionTabsTrigger>
+                <MotionTabsTrigger value="business" className="text-xs px-3">
                   Entire Business
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+                </MotionTabsTrigger>
+              </MotionTabsList>
+            </MotionTabs>
           </div>
         }
       />

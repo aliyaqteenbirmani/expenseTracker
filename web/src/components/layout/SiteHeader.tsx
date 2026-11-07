@@ -97,7 +97,7 @@ export function SiteHeader({
   onOpenCommand,
   refreshTrigger,
 }: SiteHeaderProps) {
-  const { theme, setTheme } = useTheme()
+  const { theme, switchTheme } = useTheme()
   const [comboboxOpen, setComboboxOpen] = useState(false)
 
   const activePageTitle = pageTitles[currentView] || 'Overview'
@@ -268,16 +268,16 @@ export function SiteHeader({
         refreshTrigger={refreshTrigger}
       />
 
-      {/* 7. Theme Toggle */}
+      {/* 7. Theme Toggle with View Transitions circular reveal */}
       <Button
         variant="ghost"
         size="icon"
-        className="size-9 cursor-pointer"
+        className="size-8 cursor-pointer"
         aria-label="Toggle theme"
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        onClick={(e) => switchTheme(theme === 'dark' ? 'light' : 'dark', e)}
       >
-        <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-        <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        <Sun className="size-4 rotate-0 scale-100 transition-[transform,opacity] duration-(--duration-fast) ease-out dark:-rotate-90 dark:scale-0" />
+        <Moon className="absolute size-4 rotate-90 scale-0 transition-[transform,opacity] duration-(--duration-fast) ease-out dark:rotate-0 dark:scale-100" />
       </Button>
     </header>
   )

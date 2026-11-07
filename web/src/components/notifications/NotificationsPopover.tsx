@@ -17,6 +17,9 @@ import {
 } from 'lucide-react'
 import { formatRelativeDate } from '@/lib/format'
 import { EmptyState } from '@/components/app/EmptyState'
+import { motion, AnimatePresence } from 'motion/react'
+import { spring } from '@/lib/motion'
+import { AnimatedNumber } from '@/components/motion/animated-number'
 
 export type Invitation = {
   id: string
@@ -124,12 +127,25 @@ export function NotificationsPopover({
             className="relative size-9 cursor-pointer"
             aria-label="Notifications"
           >
-            <Bell className="size-4" />
-            {count > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground animate-in zoom-in-50">
-                {count}
-              </span>
-            )}
+            <motion.div
+              animate={count > 0 ? { rotate: [0, -12, 10, -6, 3, 0] } : {}}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+            >
+              <Bell className="size-4" />
+            </motion.div>
+            <AnimatePresence>
+              {count > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  transition={spring.bouncy}
+                  className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground tabular-nums shadow-xs"
+                >
+                  <AnimatedNumber value={count} />
+                </motion.span>
+              )}
+            </AnimatePresence>
           </Button>
         )}
       />

@@ -1,3 +1,6 @@
+import { motion } from 'motion/react'
+import { spring } from '@/lib/motion'
+import { AnimatedNumber } from '@/components/motion/animated-number'
 import {
   Sidebar,
   SidebarContent,
@@ -195,13 +198,22 @@ export function AppSidebar({
                       isActive={isActive}
                       tooltip={item.label}
                       onClick={() => onNavigate(item.id)}
-                      className="cursor-pointer"
+                      className="relative cursor-pointer transition-colors duration-(--duration-fast)"
                     >
+                      {isActive && (
+                        <motion.span
+                          layoutId="nav-active"
+                          transition={spring.snappy}
+                          className="absolute inset-0 rounded-md bg-sidebar-accent -z-10"
+                        />
+                      )}
                       <Icon className="size-4" />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                     {item.badge !== undefined && (
-                      <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+                      <SidebarMenuBadge>
+                        <AnimatedNumber value={item.badge} />
+                      </SidebarMenuBadge>
                     )}
                   </SidebarMenuItem>
                 )
@@ -272,8 +284,8 @@ export function AppSidebar({
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
-                    <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                    <Sun className="size-4 rotate-0 scale-100 transition-[transform,opacity] duration-(--duration-fast) ease-out dark:-rotate-90 dark:scale-0" />
+                    <Moon className="absolute size-4 rotate-90 scale-0 transition-[transform,opacity] duration-(--duration-fast) ease-out dark:rotate-0 dark:scale-100" />
                     <span>Theme</span>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>

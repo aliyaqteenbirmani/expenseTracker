@@ -11,6 +11,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { getTransactionCategory, type Transaction } from '@/App'
 import { formatMoney } from '@/lib/format'
 import { EmptyState } from '@/components/app/EmptyState'
+import { Swap } from '@/components/motion/swap'
 import { PieChart as PieChartIcon, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -169,14 +170,22 @@ export function CategoryBreakdownCard({
             </ResponsiveContainer>
           </ChartContainer>
 
-          {/* Center text */}
+          {/* Center text with Swap animation */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Total Outflow
-            </span>
-            <span className="font-mono text-sm font-semibold tabular-nums">
-              {formatMoney(totalExpense)}
-            </span>
+            <Swap k={activeCategory || 'total'}>
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground truncate max-w-[90px]">
+                  {activeCategory || 'Total Outflow'}
+                </span>
+                <span className="font-mono text-sm font-semibold tabular-nums">
+                  {formatMoney(
+                    activeCategory
+                      ? (categoryData.find((c) => c.label === activeCategory)?.amount ?? totalExpense)
+                      : totalExpense
+                  )}
+                </span>
+              </div>
+            </Swap>
           </div>
         </div>
 
