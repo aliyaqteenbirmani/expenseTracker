@@ -19,6 +19,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -154,26 +155,28 @@ export function AppSidebar({
                 side="bottom"
                 sideOffset={4}
               >
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  Workspaces
-                </DropdownMenuLabel>
-                {businesses.map((biz, index) => {
-                  const bizName = biz.name || 'Workspace'
-                  return (
-                    <DropdownMenuItem
-                      key={biz.id}
-                      onClick={() => onSelectBusiness(biz)}
-                      className="gap-2 p-2 cursor-pointer"
-                    >
-                      <div className="flex size-6 items-center justify-center rounded-sm border bg-background text-xs font-semibold">
-                        {bizName.slice(0, 1).toUpperCase()}
-                      </div>
-                      <span className="flex-1 truncate">{bizName}</span>
-                      {biz.id === selectedBusiness?.id && <Check className="size-4 text-primary" />}
-                      {index < 9 && <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>}
-                    </DropdownMenuItem>
-                  )
-                })}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Workspaces
+                  </DropdownMenuLabel>
+                  {businesses.map((biz, index) => {
+                    const bizName = biz.name || 'Workspace'
+                    return (
+                      <DropdownMenuItem
+                        key={biz.id}
+                        onClick={() => onSelectBusiness(biz)}
+                        className="gap-2 p-2 cursor-pointer"
+                      >
+                        <div className="flex size-6 items-center justify-center rounded-sm border bg-background text-xs font-semibold">
+                          {bizName.slice(0, 1).toUpperCase()}
+                        </div>
+                        <span className="flex-1 truncate">{bizName}</span>
+                        {biz.id === selectedBusiness?.id && <Check className="size-4 text-primary" />}
+                        {index < 9 && <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onCreateBusiness} className="gap-2 p-2 cursor-pointer">
                   <div className="flex size-6 items-center justify-center rounded-md border border-dashed bg-background">
@@ -284,15 +287,17 @@ export function AppSidebar({
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onOpenProfile} className="cursor-pointer">
-                  <User className="size-4" />
-                  <span>Account & Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onOpenShortcuts} className="cursor-pointer">
-                  <Keyboard className="size-4" />
-                  <span>Keyboard Shortcuts</span>
-                  <DropdownMenuShortcut>⌘/</DropdownMenuShortcut>
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={onOpenProfile} className="cursor-pointer">
+                    <User className="size-4" />
+                    <span>Account & Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onOpenShortcuts} className="cursor-pointer">
+                    <Keyboard className="size-4" />
+                    <span>Keyboard Shortcuts</span>
+                    <DropdownMenuShortcut>⌘/</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
                     <Sun className="size-4 rotate-0 scale-100 transition-[transform,opacity] duration-(--duration-fast) ease-out dark:-rotate-90 dark:scale-0" />
