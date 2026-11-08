@@ -794,6 +794,8 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
           onToast={showToast}
           onOpenCommand={() => setCommandOpen(true)}
           refreshTrigger={notificationsRefreshTrigger}
+          user={appUser}
+          onOpenProfile={() => setShowProfile(true)}
         />
 
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
@@ -961,6 +963,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
         onAddCashbook={() => setShowCreateCashbook(true)}
         onInviteMember={() => setCurrentView('members')}
         onOpenShortcuts={() => setShowShortcuts(true)}
+        onOpenProfile={() => setShowProfile(true)}
         transactions={transactions}
         onSelectTransaction={(txn) => setViewTransactionDetail(txn)}
         canCreateTransaction={canCreateTransaction}

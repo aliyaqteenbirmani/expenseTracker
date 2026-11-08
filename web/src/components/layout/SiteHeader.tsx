@@ -44,8 +44,9 @@ import {
   ShieldCheck,
   Crown,
 } from 'lucide-react'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import type { Cashbook } from '@/App'
-import type { AppBusiness } from './AppSidebar'
+import type { AppBusiness, AppUser } from './AppSidebar'
 
 interface SiteHeaderProps {
   business: AppBusiness | null
@@ -66,6 +67,8 @@ interface SiteHeaderProps {
   onToast: (msg: string) => void
   onOpenCommand: () => void
   refreshTrigger?: number
+  user?: AppUser | null
+  onOpenProfile?: () => void
 }
 
 const pageTitles: Record<string, string> = {
@@ -96,11 +99,15 @@ export function SiteHeader({
   onToast,
   onOpenCommand,
   refreshTrigger,
+  user,
+  onOpenProfile,
 }: SiteHeaderProps) {
   const { theme, switchTheme } = useTheme()
   const [comboboxOpen, setComboboxOpen] = useState(false)
 
   const activePageTitle = pageTitles[currentView] || 'Overview'
+  const fullName = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'User' : 'User'
+  const initials = fullName.slice(0, 2).toUpperCase()
 
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border/80 bg-background/95 px-4 backdrop-blur-md">
@@ -279,6 +286,24 @@ export function SiteHeader({
         <Sun className="size-4 rotate-0 scale-100 transition-[transform,opacity] duration-(--duration-fast) ease-out dark:-rotate-90 dark:scale-0" />
         <Moon className="absolute size-4 rotate-90 scale-0 transition-[transform,opacity] duration-(--duration-fast) ease-out dark:rotate-0 dark:scale-100" />
       </Button>
+
+      {/* 8. User Profile Button */}
+      {onOpenProfile && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 rounded-lg cursor-pointer ml-1"
+          aria-label="Account profile"
+          onClick={onOpenProfile}
+          title={`Profile: ${fullName}`}
+        >
+          <Avatar className="size-7 rounded-lg">
+            <AvatarFallback className="rounded-lg bg-primary/10 text-primary font-semibold text-xs">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      )}
     </header>
   )
 }

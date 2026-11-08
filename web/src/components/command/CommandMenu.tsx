@@ -23,6 +23,7 @@ import {
   Moon,
   Laptop,
   Check,
+  User,
 } from 'lucide-react'
 import { useTheme } from '@/providers/ThemeProvider'
 import type { Cashbook, Transaction } from '@/App'
@@ -39,6 +40,7 @@ interface CommandMenuProps {
   onAddCashbook?: () => void
   onInviteMember?: () => void
   onOpenShortcuts?: () => void
+  onOpenProfile?: () => void
   transactions?: Transaction[]
   onSelectTransaction?: (txn: Transaction) => void
   canCreateTransaction?: boolean
@@ -57,6 +59,7 @@ export function CommandMenu({
   onAddCashbook,
   onInviteMember,
   onOpenShortcuts,
+  onOpenProfile,
   transactions = [],
   onSelectTransaction,
   canCreateTransaction = true,
@@ -204,6 +207,10 @@ export function CommandMenu({
         <CommandSeparator />
 
         <CommandGroup heading="Preferences">
+          <CommandItem value="user profile account credentials" onSelect={() => handleSelect(() => onOpenProfile?.())}>
+            <User className="size-4" />
+            <span>Account & Profile</span>
+          </CommandItem>
           <CommandItem value="keyboard shortcuts hotkeys" onSelect={() => handleSelect(() => onOpenShortcuts?.())}>
             <Keyboard className="size-4" />
             <span>Keyboard Shortcuts</span>
