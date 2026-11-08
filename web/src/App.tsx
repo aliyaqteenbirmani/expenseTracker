@@ -29,6 +29,7 @@ import UserProfileDialog from './UserProfileDialog'
 import KeyboardShortcutsDialog from './KeyboardShortcutsDialog'
 import TransactionAttachmentDialog from './TransactionAttachmentDialog'
 import { ResponsiveDialog } from '@/components/app/ResponsiveDialog'
+import { ErrorBoundary } from '@/components/app/ErrorBoundary'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { realtimeService } from './realtimeService'
@@ -533,6 +534,11 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
         const normalized = (list ?? []).map((item) => ({
           ...item,
           id: item.id ?? (item as Business & { Id: string }).Id,
+          name:
+            item.name ??
+            (item as Business & { Name?: string }).Name ??
+            (item as Business & { businessName?: string }).businessName ??
+            'Workspace',
         }))
         setBusinesses(normalized)
         const active =
@@ -728,7 +734,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
 
   const appBusinesses: AppBusiness[] = businesses.map((b) => ({
     id: b.id,
-    name: b.name,
+    name: b.name || (b as unknown as { businessName?: string }).businessName || (b as unknown as { Name?: string }).Name || 'Workspace',
     category: b.category,
     description: b.description,
     fileUrl: b.fileUrl,
@@ -1136,22 +1142,24 @@ export default function App() {
     <ThemeProvider defaultTheme="system" storageKey="spendwise-theme">
       <MotionConfig reducedMotion="user">
         <TooltipProvider>
-          <div className="min-h-screen bg-background text-foreground antialiased">
-            {user ? (
-              <DashboardApp user={user} onLogout={handleLogout} />
-            ) : (
-              <AuthPage onLogin={setUser} api={api} />
-            )}
-          </div>
-          <Toaster
-            position="bottom-right"
-            richColors
-            closeButton
-            expand={false}
-            visibleToasts={4}
-            gap={8}
-            duration={4000}
-          />
+          <ErrorBoundary>
+            <div className="min-h-screen bg-background text-foreground antialiased">
+              {user ? (
+                <DashboardApp user={user} onLogout={handleLogout} />
+              ) : (
+                <AuthPage onLogin={setUser} api={api} />
+              )}
+            </div>
+            <Toaster
+              position="bottom-right"
+              richColors
+              closeButton
+              expand={false}
+              visibleToasts={4}
+              gap={8}
+              duration={4000}
+            />
+          </ErrorBoundary>
         </TooltipProvider>
       </MotionConfig>
     </ThemeProvider>

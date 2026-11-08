@@ -120,37 +120,36 @@ export function AppSidebar({
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={(props) => (
+                render={
                   <SidebarMenuButton
-                    {...props}
                     size="lg"
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                  >
-                    <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                      {selectedBusiness?.fileUrl ? (
-                        <img
-                          src={selectedBusiness.fileUrl}
-                          alt={selectedBusiness.name}
-                          className="size-full rounded-lg object-cover"
-                        />
-                      ) : (
-                        <Building2 className="size-4" />
-                      )}
-                    </div>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">
-                        {selectedBusiness?.name || 'My Workspace'}
-                      </span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {selectedBusiness?.isOwner ? 'Owner' : 'Member'} · Free
-                      </span>
-                    </div>
-                    <ChevronsUpDown className="ml-auto size-4" />
-                  </SidebarMenuButton>
-                )}
-              />
+                  />
+                }
+              >
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  {selectedBusiness?.fileUrl ? (
+                    <img
+                      src={selectedBusiness.fileUrl}
+                      alt={selectedBusiness?.name || 'Workspace'}
+                      className="size-full rounded-lg object-cover"
+                    />
+                  ) : (
+                    <Building2 className="size-4" />
+                  )}
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">
+                    {selectedBusiness?.name || 'My Workspace'}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {selectedBusiness?.isOwner ? 'Owner' : 'Member'} · Free
+                  </span>
+                </div>
+                <ChevronsUpDown className="ml-auto size-4" />
+              </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+                className="w-56 rounded-lg shadow-lg border-border"
                 align="start"
                 side="bottom"
                 sideOffset={4}
@@ -158,20 +157,23 @@ export function AppSidebar({
                 <DropdownMenuLabel className="text-xs text-muted-foreground">
                   Workspaces
                 </DropdownMenuLabel>
-                {businesses.map((biz, index) => (
-                  <DropdownMenuItem
-                    key={biz.id}
-                    onClick={() => onSelectBusiness(biz)}
-                    className="gap-2 p-2"
-                  >
-                    <div className="flex size-6 items-center justify-center rounded-sm border bg-background text-xs font-semibold">
-                      {biz.name.slice(0, 1).toUpperCase()}
-                    </div>
-                    <span className="flex-1 truncate">{biz.name}</span>
-                    {biz.id === selectedBusiness?.id && <Check className="size-4 text-primary" />}
-                    {index < 9 && <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>}
-                  </DropdownMenuItem>
-                ))}
+                {businesses.map((biz, index) => {
+                  const bizName = biz.name || 'Workspace'
+                  return (
+                    <DropdownMenuItem
+                      key={biz.id}
+                      onClick={() => onSelectBusiness(biz)}
+                      className="gap-2 p-2 cursor-pointer"
+                    >
+                      <div className="flex size-6 items-center justify-center rounded-sm border bg-background text-xs font-semibold">
+                        {bizName.slice(0, 1).toUpperCase()}
+                      </div>
+                      <span className="flex-1 truncate">{bizName}</span>
+                      {biz.id === selectedBusiness?.id && <Check className="size-4 text-primary" />}
+                      {index < 9 && <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>}
+                    </DropdownMenuItem>
+                  )
+                })}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onCreateBusiness} className="gap-2 p-2 cursor-pointer">
                   <div className="flex size-6 items-center justify-center rounded-md border border-dashed bg-background">
@@ -239,28 +241,27 @@ export function AppSidebar({
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={(props) => (
+                render={
                   <SidebarMenuButton
-                    {...props}
                     size="lg"
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                  >
-                    <Avatar className="size-8 rounded-lg">
-                      <AvatarImage src="" alt={fullName} />
-                      <AvatarFallback className="rounded-lg bg-primary/10 text-primary font-semibold text-xs">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{fullName}</span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {user.email || 'My account'}
-                      </span>
-                    </div>
-                    <ChevronsUpDown className="ml-auto size-4" />
-                  </SidebarMenuButton>
-                )}
-              />
+                  />
+                }
+              >
+                <Avatar className="size-8 rounded-lg">
+                  <AvatarImage src="" alt={fullName} />
+                  <AvatarFallback className="rounded-lg bg-primary/10 text-primary font-semibold text-xs">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">{fullName}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {user.email || 'My account'}
+                  </span>
+                </div>
+                <ChevronsUpDown className="ml-auto size-4" />
+              </DropdownMenuTrigger>
               <DropdownMenuContent
                 className="w-56 rounded-lg shadow-lg border-border"
                 side="top"
