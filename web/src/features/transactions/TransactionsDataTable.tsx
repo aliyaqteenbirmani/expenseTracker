@@ -56,6 +56,7 @@ import {
   Lock,
   Plus,
   RotateCcw,
+  X,
 } from 'lucide-react'
 import { getTransactionCategory, type Transaction } from '@/App'
 import { MoneyText } from '@/components/app/MoneyText'
@@ -470,8 +471,18 @@ export function TransactionsDataTable({
                 placeholder="Search transactions..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-8 h-8 text-xs"
+                className="pl-8 pr-7 h-8 text-xs"
               />
+              {globalFilter && (
+                <button
+                  type="button"
+                  onClick={() => setGlobalFilter('')}
+                  className="absolute right-2 top-2 size-4 inline-flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                  aria-label="Clear search"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
             </div>
             <MotionToggleGroup
               value={typeFilter}

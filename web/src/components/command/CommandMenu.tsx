@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   CommandDialog,
   CommandInput,
@@ -66,6 +66,10 @@ export function CommandMenu({
   const { setTheme } = useTheme()
   const [search, setSearch] = useState('')
 
+  useEffect(() => {
+    if (open) setSearch('')
+  }, [open])
+
   const handleSelect = (callback: () => void) => {
     onOpenChange(false)
     callback()
@@ -99,6 +103,7 @@ export function CommandMenu({
             {matchingTransactions.map((t) => (
               <CommandItem
                 key={t.id}
+                value={`${t.remarks || 'transaction'} ${t.amount} ${t.transactionType}`}
                 onSelect={() => handleSelect(() => onSelectTransaction?.(t))}
                 className="flex items-center justify-between"
               >
@@ -119,27 +124,27 @@ export function CommandMenu({
         )}
 
         <CommandGroup heading="Navigation">
-          <CommandItem onSelect={() => handleSelect(() => onNavigate('overview'))}>
+          <CommandItem value="overview dashboard home" onSelect={() => handleSelect(() => onNavigate('overview'))}>
             <LayoutDashboard className="size-4" />
             <span>Dashboard / Overview</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect(() => onNavigate('transactions'))}>
+          <CommandItem value="transactions entries records" onSelect={() => handleSelect(() => onNavigate('transactions'))}>
             <ReceiptText className="size-4" />
             <span>Transactions</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect(() => onNavigate('cashbooks'))}>
+          <CommandItem value="cashbooks ledgers books" onSelect={() => handleSelect(() => onNavigate('cashbooks'))}>
             <BookOpen className="size-4" />
             <span>Cashbooks</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect(() => onNavigate('members'))}>
+          <CommandItem value="members access team collaborators permissions" onSelect={() => handleSelect(() => onNavigate('members'))}>
             <Users className="size-4" />
             <span>Members & Access</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect(() => onNavigate('receipts'))}>
+          <CommandItem value="receipts vault uploads attachments" onSelect={() => handleSelect(() => onNavigate('receipts'))}>
             <ReceiptText className="size-4" />
             <span>Receipts Vault</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect(() => onNavigate('reports'))}>
+          <CommandItem value="reports financial statements analytics charts" onSelect={() => handleSelect(() => onNavigate('reports'))}>
             <ChartColumn className="size-4" />
             <span>Financial Reports</span>
           </CommandItem>
@@ -150,24 +155,24 @@ export function CommandMenu({
         <CommandGroup heading="Actions">
           {canCreateTransaction && (
             <>
-              <CommandItem onSelect={() => handleSelect(() => onAddTransaction?.('cashin'))}>
+              <CommandItem value="add cash in income payment" onSelect={() => handleSelect(() => onAddTransaction?.('cashin'))}>
                 <ArrowDownLeft className="size-4 text-inflow" />
                 <span>Add Cash In</span>
               </CommandItem>
-              <CommandItem onSelect={() => handleSelect(() => onAddTransaction?.('cashout'))}>
+              <CommandItem value="add cash out expense payment" onSelect={() => handleSelect(() => onAddTransaction?.('cashout'))}>
                 <ArrowUpRight className="size-4 text-outflow" />
                 <span>Add Cash Out</span>
               </CommandItem>
             </>
           )}
           {canCreateCashbook && (
-            <CommandItem onSelect={() => handleSelect(() => onAddCashbook?.())}>
+            <CommandItem value="new cashbook create ledger" onSelect={() => handleSelect(() => onAddCashbook?.())}>
               <Plus className="size-4" />
               <span>New Cashbook</span>
             </CommandItem>
           )}
           {isOwner && (
-            <CommandItem onSelect={() => handleSelect(() => onInviteMember?.())}>
+            <CommandItem value="invite member teammate user" onSelect={() => handleSelect(() => onInviteMember?.())}>
               <UserPlus className="size-4" />
               <span>Invite Teammate</span>
             </CommandItem>
@@ -181,6 +186,7 @@ export function CommandMenu({
               {books.map((b) => (
                 <CommandItem
                   key={b.id}
+                  value={`cashbook ${b.cashBookName ?? b.name ?? 'Cashbook'}`}
                   onSelect={() => handleSelect(() => onSelectBook(b))}
                   className="flex items-center justify-between"
                 >
@@ -198,19 +204,19 @@ export function CommandMenu({
         <CommandSeparator />
 
         <CommandGroup heading="Preferences">
-          <CommandItem onSelect={() => handleSelect(() => onOpenShortcuts?.())}>
+          <CommandItem value="keyboard shortcuts hotkeys" onSelect={() => handleSelect(() => onOpenShortcuts?.())}>
             <Keyboard className="size-4" />
             <span>Keyboard Shortcuts</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect(() => setTheme('light'))}>
+          <CommandItem value="light theme mode" onSelect={() => handleSelect(() => setTheme('light'))}>
             <Sun className="size-4" />
             <span>Light Theme</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect(() => setTheme('dark'))}>
+          <CommandItem value="dark theme mode" onSelect={() => handleSelect(() => setTheme('dark'))}>
             <Moon className="size-4" />
             <span>Dark Theme</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect(() => setTheme('system'))}>
+          <CommandItem value="system theme mode" onSelect={() => handleSelect(() => setTheme('system'))}>
             <Laptop className="size-4" />
             <span>System Theme</span>
           </CommandItem>
