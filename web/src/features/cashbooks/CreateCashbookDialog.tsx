@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { BookOpen, Loader2, Plus, AlertCircle } from 'lucide-react'
+import { BookOpen, Plus, AlertCircle } from 'lucide-react'
 
 interface CreateCashbookDialogProps {
   token: string
@@ -22,6 +22,7 @@ export function CreateCashbookDialog({
   api,
 }: CreateCashbookDialogProps) {
   const [busy, setBusy] = useState(false)
+  const [created, setCreated] = useState(false)
   const [error, setError] = useState('')
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -35,7 +36,10 @@ export function CreateCashbookDialog({
         body: JSON.stringify({ cashBookName: name, businessId }),
       })
       await onCreated(name)
-      onClose()
+      setCreated(true)
+      setTimeout(() => {
+        onClose()
+      }, 700)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create cashbook.')
     } finally {
@@ -86,12 +90,12 @@ export function CreateCashbookDialog({
         )}
 
         <div className="flex justify-end gap-2 pt-2 border-t">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={busy} className="h-9 text-xs">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={busy || created} className="h-9 text-xs">
             Cancel
           </Button>
-          <Button type="submit" disabled={busy} className="h-9 text-xs gap-1.5">
-            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-            <span>{busy ? 'Creating…' : 'Create Cashbook'}</span>
+          <Button type="submit" disabled={busy} loading={busy} success={created} successLabel="Created!" className="h-9 text-xs gap-1.5">
+            <Plus className="size-3.5" />
+            <span>Create Cashbook</span>
           </Button>
         </div>
       </form>

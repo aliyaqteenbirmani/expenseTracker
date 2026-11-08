@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Building2, Loader2, Upload, AlertCircle } from 'lucide-react'
+import { SuccessCheck } from '@/components/motion/success-check'
 
 type Business = {
   id: string
@@ -31,6 +32,7 @@ type Props = {
 
 export default function CreateBusinessDialog({ token, onClose, onCreated }: Props) {
   const [busy, setBusy] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState('')
   const [category, setCategory] = useState('')
   const [logoFile, setLogoFile] = useState<File | null>(null)
@@ -77,8 +79,11 @@ export default function CreateBusinessDialog({ token, onClose, onCreated }: Prop
         throw new Error('Business was created, but the ID was missing in the server response.')
       }
 
-      onCreated(created)
-      onClose()
+      setIsSuccess(true)
+      setTimeout(() => {
+        onCreated(created)
+        onClose()
+      }, 700)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create workspace.')
     } finally {
@@ -89,7 +94,7 @@ export default function CreateBusinessDialog({ token, onClose, onCreated }: Prop
   return (
     <ResponsiveDialog
       open={true}
-      onOpenChange={(open) => !open && !busy && onClose()}
+      onOpenChange={(open) => !open && !busy && !isSuccess && onClose()}
       title={
         <div className="flex items-center gap-2">
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -105,7 +110,13 @@ export default function CreateBusinessDialog({ token, onClose, onCreated }: Prop
       }
       description="Add a new business workspace to track separate cashbooks, expenses and collaborators."
     >
-      <form onSubmit={submit} className="space-y-4 pt-2">
+      {isSuccess ? (
+        <div className="flex flex-col items-center justify-center py-10 space-y-3">
+          <SuccessCheck size={52} />
+          <p className="text-sm font-medium text-foreground">Workspace created successfully!</p>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-4 pt-2">
         <div className="space-y-1.5">
           <Label htmlFor="bizName" className="text-xs font-medium">
             Business Name
@@ -189,6 +200,7 @@ export default function CreateBusinessDialog({ token, onClose, onCreated }: Prop
           </Button>
         </div>
       </form>
+      )}
     </ResponsiveDialog>
   )
 }

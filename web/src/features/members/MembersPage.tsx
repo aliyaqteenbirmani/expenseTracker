@@ -151,6 +151,7 @@ export function MembersPage({
   const [editingMember, setEditingMember] = useState<Member | null>(null)
   const [editorSelected, setEditorSelected] = useState<number[]>([])
   const [savingPermissions, setSavingPermissions] = useState(false)
+  const [invited, setInvited] = useState(false)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
 
   const activeCashbook = books.find((b) => b.id === cashbookId) || books[0]
@@ -230,6 +231,8 @@ export function MembersPage({
         }),
       })
       setEmail('')
+      setInvited(true)
+      setTimeout(() => setInvited(false), 2000)
       onToast(`Invitation successfully sent to ${email}`)
       await reload()
     } catch (err) {
@@ -825,8 +828,8 @@ export function MembersPage({
                     </AlertDescription>
                   </Alert>
 
-                  <Button type="submit" disabled={busy || !email.trim()} className="w-full h-8 text-xs">
-                    {busy ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <UserPlus className="size-3.5 mr-1.5" />}
+                  <Button type="submit" disabled={busy || !email.trim()} loading={busy} success={invited} successLabel="Invitation Sent!" className="w-full h-8 text-xs">
+                    <UserPlus className="size-3.5 mr-1.5" />
                     <span>Send Invitation</span>
                   </Button>
                 </form>

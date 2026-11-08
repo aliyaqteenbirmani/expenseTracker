@@ -9,7 +9,6 @@ import {
   Pencil,
   ArrowDownLeft,
   ArrowUpRight,
-  Loader2,
   AlertCircle,
 } from 'lucide-react'
 import type { Transaction } from '@/App'
@@ -30,6 +29,7 @@ export function TransactionEditDialog({
   api,
 }: TransactionEditDialogProps) {
   const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [txnType, setTxnType] = useState(transaction.transactionType || 'CashOut')
   const [amount, setAmount] = useState(String(transaction.amount || ''))
@@ -60,7 +60,10 @@ export function TransactionEditDialog({
     try {
       await api('/api/Transaction/update', token, { method: 'PUT', body })
       await onSaved()
-      onClose()
+      setSaved(true)
+      setTimeout(() => {
+        onClose()
+      }, 700)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not update this transaction.')
     } finally {
@@ -190,12 +193,11 @@ export function TransactionEditDialog({
         )}
 
         <div className="flex justify-end gap-2 pt-2 border-t">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={busy} className="h-9 text-xs">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={busy || saved} className="h-9 text-xs">
             Cancel
           </Button>
-          <Button type="submit" disabled={busy || !amount} className="h-9 text-xs">
-            {busy ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
-            <span>Save Changes</span>
+          <Button type="submit" disabled={busy || !amount} loading={busy} success={saved} successLabel="Saved" className="h-9 text-xs">
+            Save Changes
           </Button>
         </div>
       </form>

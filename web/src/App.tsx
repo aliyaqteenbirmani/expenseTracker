@@ -3,6 +3,7 @@ import { ThemeProvider } from '@/providers/ThemeProvider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { MotionConfig } from 'motion/react'
 import { AnimatedPage } from '@/components/motion/animated-outlet'
+import { RouteProgressBar } from '@/components/motion/route-progress-bar'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
@@ -748,6 +749,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
 
   return (
     <SidebarProvider>
+      <RouteProgressBar loading={loadingTransactions} />
       <AppSidebar
         businesses={appBusinesses}
         selectedBusiness={selectedBusiness}

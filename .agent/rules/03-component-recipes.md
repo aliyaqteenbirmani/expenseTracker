@@ -21,7 +21,7 @@
 | Table rows | Data Table + `rowPresence` | first-load stagger ≤ 12; realtime insert/flash/collapse; "N new" pill if scrolled |
 | Bulk actions | floating bar | slide up `spring.smooth` |
 | Loading | shimmer `Skeleton` + `useDelayedFlag(150)` | crossfade to content, no shift |
-| Route change | `AnimatedOutlet` + route progress bar | `pageTransition`, top-level segment only |
+| Route change | `AnimatedOutlet` + `RouteProgressBar` (`components/motion/route-progress-bar.tsx`) | `pageTransition`, top-level segment only |
 | Active item between siblings | `layoutId` (`nav-active`, `active-cashbook`) | `spring.snappy` |
 | Grid ↔ list | Motion `layout` | `spring.smooth` |
 | Form error | field `animate-shake` + layout message | focus first invalid |

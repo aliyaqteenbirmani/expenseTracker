@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   type ColumnDef,
   flexRender,
@@ -43,6 +43,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   MoreHorizontal,
   Search,
   Paperclip,
@@ -65,6 +67,8 @@ import { motion, AnimatePresence } from 'motion/react'
 import { spring } from '@/lib/motion'
 import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { AnimatedNumber } from '@/components/motion/animated-number'
+import { MotionToggleGroup } from '@/components/motion/motion-toggle-group'
+import { Swap } from '@/components/motion/swap'
 
 interface TransactionsDataTableProps {
   transactions: Transaction[]
@@ -107,6 +111,40 @@ export function TransactionsDataTable({
   const [deleteCandidate, setDeleteCandidate] = useState<Transaction | null>(null)
   const showSkeleton = useDelayedFlag(loading, 150)
   const selectedCount = Object.keys(rowSelection).length
+
+  // Track recently added or updated transactions for realtime row flashing
+  const [recentTxnIds, setRecentTxnIds] = useState<Set<string>>(new Set())
+  const prevTransactionsRef = useRef<Transaction[]>(transactions)
+
+  useEffect(() => {
+    if (prevTransactionsRef.current !== transactions) {
+      const prevMap = new Map(prevTransactionsRef.current.map((t) => [t.id, t]))
+      const updatedOrNewIds = new Set<string>()
+
+      for (const t of transactions) {
+        const prev = prevMap.get(t.id)
+        if (!prev) {
+          updatedOrNewIds.add(t.id)
+        } else if (
+          prev.amount !== t.amount ||
+          prev.remarks !== t.remarks ||
+          prev.transactionType !== t.transactionType
+        ) {
+          updatedOrNewIds.add(t.id)
+        }
+      }
+
+      if (updatedOrNewIds.size > 0 && prevTransactionsRef.current.length > 0) {
+        setRecentTxnIds(updatedOrNewIds)
+        const timer = setTimeout(() => {
+          setRecentTxnIds(new Set())
+        }, 1500)
+        prevTransactionsRef.current = transactions
+        return () => clearTimeout(timer)
+      }
+      prevTransactionsRef.current = transactions
+    }
+  }, [transactions])
 
   const filteredData = useMemo(() => {
     return transactions.filter((t) => {
@@ -178,17 +216,28 @@ export function TransactionsDataTable({
     },
     {
       accessorKey: 'remarks',
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-3 h-8 text-xs font-semibold"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        >
-          Description & Details
-          <ArrowUpDown className="ml-1.5 size-3" />
-        </Button>
-      ),
+      header: ({ column }) => {
+        const sorted = column.getIsSorted()
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3 h-8 text-xs font-semibold"
+            onClick={() => column.toggleSorting(sorted === 'asc')}
+          >
+            Description & Details
+            <Swap k={String(sorted)} className="ml-1.5">
+              {sorted === 'asc' ? (
+                <ArrowUp className="size-3 text-primary" />
+              ) : sorted === 'desc' ? (
+                <ArrowDown className="size-3 text-primary" />
+              ) : (
+                <ArrowUpDown className="size-3 text-muted-foreground" />
+              )}
+            </Swap>
+          </Button>
+        )
+      },
       cell: ({ row }) => {
         const t = row.original
         const cat = getTransactionCategory(t)
@@ -228,17 +277,28 @@ export function TransactionsDataTable({
     },
     {
       accessorKey: 'transactionDate',
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-3 h-8 text-xs font-semibold"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        >
-          Date
-          <ArrowUpDown className="ml-1.5 size-3" />
-        </Button>
-      ),
+      header: ({ column }) => {
+        const sorted = column.getIsSorted()
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3 h-8 text-xs font-semibold"
+            onClick={() => column.toggleSorting(sorted === 'asc')}
+          >
+            Date
+            <Swap k={String(sorted)} className="ml-1.5">
+              {sorted === 'asc' ? (
+                <ArrowUp className="size-3 text-primary" />
+              ) : sorted === 'desc' ? (
+                <ArrowDown className="size-3 text-primary" />
+              ) : (
+                <ArrowUpDown className="size-3 text-muted-foreground" />
+              )}
+            </Swap>
+          </Button>
+        )
+      },
       cell: ({ row }) => {
         const date = row.original.transactionDate
         return (
@@ -413,32 +473,16 @@ export function TransactionsDataTable({
                 className="pl-8 h-8 text-xs"
               />
             </div>
-            <div className="flex items-center gap-1 border border-border/80 rounded-md p-0.5 bg-muted/40">
-              <Button
-                variant={typeFilter === 'all' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 text-xs px-2"
-                onClick={() => setTypeFilter('all')}
-              >
-                All
-              </Button>
-              <Button
-                variant={typeFilter === 'cashin' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 text-xs px-2 text-inflow"
-                onClick={() => setTypeFilter('cashin')}
-              >
-                Inflow
-              </Button>
-              <Button
-                variant={typeFilter === 'cashout' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 text-xs px-2 text-outflow"
-                onClick={() => setTypeFilter('cashout')}
-              >
-                Outflow
-              </Button>
-            </div>
+            <MotionToggleGroup
+              value={typeFilter}
+              onValueChange={(val) => setTypeFilter(val as 'all' | 'cashin' | 'cashout')}
+              items={[
+                { value: 'all', label: 'All' },
+                { value: 'cashin', label: 'Inflow', tint: 'inflow' },
+                { value: 'cashout', label: 'Outflow', tint: 'outflow' },
+              ]}
+              size="sm"
+            />
             {(globalFilter || typeFilter !== 'all') && (
               <Button
                 variant="ghost"
@@ -523,20 +567,26 @@ export function TransactionsDataTable({
                 </TableRow>
               ))
             ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
-                  onClick={() => onSelectTransaction?.(row.original)}
-                  className="cursor-pointer hover:bg-muted/50 transition-colors duration-(--duration-instant) h-14"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-2.5 text-xs">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const isRecent = recentTxnIds.has(row.original.id)
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && 'selected'}
+                    onClick={() => onSelectTransaction?.(row.original)}
+                    className={cn(
+                      "cursor-pointer hover:bg-muted/50 transition-colors duration-(--duration-instant) h-14",
+                      isRecent && "animate-row-flash"
+                    )}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="py-2.5 text-xs">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                )
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-48 text-center p-0">

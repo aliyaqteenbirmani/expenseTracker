@@ -43,9 +43,16 @@ function AlertDialogContent({
 }: AlertDialogPrimitive.Popup.Props & {
   size?: "default" | "sm"
 }) {
+  const [shake, setShake] = React.useState(false)
+
+  const triggerShake = React.useCallback(() => {
+    setShake(true)
+    setTimeout(() => setShake(false), 360)
+  }, [])
+
   return (
     <AlertDialogPortal>
-      <AlertDialogOverlay />
+      <AlertDialogOverlay onClick={triggerShake} />
       <AlertDialogPrimitive.Popup
         data-slot="alert-dialog-content"
         data-size={size}
@@ -53,6 +60,7 @@ function AlertDialogContent({
           "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-5 text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none data-[size=default]:max-w-md data-[size=sm]:max-w-xs",
           "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[0.96] data-open:slide-in-from-bottom-2 duration-(--duration-slow) ease-out-expo",
           "data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-[0.98] duration-(--duration-fast) ease-in",
+          shake && "animate-shake",
           className
         )}
         {...props}

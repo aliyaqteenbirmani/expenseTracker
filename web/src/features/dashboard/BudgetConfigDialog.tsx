@@ -28,6 +28,7 @@ export function BudgetConfigDialog({
     currentBudget > 0 ? String(currentBudget) : ''
   )
   const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -36,8 +37,12 @@ export function BudgetConfigDialog({
       setError('Please enter a valid monthly budget amount (greater than 0).')
       return
     }
-    onSave(val)
-    onOpenChange(false)
+    setSaved(true)
+    setTimeout(() => {
+      onSave(val)
+      onOpenChange(false)
+      setSaved(false)
+    }, 700)
   }
 
   function handlePreset(val: number) {
@@ -136,14 +141,10 @@ export function BudgetConfigDialog({
         </div>
 
         <div className="flex justify-end gap-2 pt-2 border-t">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-          >
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saved}>
             Cancel
           </Button>
-          <Button type="submit">Save Budget</Button>
+          <Button type="submit" success={saved} successLabel="Saved">Save Budget</Button>
         </div>
       </form>
     </ResponsiveDialog>

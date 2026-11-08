@@ -1,7 +1,8 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
-import { Loader2 } from "lucide-react"
+import { Loader2, Check } from "lucide-react"
+import { Swap } from "@/components/motion/swap"
 
 const buttonVariants = cva(
   "group/button relative inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap outline-none select-none " +
@@ -51,6 +52,8 @@ interface ButtonProps
   extends ButtonPrimitive.Props,
     VariantProps<typeof buttonVariants> {
   loading?: boolean
+  success?: boolean
+  successLabel?: string
 }
 
 function Button({
@@ -58,6 +61,8 @@ function Button({
   variant = "default",
   size = "default",
   loading = false,
+  success = false,
+  successLabel,
   disabled,
   children,
   ...props
@@ -81,7 +86,16 @@ function Button({
           loading && "opacity-0 select-none pointer-events-none"
         )}
       >
-        {children}
+        {success ? (
+          <Swap k="button-success">
+            <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+              <Check className="size-3.5" />
+              <span>{successLabel || "Saved"}</span>
+            </span>
+          </Swap>
+        ) : (
+          children
+        )}
       </span>
     </ButtonPrimitive>
   )
