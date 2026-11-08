@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { MotionTabs, MotionTabsList, MotionTabsTrigger } from '@/components/motion/motion-tabs'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { MotionToggleGroup } from '@/components/motion/motion-toggle-group'
 import {
   Table,
   TableBody,
@@ -589,24 +589,16 @@ export function MembersPage({
                     Pending and historical collaboration invitations sent by you.
                   </CardDescription>
                 </div>
-                <ToggleGroup
-                  value={[sentStatus]}
-                  onValueChange={(vals) => {
-                    const chosen = Array.isArray(vals) ? vals[0] : vals
-                    if (chosen) setSentStatus(chosen)
-                  }}
-                  className="border border-border/80 rounded-lg p-0.5"
-                >
-                  <ToggleGroupItem value="All" className="text-xs h-7 px-2">
-                    All
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="Pending" className="text-xs h-7 px-2">
-                    Pending
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="Accepted" className="text-xs h-7 px-2">
-                    Accepted
-                  </ToggleGroupItem>
-                </ToggleGroup>
+                <MotionToggleGroup
+                  value={sentStatus}
+                  onValueChange={setSentStatus}
+                  items={[
+                    { value: 'All', label: 'All' },
+                    { value: 'Pending', label: 'Pending' },
+                    { value: 'Accepted', label: 'Accepted' },
+                  ]}
+                  size="sm"
+                />
               </CardHeader>
               <CardContent className="p-0">
                 <Table>

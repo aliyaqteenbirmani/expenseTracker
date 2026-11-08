@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'motion/react'
 import { spring } from '@/lib/motion'
 import { AnimatedNumber } from '@/components/motion/animated-number'
@@ -92,6 +93,7 @@ export function AppSidebar({
   unreadInvitesCount = 0,
 }: AppSidebarProps) {
   const { setTheme } = useTheme()
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null)
   const fullName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'User'
   const initials = fullName.slice(0, 2).toUpperCase()
 
@@ -188,7 +190,7 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu onMouseLeave={() => setHoveredNav(null)}>
               {navItems.map((item) => {
                 const Icon = item.icon
                 const isActive = currentView === item.id
@@ -198,6 +200,7 @@ export function AppSidebar({
                       isActive={isActive}
                       tooltip={item.label}
                       onClick={() => onNavigate(item.id)}
+                      onMouseEnter={() => setHoveredNav(item.id)}
                       className="relative cursor-pointer transition-colors duration-(--duration-fast)"
                     >
                       {isActive && (
@@ -205,6 +208,13 @@ export function AppSidebar({
                           layoutId="nav-active"
                           transition={spring.snappy}
                           className="absolute inset-0 rounded-md bg-sidebar-accent -z-10"
+                        />
+                      )}
+                      {!isActive && hoveredNav === item.id && (
+                        <motion.span
+                          layoutId="nav-hover-glide"
+                          transition={spring.snappy}
+                          className="absolute inset-0 rounded-md bg-sidebar-accent/50 -z-10"
                         />
                       )}
                       <Icon className="size-4" />

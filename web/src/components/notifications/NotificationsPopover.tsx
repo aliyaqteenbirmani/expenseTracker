@@ -53,6 +53,7 @@ export function NotificationsPopover({
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [hoveredNotifId, setHoveredNotifId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'
@@ -197,9 +198,20 @@ export function NotificationsPopover({
               />
             </div>
           ) : (
-            <div className="divide-y divide-border/60">
+            <div className="divide-y divide-border/60" onMouseLeave={() => setHoveredNotifId(null)}>
               {invitations.map((inv) => (
-                <div key={inv.id} className="p-3.5 space-y-2 hover:bg-muted/40 transition-colors">
+                <div
+                  key={inv.id}
+                  onMouseEnter={() => setHoveredNotifId(inv.id)}
+                  className="relative z-0 p-3.5 space-y-2 transition-colors"
+                >
+                  {hoveredNotifId === inv.id && (
+                    <motion.div
+                      layoutId="notif-hover-glide"
+                      transition={spring.snappy}
+                      className="absolute inset-0 bg-muted/50 -z-10"
+                    />
+                  )}
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-1.5">
