@@ -86,6 +86,9 @@ export type Cashbook = {
   cashBookName?: string
   name?: string
   businessId: string
+  isOwner?: boolean
+  role?: string
+  ownerName?: string
 }
 
 export type Transaction = {
@@ -485,16 +488,11 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
 
   const reloadCashbooks = useCallback(
     async (targetBusinessId?: string, preferredCashbookId?: string) => {
-      const bId = targetBusinessId ?? businessId
-      if (!bId) {
-        setBooks([])
-        setBook(null)
-        setTransactions([])
-        return
-      }
+      const bId = targetBusinessId !== undefined ? targetBusinessId : businessId
       try {
+        const query = bId ? `?id=${encodeURIComponent(bId)}` : ''
         const list = await api<Cashbook[]>(
-          `/api/CashBook/getall?id=${encodeURIComponent(bId)}`,
+          `/api/CashBook/getall${query}`,
           token
         )
         const normalized = (list ?? []).map((item) => ({
@@ -507,6 +505,9 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
             (item as Cashbook & { Name?: string }).Name ??
             'Cashbook',
           businessId: item.businessId ?? (item as Cashbook & { BusinessId: string }).BusinessId ?? bId,
+          isOwner: item.isOwner ?? true,
+          role: item.role ?? (item.isOwner === false ? 'Member' : 'Owner'),
+          ownerName: item.ownerName,
         }))
         setBooks(normalized)
         const selected =
@@ -550,9 +551,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
           await reloadCashbooks(active.id, preferredCashbookId)
         } else {
           setBusinessId('')
-          setBooks([])
-          setBook(null)
-          setTransactions([])
+          await reloadCashbooks('', preferredCashbookId)
         }
       } catch (e) {
         showToast(e instanceof Error ? e.message : 'Could not load businesses.')

@@ -11,6 +11,12 @@ namespace SpendwiseSystem.Domain.DTOs.CashBookDtos
         public string CashBookName { get; set; }
         [Required]
         public string BusinessId { get; set; }
+
+        public bool IsOwner { get; set; } = true;
+
+        public string Role { get; set; } = "Owner";
+
+        public string? OwnerName { get; set; }
     }
 }
 

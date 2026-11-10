@@ -96,10 +96,13 @@ export function TransactionsPage({
             {books.length > 1 ? (
               <Select
                 value={selectedBookId}
-                items={books.map((b) => ({
-                  value: b.id,
-                  label: b.cashBookName ?? b.name ?? 'Cashbook',
-                }))}
+                items={books.map((b) => {
+                  const label = b.cashBookName ?? b.name ?? 'Cashbook'
+                  return {
+                    value: b.id,
+                    label: b.isOwner === false ? `${label} (Shared)` : label,
+                  }
+                })}
                 onValueChange={(val) => {
                   const b = books.find((x) => x.id === val)
                   if (b) onSelectBook(b)
@@ -114,9 +117,17 @@ export function TransactionsPage({
                 <SelectContent>
                   {books.map((b) => {
                     const label = b.cashBookName ?? b.name ?? 'Cashbook'
+                    const displayLabel = b.isOwner === false ? `${label} (Shared)` : label
                     return (
-                      <SelectItem key={b.id} value={b.id} label={label} className="text-xs">
-                        {label}
+                      <SelectItem key={b.id} value={b.id} label={displayLabel} className="text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <span>{label}</span>
+                          {b.isOwner === false && (
+                            <span className="rounded bg-amber-500/10 px-1 py-0.5 text-[9px] font-medium text-amber-600 dark:text-amber-400">
+                              Shared
+                            </span>
+                          )}
+                        </span>
                       </SelectItem>
                     )
                   })}

@@ -244,8 +244,10 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
             if (currentUserId == Guid.Empty)
                 return ApiResponse<UserWorkspaceAccessDto>.FailureResponse("Current user id is required.");
 
-            var isOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
-            if (isOwner)
+            var isBusinessOwner = await _permissionAccessService.IsBusinessOwnerAsync(businessId, currentUserId);
+            var isCashbookOwner = cashbookId.HasValue && await _permissionAccessService.IsCashbookOwnerAsync(cashbookId.Value, currentUserId);
+
+            if (isBusinessOwner && (!cashbookId.HasValue || isCashbookOwner))
             {
                 return ApiResponse<UserWorkspaceAccessDto>.SuccessResponse(
                     "User access retrieved successfully.",
@@ -262,10 +264,19 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
                 cashbookId,
                 currentUserId);
 
-            if (cashbookId.HasValue && await _permissionAccessService.IsCashbookOwnerAsync(cashbookId.Value, currentUserId))
+            if (isBusinessOwner)
+            {
+                access.BusinessPermissions = Enum.GetNames<BusinessPermission>().ToList();
+            }
+
+            if (cashbookId.HasValue && isCashbookOwner)
             {
                 access.IsOwner = true;
                 access.CashbookPermissions = Enum.GetNames<SpendwiseSystem.Domain.Enums.CashbookPermission>().ToList();
+            }
+            else if (cashbookId.HasValue && !isCashbookOwner)
+            {
+                access.IsOwner = false;
             }
 
             return ApiResponse<UserWorkspaceAccessDto>.SuccessResponse(

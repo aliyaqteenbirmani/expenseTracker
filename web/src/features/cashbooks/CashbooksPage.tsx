@@ -29,6 +29,7 @@ import {
   ReceiptText,
   Building2,
   ArrowRight,
+  Users,
 } from 'lucide-react'
 import type { Cashbook } from '@/App'
 import { cn } from '@/lib/utils'
@@ -67,7 +68,10 @@ export function CashbooksPage({
   onToast,
 }: CashbooksPageProps) {
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'active' | 'other'>('all')
+  const [filter, setFilter] = useState<'all' | 'owned' | 'shared' | 'active'>('all')
+
+  const ownedCount = useMemo(() => books.filter((b) => b.isOwner !== false).length, [books])
+  const sharedCount = useMemo(() => books.filter((b) => b.isOwner === false).length, [books])
 
   const filteredBooks = useMemo(() => {
     return books.filter((b) => {
@@ -77,7 +81,8 @@ export function CashbooksPage({
 
       if (!matchesSearch) return false
       if (filter === 'active') return isActive
-      if (filter === 'other') return !isActive
+      if (filter === 'owned') return b.isOwner !== false
+      if (filter === 'shared') return b.isOwner === false
       return true
     })
   }, [books, search, filter, selectedBook?.id])
@@ -147,11 +152,16 @@ export function CashbooksPage({
 
         <MotionToggleGroup
           value={filter}
-          onValueChange={(val) => setFilter(val as 'all' | 'active' | 'other')}
+          onValueChange={(val) => setFilter(val as 'all' | 'owned' | 'shared' | 'active')}
           items={[
             { value: 'all', label: `All (${books.length})` },
+            ...(sharedCount > 0
+              ? [
+                  { value: 'owned', label: `My Books (${ownedCount})` },
+                  { value: 'shared', label: `Shared (${sharedCount})` },
+                ]
+              : []),
             { value: 'active', label: 'Active' },
-            { value: 'other', label: 'Other' },
           ]}
           size="sm"
         />
@@ -213,22 +223,37 @@ export function CashbooksPage({
                       <h3 className="font-semibold text-base text-foreground tracking-tight">
                         {bookTitle}
                       </h3>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Building2 className="size-3" />
-                        <span>{businessName}</span>
-                      </p>
+                      {b.isOwner === false ? (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Users className="size-3 text-amber-500" />
+                          <span>Shared by {b.ownerName || 'Owner'}</span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Building2 className="size-3" />
+                          <span>{businessName || 'My Workspace'}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    {isActive ? (
-                      <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-2 py-0.5">
-                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Active
+                    {b.isOwner === false ? (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-500/10 dark:text-amber-400"
+                      >
+                        Shared Member
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                        Standard
+                        Owner
+                      </Badge>
+                    )}
+                    {isActive && (
+                      <Badge className="bg-primary text-primary-foreground text-[10px] gap-1 px-2 py-0.5">
+                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Active
                       </Badge>
                     )}
 
@@ -262,13 +287,13 @@ export function CashbooksPage({
                           <ReceiptText className="size-4 mr-2" />
                           <span>View transactions</span>
                         </DropdownMenuItem>
-                        {canEdit && (
+                        {canEdit && b.isOwner !== false && (
                           <DropdownMenuItem onClick={() => onEditCashbook(b)}>
                             <Pencil className="size-4 mr-2" />
                             <span>Rename cashbook</span>
                           </DropdownMenuItem>
                         )}
-                        {canDelete && (
+                        {canDelete && b.isOwner !== false && (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem

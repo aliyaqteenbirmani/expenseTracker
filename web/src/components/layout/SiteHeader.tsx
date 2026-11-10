@@ -182,8 +182,13 @@ export function SiteHeader({
                       }}
                       className="flex items-center justify-between text-xs cursor-pointer"
                     >
-                      <span className="truncate">
-                        {cb.cashBookName ?? cb.name ?? 'Cashbook'}
+                      <span className="truncate flex items-center gap-1.5">
+                        <span className="truncate">{cb.cashBookName ?? cb.name ?? 'Cashbook'}</span>
+                        {cb.isOwner === false && (
+                          <span className="rounded bg-amber-500/10 px-1 py-0.5 text-[9px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
+                            Shared
+                          </span>
+                        )}
                       </span>
                       {cb.id === activeCashbook?.id && (
                         <Check className="size-3.5 text-primary" />
