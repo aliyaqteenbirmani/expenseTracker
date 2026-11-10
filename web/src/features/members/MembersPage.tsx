@@ -137,6 +137,9 @@ export function MembersPage({
 }: MembersPageProps) {
   const [scope, setScope] = useState<'cashbook' | 'business'>('cashbook')
   const [cashbookId, setCashbookId] = useState(books[0]?.id ?? '')
+  const activeBook = books.find((b) => b.id === cashbookId)
+  const activeCashbookName =
+    activeBook?.cashBookName ?? activeBook?.name ?? 'Select cashbook'
   const [members, setMembers] = useState<Member[]>([])
   const [, setPending] = useState<Invitation[]>([])
   const [sent, setSent] = useState<Invitation[]>([])
@@ -315,21 +318,38 @@ export function MembersPage({
         }
         actions={
           <div className="flex items-center gap-3">
-            {scope === 'cashbook' && books.length > 1 && (
-              <Select value={cashbookId} onValueChange={(val) => val && setCashbookId(val)}>
-                <SelectTrigger className="h-8 text-xs w-44">
-                  <BookOpen className="size-3.5 mr-1 text-muted-foreground" />
-                  <SelectValue placeholder="Select cashbook" />
+            {scope === 'cashbook' && books.length > 1 ? (
+              <Select
+                value={cashbookId}
+                items={books.map((b) => ({
+                  value: b.id,
+                  label: b.cashBookName ?? b.name ?? 'Cashbook',
+                }))}
+                onValueChange={(val) => val && setCashbookId(val)}
+              >
+                <SelectTrigger className="h-8 text-xs min-w-44 max-w-64 gap-1.5">
+                  <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Select cashbook">
+                    {activeCashbookName}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {books.map((b) => (
-                    <SelectItem key={b.id} value={b.id} className="text-xs">
-                      {b.cashBookName ?? b.name ?? 'Cashbook'}
-                    </SelectItem>
-                  ))}
+                  {books.map((b) => {
+                    const label = b.cashBookName ?? b.name ?? 'Cashbook'
+                    return (
+                      <SelectItem key={b.id} value={b.id} label={label} className="text-xs">
+                        {label}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
-            )}
+            ) : scope === 'cashbook' && books.length === 1 ? (
+              <div className="flex h-8 items-center gap-1.5 rounded-lg border border-border/80 bg-muted/40 px-2.5 text-xs font-medium text-foreground">
+                <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                <span className="truncate max-w-48">{activeCashbookName}</span>
+              </div>
+            ) : null}
 
             <MotionTabs
               value={scope}

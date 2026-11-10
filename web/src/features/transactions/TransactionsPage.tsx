@@ -61,6 +61,9 @@ export function TransactionsPage({
   onDeleteTransaction,
 }: TransactionsPageProps) {
   const [refreshing, setRefreshing] = useState(false)
+  const activeBook = books.find((b) => b.id === selectedBookId)
+  const activeCashbookName =
+    activeBook?.cashBookName ?? activeBook?.name ?? cashbookName ?? 'Cashbook'
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -90,27 +93,41 @@ export function TransactionsPage({
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {books.length > 1 && (
+            {books.length > 1 ? (
               <Select
                 value={selectedBookId}
+                items={books.map((b) => ({
+                  value: b.id,
+                  label: b.cashBookName ?? b.name ?? 'Cashbook',
+                }))}
                 onValueChange={(val) => {
                   const b = books.find((x) => x.id === val)
                   if (b) onSelectBook(b)
                 }}
               >
-                <SelectTrigger className="h-8 text-xs w-44">
-                  <BookOpen className="size-3.5 mr-1 text-muted-foreground" />
-                  <SelectValue placeholder="Select cashbook" />
+                <SelectTrigger className="h-8 text-xs min-w-44 max-w-64 gap-1.5">
+                  <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Select cashbook">
+                    {activeCashbookName}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {books.map((b) => (
-                    <SelectItem key={b.id} value={b.id} className="text-xs">
-                      {b.cashBookName ?? b.name ?? 'Cashbook'}
-                    </SelectItem>
-                  ))}
+                  {books.map((b) => {
+                    const label = b.cashBookName ?? b.name ?? 'Cashbook'
+                    return (
+                      <SelectItem key={b.id} value={b.id} label={label} className="text-xs">
+                        {label}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
-            )}
+            ) : books.length === 1 ? (
+              <div className="flex h-8 items-center gap-1.5 rounded-lg border border-border/80 bg-muted/40 px-2.5 text-xs font-medium text-foreground">
+                <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                <span className="truncate max-w-48">{activeCashbookName}</span>
+              </div>
+            ) : null}
 
             <Button
               variant="outline"

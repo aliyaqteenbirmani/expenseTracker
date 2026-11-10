@@ -57,6 +57,9 @@ export function ReceiptsVaultPage({
 }: ReceiptsVaultPageProps) {
   const [query, setQuery] = useState('')
   const [sortBy, setSortBy] = useState<'date-desc' | 'amount-desc'>('date-desc')
+  const activeBook = books?.find((b) => b.id === selectedBookId)
+  const activeCashbookName =
+    activeBook?.cashBookName ?? activeBook?.name ?? cashbookName ?? 'Cashbook'
 
   const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://localhost:7195'
 
@@ -122,27 +125,41 @@ export function ReceiptsVaultPage({
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {books && books.length > 1 && onSelectBook && (
+            {books && books.length > 1 && onSelectBook ? (
               <Select
                 value={selectedBookId}
+                items={books.map((b) => ({
+                  value: b.id,
+                  label: b.cashBookName ?? b.name ?? 'Cashbook',
+                }))}
                 onValueChange={(val) => {
                   const b = books.find((x) => x.id === val)
                   if (b) onSelectBook(b)
                 }}
               >
-                <SelectTrigger className="h-8 text-xs w-44">
-                  <BookOpen className="size-3.5 mr-1 text-muted-foreground" />
-                  <SelectValue placeholder="Select cashbook" />
+                <SelectTrigger className="h-8 text-xs min-w-44 max-w-64 gap-1.5">
+                  <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Select cashbook">
+                    {activeCashbookName}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {books.map((b) => (
-                    <SelectItem key={b.id} value={b.id} className="text-xs">
-                      {b.cashBookName ?? b.name ?? 'Cashbook'}
-                    </SelectItem>
-                  ))}
+                  {books.map((b) => {
+                    const label = b.cashBookName ?? b.name ?? 'Cashbook'
+                    return (
+                      <SelectItem key={b.id} value={b.id} label={label} className="text-xs">
+                        {label}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
-            )}
+            ) : books && books.length === 1 ? (
+              <div className="flex h-8 items-center gap-1.5 rounded-lg border border-border/80 bg-muted/40 px-2.5 text-xs font-medium text-foreground">
+                <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                <span className="truncate max-w-48">{activeCashbookName}</span>
+              </div>
+            ) : null}
 
             <Button size="sm" className="h-8 text-xs gap-1.5" onClick={onUploadReceipt}>
               <Plus className="size-3.5" />
@@ -167,7 +184,9 @@ export function ReceiptsVaultPage({
         <div className="flex items-center gap-2">
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
             <SelectTrigger className="h-8 text-xs w-36">
-              <SelectValue placeholder="Sort order" />
+              <SelectValue placeholder="Sort order">
+                {sortBy === 'amount-desc' ? 'Highest Amount' : 'Newest Date'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="date-desc" className="text-xs">
