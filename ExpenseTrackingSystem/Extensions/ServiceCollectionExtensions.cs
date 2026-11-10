@@ -15,6 +15,7 @@ using SpendwiseSystem.Application.Services.InvitationService;
 using SpendwiseSystem.Application.Services.MemberManagementService;
 using SpendwiseSystem.Application.Services.PermissionAccessService;
 using SpendwiseSystem.Application.Services.SpendwiseService;
+using SpendwiseSystem.Application.Services.SplitExpenses;
 using SpendwiseSystem.Application.Services.TokenService;
 using SpendwiseSystem.Application.Services.TransactionService;
 using SpendwiseSystem.Application.Services.ReceiptOcrService;
@@ -80,6 +81,9 @@ namespace SpendwiseSystem.API.Extensions
 
             services.AddTransient<IPermissionAccessRepository, PermissionAccessRepository>();
             services.AddTransient<IPermissionAccessService, PermissionAccessService>();
+
+            services.AddTransient<ISplitGroupRepository, SplitGroupRepository>();
+            services.AddTransient<ISplitGroupService, SplitGroupService>();
 
             services.AddSingleton<AutoMapper.IConfigurationProvider>(_ =>
             {
