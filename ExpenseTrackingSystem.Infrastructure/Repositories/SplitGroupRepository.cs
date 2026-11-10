@@ -58,7 +58,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.Email) AS OwnerName,
                     u.Email AS OwnerEmail,
                     (SELECT COUNT(1) FROM dbo.SplitGroupMembers gm2 WHERE gm2.GroupId = g.Id AND gm2.IsActive = 1) AS MemberCount,
-                    CAST(0 AS DECIMAL(18,2)) AS TotalExpenses,
+                    ISNULL((SELECT SUM(Amount) FROM dbo.SplitExpenses e WHERE e.GroupId = g.Id AND e.IsDeleted = 0), CAST(0 AS DECIMAL(18,2))) AS TotalExpenses,
                     CAST(0 AS DECIMAL(18,2)) AS CurrentUserBalance,
                     gm.Role AS CurrentUserRole,
                     g.CreatedAt
@@ -85,7 +85,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.Email) AS OwnerName,
                     u.Email AS OwnerEmail,
                     (SELECT COUNT(1) FROM dbo.SplitGroupMembers gm2 WHERE gm2.GroupId = g.Id AND gm2.IsActive = 1) AS MemberCount,
-                    CAST(0 AS DECIMAL(18,2)) AS TotalExpenses,
+                    ISNULL((SELECT SUM(Amount) FROM dbo.SplitExpenses e WHERE e.GroupId = g.Id AND e.IsDeleted = 0), CAST(0 AS DECIMAL(18,2))) AS TotalExpenses,
                     CAST(0 AS DECIMAL(18,2)) AS CurrentUserBalance,
                     gm.Role AS CurrentUserRole,
                     g.IsActive,
