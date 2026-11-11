@@ -47,6 +47,7 @@ import {
   Laptop,
   Check,
   Building2,
+  HandCoins,
 } from 'lucide-react'
 import { useTheme } from '@/providers/ThemeProvider'
 
@@ -233,6 +234,33 @@ export function AppSidebar({
                   </SidebarMenuItem>
                 )
               })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* 3. Independent Module: Split Expenses */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Split Expenses</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={currentView === 'split-expenses'}
+                  tooltip="Split Expenses"
+                  onClick={() => onNavigate('split-expenses')}
+                  className="relative cursor-pointer transition-colors duration-(--duration-fast)"
+                >
+                  {currentView === 'split-expenses' && (
+                    <motion.span
+                      layoutId="nav-active"
+                      transition={spring.snappy}
+                      className="absolute inset-0 rounded-md bg-sidebar-accent -z-10"
+                    />
+                  )}
+                  <HandCoins className="size-4" />
+                  <span>Split Expenses</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -1,0 +1,238 @@
+export interface SplitGroupSummaryDto {
+  id: string
+  name: string
+  description?: string
+  icon?: string
+  ownerId: string
+  ownerName: string
+  memberCount: number
+  totalExpenses: number
+  currentUserBalance: number
+  currentUserRole: string
+  createdAt: string
+}
+
+export interface SplitGroupMemberDto {
+  id: string
+  userId: string
+  fullName: string
+  email: string
+  role: string
+  joinedAt: string
+  isActive: boolean
+  balance: number
+}
+
+export interface SplitGroupDetailDto {
+  id: string
+  name: string
+  description?: string
+  icon?: string
+  ownerId: string
+  ownerName: string
+  ownerEmail: string
+  memberCount: number
+  totalExpenses: number
+  currentUserBalance: number
+  currentUserRole: string
+  isActive: boolean
+  createdAt: string
+  members: SplitGroupMemberDto[]
+}
+
+export interface SplitExpenseShareItemDto {
+  userId: string
+  userName: string
+  userEmail: string
+  shareAmount: number
+  isPayer: boolean
+}
+
+export interface SplitExpenseListItemDto {
+  id: string
+  groupId: string
+  title: string
+  amount: number
+  payerId: string
+  payerName: string
+  expenseDate: string
+  category?: string
+  participantCount: number
+  currentUserShare: number
+  createdBy: string
+  createdByName: string
+  createdAt: string
+}
+
+export interface SplitExpenseDetailDto {
+  id: string
+  groupId: string
+  title: string
+  description?: string
+  note?: string
+  amount: number
+  category?: string
+  expenseDate: string
+  payerId: string
+  payerName: string
+  payerEmail: string
+  receiptUrl?: string
+  splitType: string
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+  shares: SplitExpenseShareItemDto[]
+}
+
+export interface PagedExpenseResultDto {
+  items: SplitExpenseListItemDto[]
+  totalCount: number
+  pageNumber: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface MemberBalanceDto {
+  userId: string
+  fullName: string
+  email: string
+  totalPaid: number
+  totalShare: number
+  settlementsPaid: number
+  settlementsReceived: number
+  netBalance: number
+  role: string
+  isActive: boolean
+}
+
+export interface GroupFinancialSummaryDto {
+  groupId: string
+  groupName: string
+  totalExpensesAmount: number
+  totalSettlementsAmount: number
+  totalActiveDebt: number
+  membersCount: number
+  currentUserNetBalance: number
+  memberBalances: MemberBalanceDto[]
+}
+
+export interface SplitSettlementDto {
+  id: string
+  groupId: string
+  groupName: string
+  fromUserId: string
+  fromUserName: string
+  fromUserEmail: string
+  toUserId: string
+  toUserName: string
+  toUserEmail: string
+  amount: number
+  settlementDate: string
+  note?: string
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SuggestedSettlementDto {
+  fromUserId: string
+  fromUserName: string
+  fromUserEmail: string
+  toUserId: string
+  toUserName: string
+  toUserEmail: string
+  amount: number
+}
+
+export interface SettleUpOverviewDto {
+  groupId: string
+  groupName: string
+  totalOutstandingDebt: number
+  debtors: MemberBalanceDto[]
+  creditors: MemberBalanceDto[]
+  suggestedTransactions: SuggestedSettlementDto[]
+}
+
+export interface SplitGroupActivityDto {
+  id: string
+  groupId: string
+  userId: string
+  userName: string
+  userEmail?: string
+  activityType: string
+  referenceId?: string
+  description: string
+  createdAt: string
+}
+
+export interface PagedGroupActivityResultDto {
+  items: SplitGroupActivityDto[]
+  totalCount: number
+  pageNumber: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface SplitGroupInvitationDto {
+  id: string
+  groupId: string
+  groupName: string
+  invitedUserId?: string
+  invitedEmail: string
+  invitedBy: string
+  invitedByName: string
+  status: 'Pending' | 'Accepted' | 'Rejected' | 'Expired' | 'Revoked'
+  expiresAt: string
+  createdAt: string
+  respondedAt?: string
+}
+
+export interface CreateSplitGroupDto {
+  name: string
+  description?: string
+  icon?: string
+}
+
+export interface UpdateSplitGroupDto {
+  name: string
+  description?: string
+  icon?: string
+}
+
+export interface CreateSplitExpenseDto {
+  title: string
+  amount: number
+  description?: string
+  note?: string
+  category?: string
+  expenseDate?: string
+  payerId?: string
+  receiptUrl?: string
+  participantUserIds: string[]
+}
+
+export interface UpdateSplitExpenseDto {
+  title: string
+  amount: number
+  description?: string
+  note?: string
+  category?: string
+  expenseDate?: string
+  payerId: string
+  receiptUrl?: string
+  participantUserIds: string[]
+}
+
+export interface RecordSettlementDto {
+  fromUserId: string
+  toUserId: string
+  amount: number
+  settlementDate?: string
+  note?: string
+}
+
+export interface InviteSplitGroupMemberDto {
+  email: string
+}

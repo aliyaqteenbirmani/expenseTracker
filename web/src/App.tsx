@@ -17,6 +17,7 @@ import { MembersPage } from '@/features/members/MembersPage'
 import { ReceiptsVaultPage } from '@/features/receipts/ReceiptsVaultPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
 import { BusinessSettings } from '@/features/settings/BusinessSettings'
+import { SplitExpensesPage } from '@/features/split-expenses/SplitExpensesPage'
 import { AuthPage } from '@/features/auth/AuthPage'
 import { CreateCashbookDialog } from '@/features/cashbooks/CreateCashbookDialog'
 import { ManageCashbookDialog } from '@/features/cashbooks/ManageCashbookDialog'
@@ -944,6 +945,14 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
                 }}
                 onToast={showToast}
                 api={api}
+              />
+            )}
+
+            {currentView === 'split-expenses' && user && (
+              <SplitExpensesPage
+                token={token}
+                currentUserId={user.id ?? (user as unknown as { Id?: string }).Id}
+                onToast={showToast}
               />
             )}
           </AnimatedPage>
