@@ -177,17 +177,24 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                         SettlementDate = @SettlementDate,
                         Note = @Note,
                         UpdatedAt = SYSUTCDATETIME()
-                    WHERE Id = @Id AND IsDeleted = 0;";
+                    WHERE Id = @Id AND GroupId = @GroupId AND IsDeleted = 0;";
 
-                await connection.ExecuteAsync(updateSql, new
+                var rows = await connection.ExecuteAsync(updateSql, new
                 {
                     Id = settlement.Id,
+                    GroupId = settlement.GroupId,
                     FromUserId = settlement.FromUserId,
                     ToUserId = settlement.ToUserId,
                     Amount = settlement.Amount,
                     SettlementDate = settlement.SettlementDate,
                     Note = settlement.Note
                 }, transaction);
+
+                if (rows == 0)
+                {
+                    transaction.Rollback();
+                    return null;
+                }
 
                 const string insertActivitySql = @"
                     INSERT INTO dbo.SplitGroupActivities 
@@ -244,9 +251,19 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     UPDATE dbo.SplitSettlements
                     SET IsDeleted = 1,
                         UpdatedAt = SYSUTCDATETIME()
-                    WHERE Id = @SettlementId;";
+                    WHERE Id = @SettlementId AND GroupId = @GroupId AND IsDeleted = 0;";
 
-                await connection.ExecuteAsync(softDeleteSql, new { SettlementId = settlementId }, transaction);
+                var rows = await connection.ExecuteAsync(softDeleteSql, new
+                {
+                    SettlementId = settlementId,
+                    GroupId = groupId
+                }, transaction);
+
+                if (rows == 0)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
 
                 const string insertActivitySql = @"
                     INSERT INTO dbo.SplitGroupActivities 

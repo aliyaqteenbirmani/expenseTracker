@@ -267,7 +267,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                         UpdatedAt = SYSUTCDATETIME()
                     WHERE Id = @Id AND IsDeleted = 0;";
 
-                await connection.ExecuteAsync(updateExpenseSql, new
+                var rows = await connection.ExecuteAsync(updateExpenseSql, new
                 {
                     Id = expense.Id,
                     Title = expense.Title,
@@ -279,6 +279,12 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     PayerId = expense.PayerId,
                     ReceiptUrl = expense.ReceiptUrl
                 }, transaction);
+
+                if (rows == 0)
+                {
+                    transaction.Rollback();
+                    return null;
+                }
 
                 const string deleteSharesSql = @"
                     DELETE FROM dbo.SplitExpenseShares
@@ -349,9 +355,19 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     UPDATE dbo.SplitExpenses
                     SET IsDeleted = 1,
                         UpdatedAt = SYSUTCDATETIME()
-                    WHERE Id = @ExpenseId;";
+                    WHERE Id = @ExpenseId AND GroupId = @GroupId AND IsDeleted = 0;";
 
-                await connection.ExecuteAsync(softDeleteSql, new { ExpenseId = expenseId }, transaction);
+                var rows = await connection.ExecuteAsync(softDeleteSql, new
+                {
+                    ExpenseId = expenseId,
+                    GroupId = groupId
+                }, transaction);
+
+                if (rows == 0)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
 
                 const string insertActivitySql = @"
                     INSERT INTO dbo.SplitGroupActivities 

@@ -494,9 +494,14 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     SET Status = 'Accepted',
                         InvitedUserId = @UserId,
                         RespondedAt = SYSUTCDATETIME()
-                    WHERE Id = @InvitationId;";
+                    WHERE Id = @InvitationId AND Status = 'Pending';";
 
-                await connection.ExecuteAsync(updateInviteSql, new { InvitationId = invitationId, UserId = userId }, transaction);
+                var updateRows = await connection.ExecuteAsync(updateInviteSql, new { InvitationId = invitationId, UserId = userId }, transaction);
+                if (updateRows == 0)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
 
                 // Check if membership record already exists (e.g. previously removed)
                 const string checkMemberSql = @"
