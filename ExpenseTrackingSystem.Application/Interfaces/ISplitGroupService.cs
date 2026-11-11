@@ -23,5 +23,7 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<ApiResponse<bool>> RemoveMemberAsync(Guid groupId, Guid userIdToRemove, Guid currentUserId, string currentUserName);
 
         Task<ApiResponse<List<SplitGroupActivityDto>>> GetGroupActivitiesAsync(Guid groupId, Guid currentUserId);
+        Task<ApiResponse<PagedGroupActivityResultDto>> GetPagedGroupActivitiesAsync(Guid groupId, SplitGroupActivityQueryParameters parameters, Guid currentUserId);
+        Task<ApiResponse<SplitGroupActivityDto>> GetActivityByIdAsync(Guid groupId, Guid activityId, Guid currentUserId);
     }
 }

@@ -30,6 +30,8 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<bool> RemoveMemberAsync(Guid groupId, Guid userIdToRemove, Guid removedByUserId, string removerName);
 
         Task<List<SplitGroupActivityDto>> GetGroupActivitiesAsync(Guid groupId, int limit = 50);
+        Task<PagedGroupActivityResultDto> GetPagedGroupActivitiesAsync(Guid groupId, SplitGroupActivityQueryParameters parameters);
+        Task<SplitGroupActivityDto?> GetActivityByIdAsync(Guid groupId, Guid activityId);
         Task LogActivityAsync(Guid groupId, Guid userId, string activityType, string description, Guid? referenceId = null);
     }
 }

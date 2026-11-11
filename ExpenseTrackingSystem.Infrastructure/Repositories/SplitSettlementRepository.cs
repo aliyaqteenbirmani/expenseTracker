@@ -146,7 +146,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     GroupId = settlement.GroupId,
                     UserId = settlement.CreatedBy,
                     ReferenceId = settlement.Id,
-                    Description = $"{creatorName} recorded a payment: {fromName} paid {toName} Rs. {settlement.Amount:N2}."
+                    Description = $"{fromName} paid {toName} Rs. {settlement.Amount:N2}."
                 }, transaction);
 
                 transaction.Commit();

@@ -299,5 +299,30 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             var activities = await _groupRepository.GetGroupActivitiesAsync(groupId);
             return ApiResponse<List<SplitGroupActivityDto>>.SuccessResponse("Activities retrieved successfully.", activities);
         }
+
+        public async Task<ApiResponse<PagedGroupActivityResultDto>> GetPagedGroupActivitiesAsync(
+            Guid groupId, SplitGroupActivityQueryParameters parameters, Guid currentUserId)
+        {
+            var membership = await _groupRepository.GetMembershipAsync(groupId, currentUserId);
+            if (membership == null || !membership.IsActive)
+                return ApiResponse<PagedGroupActivityResultDto>.ForbiddenResponse("You must be an active member of this group to view its activity history.");
+
+            var paged = await _groupRepository.GetPagedGroupActivitiesAsync(groupId, parameters);
+            return ApiResponse<PagedGroupActivityResultDto>.SuccessResponse("Activities retrieved successfully.", paged);
+        }
+
+        public async Task<ApiResponse<SplitGroupActivityDto>> GetActivityByIdAsync(
+            Guid groupId, Guid activityId, Guid currentUserId)
+        {
+            var membership = await _groupRepository.GetMembershipAsync(groupId, currentUserId);
+            if (membership == null || !membership.IsActive)
+                return ApiResponse<SplitGroupActivityDto>.ForbiddenResponse("You must be an active member of this group to view activity details.");
+
+            var activity = await _groupRepository.GetActivityByIdAsync(groupId, activityId);
+            if (activity == null)
+                return ApiResponse<SplitGroupActivityDto>.FailureResponse("Activity not found.");
+
+            return ApiResponse<SplitGroupActivityDto>.SuccessResponse("Activity retrieved successfully.", activity);
+        }
     }
 }

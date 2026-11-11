@@ -231,7 +231,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     GroupId = expense.GroupId,
                     UserId = expense.CreatedBy,
                     ReferenceId = expense.Id,
-                    Description = $"{creatorName} added expense \"{expense.Title}\" ({expense.Amount:N2})."
+                    Description = $"{creatorName} added {expense.Title} expense of Rs. {expense.Amount:N2}."
                 }, transaction);
 
                 transaction.Commit();
@@ -306,7 +306,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     GroupId = expense.GroupId,
                     UserId = expense.CreatedBy,
                     ReferenceId = expense.Id,
-                    Description = $"{editorName} updated expense \"{expense.Title}\" ({expense.Amount:N2})."
+                    Description = $"{editorName} updated the {expense.Title} expense."
                 }, transaction);
 
                 transaction.Commit();
@@ -365,7 +365,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     GroupId = groupId,
                     UserId = deletedByUserId,
                     ReferenceId = expenseId,
-                    Description = $"{deletedByName} deleted expense \"{title}\"."
+                    Description = $"{deletedByName} deleted {title} expense."
                 }, transaction);
 
                 transaction.Commit();

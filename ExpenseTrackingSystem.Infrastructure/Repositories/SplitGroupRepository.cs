@@ -537,7 +537,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
 
                 const string activitySql = @"
                     INSERT INTO dbo.SplitGroupActivities (Id, GroupId, UserId, ActivityType, ReferenceId, Description, CreatedAt)
-                    VALUES (@ActivityId, @GroupId, @UserId, 'InvitationAccepted', @ReferenceId, @Description, SYSUTCDATETIME());";
+                    VALUES (@ActivityId, @GroupId, @UserId, 'MemberJoined', @ReferenceId, @Description, SYSUTCDATETIME());";
 
                 await connection.ExecuteAsync(activitySql, new
                 {
@@ -545,7 +545,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     GroupId = invitation.GroupId,
                     UserId = userId,
                     ReferenceId = invitationId,
-                    Description = $"{userName} accepted the invitation and joined the group."
+                    Description = $"{userName} joined the group."
                 }, transaction);
 
                 transaction.Commit();
@@ -659,6 +659,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     a.GroupId,
                     a.UserId,
                     ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.Email) AS UserName,
+                    u.Email AS UserEmail,
                     a.ActivityType,
                     a.ReferenceId,
                     a.Description,
@@ -671,6 +672,104 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             using var connection = CreateConnection();
             var results = await connection.QueryAsync<SplitGroupActivityDto>(sql, new { GroupId = groupId, Limit = limit });
             return results.ToList();
+        }
+
+        public async Task<PagedGroupActivityResultDto> GetPagedGroupActivitiesAsync(
+            Guid groupId, SplitGroupActivityQueryParameters parameters)
+        {
+            var sqlBuilder = new System.Text.StringBuilder();
+            var countSqlBuilder = new System.Text.StringBuilder();
+            var dynamicParams = new DynamicParameters();
+
+            dynamicParams.Add("@GroupId", groupId);
+
+            countSqlBuilder.Append("SELECT COUNT(1) FROM dbo.SplitGroupActivities a WHERE a.GroupId = @GroupId");
+            sqlBuilder.Append(@"
+                SELECT 
+                    a.Id,
+                    a.GroupId,
+                    a.UserId,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.Email) AS UserName,
+                    u.Email AS UserEmail,
+                    a.ActivityType,
+                    a.ReferenceId,
+                    a.Description,
+                    a.CreatedAt
+                FROM dbo.SplitGroupActivities a
+                LEFT JOIN dbo.Users u ON u.Id = a.UserId
+                WHERE a.GroupId = @GroupId");
+
+            if (!string.IsNullOrWhiteSpace(parameters.ActivityType))
+            {
+                dynamicParams.Add("@ActivityType", parameters.ActivityType.Trim());
+                const string typeFilter = " AND a.ActivityType = @ActivityType";
+                countSqlBuilder.Append(typeFilter);
+                sqlBuilder.Append(typeFilter);
+            }
+
+            if (parameters.FromDate.HasValue)
+            {
+                dynamicParams.Add("@FromDate", parameters.FromDate.Value);
+                const string fromDateFilter = " AND a.CreatedAt >= @FromDate";
+                countSqlBuilder.Append(fromDateFilter);
+                sqlBuilder.Append(fromDateFilter);
+            }
+
+            if (parameters.ToDate.HasValue)
+            {
+                dynamicParams.Add("@ToDate", parameters.ToDate.Value);
+                const string toDateFilter = " AND a.CreatedAt <= @ToDate";
+                countSqlBuilder.Append(toDateFilter);
+                sqlBuilder.Append(toDateFilter);
+            }
+
+            sqlBuilder.Append(" ORDER BY a.CreatedAt DESC");
+
+            var pageNumber = parameters.PageNumber < 1 ? 1 : parameters.PageNumber;
+            var pageSize = parameters.PageSize < 1 ? 20 : (parameters.PageSize > 100 ? 100 : parameters.PageSize);
+            var offset = (pageNumber - 1) * pageSize;
+
+            dynamicParams.Add("@Offset", offset);
+            dynamicParams.Add("@PageSize", pageSize);
+
+            sqlBuilder.Append(" OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;");
+
+            using var connection = CreateConnection();
+            var totalCount = await connection.ExecuteScalarAsync<int>(countSqlBuilder.ToString(), dynamicParams);
+            var items = await connection.QueryAsync<SplitGroupActivityDto>(sqlBuilder.ToString(), dynamicParams);
+
+            return new PagedGroupActivityResultDto
+            {
+                Items = items.ToList(),
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
+
+        public async Task<SplitGroupActivityDto?> GetActivityByIdAsync(Guid groupId, Guid activityId)
+        {
+            const string sql = @"
+                SELECT 
+                    a.Id,
+                    a.GroupId,
+                    a.UserId,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.Email) AS UserName,
+                    u.Email AS UserEmail,
+                    a.ActivityType,
+                    a.ReferenceId,
+                    a.Description,
+                    a.CreatedAt
+                FROM dbo.SplitGroupActivities a
+                LEFT JOIN dbo.Users u ON u.Id = a.UserId
+                WHERE a.GroupId = @GroupId AND a.Id = @ActivityId;";
+
+            using var connection = CreateConnection();
+            return await connection.QueryFirstOrDefaultAsync<SplitGroupActivityDto>(sql, new
+            {
+                GroupId = groupId,
+                ActivityId = activityId
+            });
         }
 
         public async Task LogActivityAsync(Guid groupId, Guid userId, string activityType, string description, Guid? referenceId = null)

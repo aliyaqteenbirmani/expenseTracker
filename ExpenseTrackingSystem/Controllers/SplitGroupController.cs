@@ -219,16 +219,39 @@ namespace SpendwiseSystem.API.Controllers
         }
 
         [HttpGet("{groupId:guid}/activities")]
-        public async Task<ActionResult<ApiResponse<List<SplitGroupActivityDto>>>> GetGroupActivities(Guid groupId)
+        public async Task<ActionResult<ApiResponse<PagedGroupActivityResultDto>>> GetGroupActivities(
+            Guid groupId,
+            [FromQuery] SplitGroupActivityQueryParameters parameters)
         {
             if (CurrentUserId == Guid.Empty)
                 return Unauthorized(ApiResponses.Unauthorized());
 
-            var response = await _splitGroupService.GetGroupActivitiesAsync(groupId, CurrentUserId);
+            var response = await _splitGroupService.GetPagedGroupActivitiesAsync(groupId, parameters, CurrentUserId);
             if (!response.Success)
             {
                 if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
                     return StatusCode(403, response);
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpGet("{groupId:guid}/activities/{activityId:guid}")]
+        public async Task<ActionResult<ApiResponse<SplitGroupActivityDto>>> GetActivityById(
+            Guid groupId,
+            Guid activityId)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _splitGroupService.GetActivityByIdAsync(groupId, activityId, CurrentUserId);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                if (response.StatusCode == 404 || response.ErrorCode == "NOT_FOUND")
+                    return NotFound(response);
                 return BadRequest(response);
             }
 

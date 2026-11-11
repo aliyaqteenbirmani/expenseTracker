@@ -106,10 +106,29 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public Guid GroupId { get; set; }
         public Guid UserId { get; set; }
         public string UserName { get; set; } = string.Empty;
+        public string UserEmail { get; set; } = string.Empty;
         public string ActivityType { get; set; } = string.Empty;
         public Guid? ReferenceId { get; set; }
         public string Description { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+    }
+
+    public class SplitGroupActivityQueryParameters
+    {
+        public string? ActivityType { get; set; }
+        public DateTime? FromDate { get; set; }
+        public DateTime? ToDate { get; set; }
+        public int PageNumber { get; set; } = 1;
+        public int PageSize { get; set; } = 20;
+    }
+
+    public class PagedGroupActivityResultDto
+    {
+        public List<SplitGroupActivityDto> Items { get; set; } = new();
+        public int TotalCount { get; set; }
+        public int PageNumber { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
     }
 
     // --- Expense Management DTOs ---
