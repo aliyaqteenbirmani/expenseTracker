@@ -483,7 +483,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     WHERE Id = @InvitationId;";
 
                 var invitation = await connection.QueryFirstOrDefaultAsync<SplitGroupInvitation>(selectSql, new { InvitationId = invitationId }, transaction);
-                if (invitation == null || invitation.Status != "Pending")
+                if (invitation == null || invitation.Status != "Pending" || invitation.ExpiresAt <= DateTime.UtcNow)
                 {
                     transaction.Rollback();
                     return false;
