@@ -11,6 +11,7 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<ApiResponse<SplitGroupSummaryDto>> CreateGroupAsync(CreateSplitGroupDto dto, Guid userId, string userName);
         Task<ApiResponse<List<SplitGroupSummaryDto>>> GetMyGroupsAsync(Guid userId);
         Task<ApiResponse<SplitGroupDetailDto>> GetGroupDetailsAsync(Guid groupId, Guid userId);
+        Task<ApiResponse<List<SplitGroupMemberDto>>> GetGroupMembersAsync(Guid groupId, Guid userId);
         Task<ApiResponse<bool>> UpdateGroupAsync(Guid groupId, UpdateSplitGroupDto dto, Guid userId, string userName);
         Task<ApiResponse<bool>> DeleteGroupAsync(Guid groupId, Guid userId, string userName);
 

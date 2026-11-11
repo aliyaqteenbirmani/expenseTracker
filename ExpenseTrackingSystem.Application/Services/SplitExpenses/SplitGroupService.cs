@@ -75,6 +75,16 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             return ApiResponse<SplitGroupDetailDto>.SuccessResponse("Group details retrieved successfully.", details);
         }
 
+        public async Task<ApiResponse<List<SplitGroupMemberDto>>> GetGroupMembersAsync(Guid groupId, Guid userId)
+        {
+            var membership = await _groupRepository.GetMembershipAsync(groupId, userId);
+            if (membership == null || !membership.IsActive)
+                return ApiResponse<List<SplitGroupMemberDto>>.ForbiddenResponse("You are not an active member of this group.");
+
+            var members = await _groupRepository.GetGroupMembersAsync(groupId);
+            return ApiResponse<List<SplitGroupMemberDto>>.SuccessResponse("Group members retrieved successfully.", members);
+        }
+
         public async Task<ApiResponse<bool>> UpdateGroupAsync(Guid groupId, UpdateSplitGroupDto dto, Guid userId, string userName)
         {
             var group = await _groupRepository.GetGroupByIdAsync(groupId);

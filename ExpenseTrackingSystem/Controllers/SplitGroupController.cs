@@ -71,6 +71,23 @@ namespace SpendwiseSystem.API.Controllers
             return Ok(response);
         }
 
+        [HttpGet("{groupId:guid}/members")]
+        public async Task<ActionResult<ApiResponse<List<SplitGroupMemberDto>>>> GetGroupMembers(Guid groupId)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _splitGroupService.GetGroupMembersAsync(groupId, CurrentUserId);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return NotFound(response);
+            }
+
+            return Ok(response);
+        }
+
         [HttpPut("{groupId:guid}")]
         public async Task<ActionResult<ApiResponse<bool>>> UpdateGroup(Guid groupId, [FromBody] UpdateSplitGroupDto dto)
         {
