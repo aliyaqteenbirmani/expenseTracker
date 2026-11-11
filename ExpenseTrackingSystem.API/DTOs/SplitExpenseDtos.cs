@@ -277,4 +277,81 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public int SettledMembersCount { get; set; }
         public int UnsettledMembersCount { get; set; }
     }
+
+    // --- Settlement Management DTOs ---
+
+    public class RecordSettlementDto
+    {
+        [Required(ErrorMessage = "Payer (FromUserId) is required.")]
+        public Guid FromUserId { get; set; }
+
+        [Required(ErrorMessage = "Receiver (ToUserId) is required.")]
+        public Guid ToUserId { get; set; }
+
+        [Range(0.01, 1000000000.00, ErrorMessage = "Settlement amount must be greater than zero.")]
+        public decimal Amount { get; set; }
+
+        public DateTime? SettlementDate { get; set; }
+
+        [StringLength(500, ErrorMessage = "Note cannot exceed 500 characters.")]
+        public string? Note { get; set; }
+    }
+
+    public class UpdateSettlementDto
+    {
+        [Required(ErrorMessage = "Payer (FromUserId) is required.")]
+        public Guid FromUserId { get; set; }
+
+        [Required(ErrorMessage = "Receiver (ToUserId) is required.")]
+        public Guid ToUserId { get; set; }
+
+        [Range(0.01, 1000000000.00, ErrorMessage = "Settlement amount must be greater than zero.")]
+        public decimal Amount { get; set; }
+
+        public DateTime? SettlementDate { get; set; }
+
+        [StringLength(500, ErrorMessage = "Note cannot exceed 500 characters.")]
+        public string? Note { get; set; }
+    }
+
+    public class SplitSettlementDto
+    {
+        public Guid Id { get; set; }
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+        public Guid FromUserId { get; set; }
+        public string FromUserName { get; set; } = string.Empty;
+        public string FromUserEmail { get; set; } = string.Empty;
+        public Guid ToUserId { get; set; }
+        public string ToUserName { get; set; } = string.Empty;
+        public string ToUserEmail { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public DateTime SettlementDate { get; set; }
+        public string? Note { get; set; }
+        public Guid CreatedBy { get; set; }
+        public string CreatedByName { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
+
+    public class SuggestedSettlementDto
+    {
+        public Guid FromUserId { get; set; }
+        public string FromUserName { get; set; } = string.Empty;
+        public string FromUserEmail { get; set; } = string.Empty;
+        public Guid ToUserId { get; set; }
+        public string ToUserName { get; set; } = string.Empty;
+        public string ToUserEmail { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+    }
+
+    public class SettleUpOverviewDto
+    {
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+        public decimal TotalOutstandingDebt { get; set; }
+        public List<MemberBalanceDto> Debtors { get; set; } = new();
+        public List<MemberBalanceDto> Creditors { get; set; } = new();
+        public List<SuggestedSettlementDto> SuggestedTransactions { get; set; } = new();
+    }
 }

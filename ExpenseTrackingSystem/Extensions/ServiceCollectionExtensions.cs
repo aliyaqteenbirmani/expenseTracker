@@ -89,6 +89,9 @@ namespace SpendwiseSystem.API.Extensions
             services.AddTransient<ISplitExpenseService, SplitExpenseService>();
             services.AddTransient<ISplitBalanceRepository, SplitBalanceRepository>();
             services.AddTransient<ISplitBalanceService, SplitBalanceService>();
+            services.AddTransient<IDebtSimplificationService, DebtSimplificationService>();
+            services.AddTransient<ISplitSettlementRepository, SplitSettlementRepository>();
+            services.AddTransient<ISplitSettlementService, SplitSettlementService>();
 
             services.AddSingleton<AutoMapper.IConfigurationProvider>(_ =>
             {
