@@ -84,6 +84,7 @@ namespace SpendwiseSystem.API.Extensions
 
             services.AddTransient<ISplitGroupRepository, SplitGroupRepository>();
             services.AddTransient<ISplitGroupService, SplitGroupService>();
+            services.AddTransient<ISplitGroupAuthorizationService, SplitGroupAuthorizationService>();
             services.AddTransient<ISplitCalculatorService, EqualSplitCalculatorService>();
             services.AddTransient<ISplitExpenseRepository, SplitExpenseRepository>();
             services.AddTransient<ISplitExpenseService, SplitExpenseService>();
