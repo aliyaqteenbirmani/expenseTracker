@@ -245,4 +245,36 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public int PageSize { get; set; }
         public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
     }
+
+    // --- Balance Tracking DTOs ---
+
+    public class MemberBalanceDto
+    {
+        public Guid UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = "Member";
+        public bool IsActive { get; set; }
+        public decimal TotalPaid { get; set; }
+        public decimal TotalShare { get; set; }
+        public decimal SettlementsPaid { get; set; }
+        public decimal SettlementsReceived { get; set; }
+        public decimal NetBalance { get; set; }
+        public string StatusDescription { get; set; } = string.Empty;
+    }
+
+    public class GroupFinancialSummaryDto
+    {
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+        public decimal TotalExpenses { get; set; }
+        public decimal TotalSettlements { get; set; }
+        public decimal CurrentUserBalance { get; set; }
+        public decimal CurrentUserTotalPaid { get; set; }
+        public decimal CurrentUserTotalShare { get; set; }
+        public string CurrentUserStatusText { get; set; } = string.Empty;
+        public int MemberCount { get; set; }
+        public int SettledMembersCount { get; set; }
+        public int UnsettledMembersCount { get; set; }
+    }
 }
