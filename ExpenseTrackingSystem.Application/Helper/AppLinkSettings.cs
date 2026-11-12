@@ -8,6 +8,7 @@ namespace SpendwiseSystem.Application.Helper
 {
     public class AppLinkSettings
     {
+        public string InvitationBaseUrl { get; set; } = string.Empty;
         public string PasswordResetBaseUrl { get; set; } = string.Empty;
     }
 }

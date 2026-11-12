@@ -79,10 +79,28 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
 
     public class InviteSplitGroupMemberDto
     {
+        private string? _email;
+
         [EmailAddress(ErrorMessage = "Please provide a valid email address.")]
-        public string? InvitedEmail { get; set; }
+        public string? InvitedEmail
+        {
+            get => _email;
+            set => _email = value?.Trim();
+        }
+
+        [EmailAddress(ErrorMessage = "Please provide a valid email address.")]
+        public string? Email
+        {
+            get => _email;
+            set => _email = value?.Trim();
+        }
 
         public Guid? InvitedUserId { get; set; }
+        public Guid? UserId
+        {
+            get => InvitedUserId;
+            set => InvitedUserId = value;
+        }
     }
 
     public class SplitGroupInvitationDto
@@ -98,6 +116,39 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public DateTime ExpiresAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? RespondedAt { get; set; }
+        public DateTime? LastSentAt { get; set; }
+        public int ResendCount { get; set; }
+        public string? InvitationToken { get; set; }
+    }
+
+    public class SplitNotificationDto
+    {
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public Guid? GroupId { get; set; }
+        public string? GroupName { get; set; }
+        public Guid? ReferenceId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public bool IsRead { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? ReadAt { get; set; }
+    }
+
+    public class SplitNotificationUnreadCountDto
+    {
+        public int UnreadCount { get; set; }
+    }
+
+    public class PagedSplitNotificationResultDto
+    {
+        public List<SplitNotificationDto> Items { get; set; } = new();
+        public int TotalCount { get; set; }
+        public int UnreadCount { get; set; }
+        public int PageNumber { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
     }
 
     public class SplitGroupActivityDto

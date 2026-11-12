@@ -36,9 +36,12 @@ namespace SpendwiseSystem.Domain.Entities
         public Guid InvitedBy { get; set; }
         public string Status { get; set; } = "Pending"; // "Pending", "Accepted", "Rejected", "Expired", "Revoked"
         public string? InvitationToken { get; set; }
+        public string? TokenHash { get; set; }
         public DateTime ExpiresAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? RespondedAt { get; set; }
+        public DateTime? LastSentAt { get; set; }
+        public int ResendCount { get; set; } = 0;
     }
 
     public class SplitExpense
@@ -94,5 +97,19 @@ namespace SpendwiseSystem.Domain.Entities
         public Guid? ReferenceId { get; set; }
         public string Description { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    public class SplitNotification
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid UserId { get; set; }
+        public string Type { get; set; } = "GroupInvitationReceived"; // "GroupInvitationReceived", "InvitationAccepted", "InvitationRejected"
+        public Guid? GroupId { get; set; }
+        public Guid? ReferenceId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public bool IsRead { get; set; } = false;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? ReadAt { get; set; }
     }
 }

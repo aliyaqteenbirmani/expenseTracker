@@ -771,6 +771,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
         onOpenProfile={() => setShowProfile(true)}
         onOpenShortcuts={() => setShowShortcuts(true)}
         unreadInvitesCount={unreadInvitesCount}
+        token={token}
       />
 
       <SidebarInset>

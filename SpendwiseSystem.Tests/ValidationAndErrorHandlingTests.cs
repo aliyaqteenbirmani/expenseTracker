@@ -78,6 +78,32 @@ namespace SpendwiseSystem.Tests
                 return Task.FromResult(invitation);
             }
 
+            public Task<SplitGroupInvitation?> GetInvitationByTokenAsync(string token)
+            {
+                return Task.FromResult(Invitations.FirstOrDefault(i => i.InvitationToken == token || i.TokenHash == token));
+            }
+
+            public Task<bool> UpdateInvitationResendAsync(Guid invitationId)
+            {
+                var invite = Invitations.FirstOrDefault(i => i.Id == invitationId);
+                if (invite != null)
+                {
+                    invite.ResendCount++;
+                    invite.LastSentAt = DateTime.UtcNow;
+                }
+                return Task.FromResult(true);
+            }
+
+            public Task<List<SplitGroupInvitation>> LinkPendingInvitationsForUserAsync(Guid userId, string email)
+            {
+                var pending = Invitations.Where(i => string.Equals(i.InvitedEmail, email, StringComparison.OrdinalIgnoreCase) && !i.InvitedUserId.HasValue).ToList();
+                foreach (var p in pending)
+                {
+                    p.InvitedUserId = userId;
+                }
+                return Task.FromResult(pending);
+            }
+
             public Task<bool> RevokeInvitationAsync(Guid invitationId, Guid revokedByUserId, string revokerName, Guid groupId) =>
                 Task.FromResult(true);
 

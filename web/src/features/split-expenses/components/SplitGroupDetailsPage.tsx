@@ -29,6 +29,7 @@ import { SettleUpDialog } from './SettleUpDialog'
 import { InviteMemberDialog } from './InviteMemberDialog'
 import { toast } from 'sonner'
 import { getMemberInitials } from './MemberSelector'
+import { SplitNotificationBell } from './SplitNotificationBell'
 import type {
   SplitGroupDetailDto,
   SplitExpenseListItemDto,
@@ -56,6 +57,8 @@ import {
   Mail,
   UserX,
   Crown,
+  Send,
+  Loader2,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -221,6 +224,22 @@ export function SplitGroupDetailsPage({
     }
   }
 
+  // Invitation resending
+  const [resendingInviteId, setResendingInviteId] = useState<string | null>(null)
+  const handleResendInvitation = async (invitationId: string) => {
+    try {
+      setResendingInviteId(invitationId)
+      await splitExpensesApi.resendInvitation(groupId, invitationId, token)
+      toast.success('Invitation resent successfully')
+      loadInvitations()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to resend invitation'
+      toast.error(msg)
+    } finally {
+      setResendingInviteId(null)
+    }
+  }
+
   // Group deletion
   const handleDeleteGroup = async () => {
     try {
@@ -315,6 +334,7 @@ export function SplitGroupDetailsPage({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <SplitNotificationBell token={token} onInvitationProcessed={loadGroupDetails} />
           <Button
             onClick={() => setAddExpenseOpen(true)}
             size="sm"
@@ -840,19 +860,36 @@ export function SplitGroupDetailsPage({
                       <div>
                         <div className="font-medium text-xs">{inv.invitedEmail}</div>
                         <div className="text-[10px] text-muted-foreground">
-                          Invited by {inv.invitedByName} · Expires in 7 days
+                          Invited by {inv.invitedByName}
+                          {inv.resendCount && inv.resendCount > 0 ? ` · Resent ${inv.resendCount}x` : ''}
                         </div>
                       </div>
                     </div>
                     {isOwner && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs text-destructive hover:bg-destructive/10"
-                        onClick={() => handleRevokeInvitation(inv.id)}
-                      >
-                        Revoke
-                      </Button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          disabled={resendingInviteId === inv.id}
+                          onClick={() => handleResendInvitation(inv.id)}
+                        >
+                          {resendingInviteId === inv.id ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            <Send className="size-3" />
+                          )}
+                          Resend
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                          onClick={() => handleRevokeInvitation(inv.id)}
+                        >
+                          Revoke
+                        </Button>
+                      </div>
                     )}
                   </div>
                 ))}

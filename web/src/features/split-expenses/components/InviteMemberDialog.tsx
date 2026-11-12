@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { splitExpensesApi } from '../splitExpensesApi'
 import { toast } from 'sonner'
 import type { SplitGroupInvitationDto } from '../types'
-import { Mail, UserPlus } from 'lucide-react'
+import { Mail, UserPlus, CheckCircle2 } from 'lucide-react'
 
 interface InviteMemberDialogProps {
   open: boolean
@@ -15,6 +15,8 @@ interface InviteMemberDialogProps {
   token?: string
   onMemberInvited: (invitation: SplitGroupInvitationDto) => void
 }
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function InviteMemberDialog({
   open,
@@ -28,8 +30,15 @@ export function InviteMemberDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email.trim() || !email.includes('@')) {
-      toast.error('Please enter a valid email address')
+    const cleanEmail = email.trim()
+
+    if (!cleanEmail) {
+      toast.error('Please enter an email address')
+      return
+    }
+
+    if (!EMAIL_REGEX.test(cleanEmail)) {
+      toast.error('Please enter a valid email address (e.g. user@example.com)')
       return
     }
 
@@ -37,10 +46,14 @@ export function InviteMemberDialog({
       setLoading(true)
       const res = await splitExpensesApi.inviteMember(
         groupId,
-        { email: email.trim() },
+        {
+          email: cleanEmail,
+          invitedEmail: cleanEmail,
+        },
         token
       )
-      toast.success(`Invitation sent to ${email}`)
+
+      toast.success(`Invitation sent to ${cleanEmail}`)
       setEmail('')
       onOpenChange(false)
       onMemberInvited(res)
@@ -57,17 +70,17 @@ export function InviteMemberDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Invite Group Member"
-      description="Invite a registered user to join this group by email."
+      description="Invite someone to join this split group by email."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="invite-email">User Email *</Label>
+          <Label htmlFor="invite-email">Member Email *</Label>
           <div className="relative">
             <Mail className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="invite-email"
               type="email"
-              placeholder="user@example.com"
+              placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
@@ -76,9 +89,20 @@ export function InviteMemberDialog({
               autoFocus
             />
           </div>
-          <p className="text-xs text-muted-foreground">
-            The invited user will see this invitation in their Split Expenses dashboard.
-          </p>
+          <div className="rounded-lg border bg-muted/30 p-2.5 text-xs text-muted-foreground space-y-1 mt-2">
+            <div className="flex items-start gap-1.5">
+              <CheckCircle2 className="size-3.5 text-primary shrink-0 mt-0.5" />
+              <span>
+                <strong>Registered users</strong> receive an in-app notification with an instant Accept button.
+              </span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <CheckCircle2 className="size-3.5 text-primary shrink-0 mt-0.5" />
+              <span>
+                <strong>New users</strong> receive an email invitation with a secure link to register and join.
+              </span>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

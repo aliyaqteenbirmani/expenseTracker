@@ -16,6 +16,9 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<ApiResponse<bool>> DeleteGroupAsync(Guid groupId, Guid userId, string userName);
 
         Task<ApiResponse<SplitGroupInvitationDto>> InviteMemberAsync(Guid groupId, InviteSplitGroupMemberDto dto, Guid currentUserId, string currentUserName);
+        Task<ApiResponse<SplitGroupInvitationDto>> ResendInvitationAsync(Guid groupId, Guid invitationId, Guid currentUserId, string currentUserName);
+        Task<ApiResponse<SplitGroupInvitationDto>> GetInvitationByTokenAsync(string token);
+        Task<int> LinkPendingInvitationsOnAuthAsync(Guid userId, string email);
         Task<ApiResponse<List<SplitGroupInvitationDto>>> GetPendingInvitationsAsync(Guid groupId, Guid currentUserId);
         Task<ApiResponse<List<SplitGroupInvitationDto>>> GetMyInvitationsAsync(Guid currentUserId, string currentUserEmail);
         Task<ApiResponse<bool>> RevokeInvitationAsync(Guid groupId, Guid invitationId, Guid currentUserId, string currentUserName);

@@ -315,7 +315,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
         public async Task<SplitGroupInvitation?> GetInvitationByIdAsync(Guid invitationId)
         {
             const string sql = @"
-                SELECT Id, GroupId, InvitedUserId, InvitedEmail, InvitedBy, Status, InvitationToken, ExpiresAt, CreatedAt, RespondedAt
+                SELECT Id, GroupId, InvitedUserId, InvitedEmail, InvitedBy, Status, InvitationToken, TokenHash, ExpiresAt, CreatedAt, RespondedAt, LastSentAt, ResendCount
                 FROM dbo.SplitGroupInvitations
                 WHERE Id = @InvitationId;";
 
@@ -323,10 +323,23 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             return await connection.QueryFirstOrDefaultAsync<SplitGroupInvitation>(sql, new { InvitationId = invitationId });
         }
 
+        public async Task<SplitGroupInvitation?> GetInvitationByTokenAsync(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token)) return null;
+
+            const string sql = @"
+                SELECT TOP 1 Id, GroupId, InvitedUserId, InvitedEmail, InvitedBy, Status, InvitationToken, TokenHash, ExpiresAt, CreatedAt, RespondedAt, LastSentAt, ResendCount
+                FROM dbo.SplitGroupInvitations
+                WHERE (InvitationToken = @Token OR TokenHash = @Token);";
+
+            using var connection = CreateConnection();
+            return await connection.QueryFirstOrDefaultAsync<SplitGroupInvitation>(sql, new { Token = token.Trim() });
+        }
+
         public async Task<SplitGroupInvitation?> GetPendingInvitationByEmailAsync(Guid groupId, string email)
         {
             const string sql = @"
-                SELECT TOP 1 Id, GroupId, InvitedUserId, InvitedEmail, InvitedBy, Status, InvitationToken, ExpiresAt, CreatedAt, RespondedAt
+                SELECT TOP 1 Id, GroupId, InvitedUserId, InvitedEmail, InvitedBy, Status, InvitationToken, TokenHash, ExpiresAt, CreatedAt, RespondedAt, LastSentAt, ResendCount
                 FROM dbo.SplitGroupInvitations
                 WHERE GroupId = @GroupId AND LOWER(InvitedEmail) = LOWER(@Email) AND Status = 'Pending';";
 
@@ -348,7 +361,10 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     i.Status,
                     i.ExpiresAt,
                     i.CreatedAt,
-                    i.RespondedAt
+                    i.RespondedAt,
+                    i.LastSentAt,
+                    i.ResendCount,
+                    i.InvitationToken
                 FROM dbo.SplitGroupInvitations i
                 INNER JOIN dbo.SplitGroups g ON g.Id = i.GroupId
                 LEFT JOIN dbo.Users u ON u.Id = i.InvitedBy
@@ -374,7 +390,10 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     i.Status,
                     i.ExpiresAt,
                     i.CreatedAt,
-                    i.RespondedAt
+                    i.RespondedAt,
+                    i.LastSentAt,
+                    i.ResendCount,
+                    i.InvitationToken
                 FROM dbo.SplitGroupInvitations i
                 INNER JOIN dbo.SplitGroups g ON g.Id = i.GroupId AND g.IsDeleted = 0
                 LEFT JOIN dbo.Users u ON u.Id = i.InvitedBy
@@ -388,6 +407,62 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             return results.ToList();
         }
 
+        public async Task<bool> UpdateInvitationResendAsync(Guid invitationId)
+        {
+            const string sql = @"
+                UPDATE dbo.SplitGroupInvitations
+                SET ResendCount = ResendCount + 1,
+                    LastSentAt = SYSUTCDATETIME()
+                WHERE Id = @InvitationId AND Status = 'Pending';";
+
+            using var connection = CreateConnection();
+            var rows = await connection.ExecuteAsync(sql, new { InvitationId = invitationId });
+            return rows > 0;
+        }
+
+        public async Task<List<SplitGroupInvitation>> LinkPendingInvitationsForUserAsync(Guid userId, string email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return new List<SplitGroupInvitation>();
+
+            using var connection = CreateConnection();
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+
+            try
+            {
+                const string selectSql = @"
+                    SELECT Id, GroupId, InvitedUserId, InvitedEmail, InvitedBy, Status, InvitationToken, TokenHash, ExpiresAt, CreatedAt, RespondedAt, LastSentAt, ResendCount
+                    FROM dbo.SplitGroupInvitations
+                    WHERE LOWER(InvitedEmail) = LOWER(@Email)
+                      AND InvitedUserId IS NULL
+                      AND Status = 'Pending'
+                      AND ExpiresAt > SYSUTCDATETIME();";
+
+                var pendingInvites = (await connection.QueryAsync<SplitGroupInvitation>(selectSql, new { Email = email.Trim() }, transaction)).ToList();
+
+                if (pendingInvites.Count > 0)
+                {
+                    const string updateSql = @"
+                        UPDATE dbo.SplitGroupInvitations
+                        SET InvitedUserId = @UserId
+                        WHERE LOWER(InvitedEmail) = LOWER(@Email)
+                          AND InvitedUserId IS NULL
+                          AND Status = 'Pending'
+                          AND ExpiresAt > SYSUTCDATETIME();";
+
+                    await connection.ExecuteAsync(updateSql, new { UserId = userId, Email = email.Trim() }, transaction);
+                }
+
+                transaction.Commit();
+                return pendingInvites;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+
         public async Task<SplitGroupInvitation> CreateInvitationAsync(SplitGroupInvitation invitation, string inviterName, string groupName)
         {
             using var connection = CreateConnection();
@@ -398,9 +473,9 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             {
                 const string insertSql = @"
                     INSERT INTO dbo.SplitGroupInvitations 
-                        (Id, GroupId, InvitedUserId, InvitedEmail, InvitedBy, Status, InvitationToken, ExpiresAt, CreatedAt)
+                        (Id, GroupId, InvitedUserId, InvitedEmail, InvitedBy, Status, InvitationToken, TokenHash, ExpiresAt, CreatedAt, LastSentAt, ResendCount)
                     VALUES 
-                        (@Id, @GroupId, @InvitedUserId, @InvitedEmail, @InvitedBy, @Status, @InvitationToken, @ExpiresAt, @CreatedAt);";
+                        (@Id, @GroupId, @InvitedUserId, @InvitedEmail, @InvitedBy, @Status, @InvitationToken, @TokenHash, @ExpiresAt, @CreatedAt, @LastSentAt, @ResendCount);";
 
                 await connection.ExecuteAsync(insertSql, invitation, transaction);
 

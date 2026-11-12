@@ -1,9 +1,15 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using SpendwiseSystem.Application.Helper;
 using SpendwiseSystem.Application.Interfaces;
+using SpendwiseSystem.Application.Services.EmailService;
 using SpendwiseSystem.Domain.DTOs.SplitExpenseDtos;
 using SpendwiseSystem.Domain.Entities;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace SpendwiseSystem.Application.Services.SplitExpenses
@@ -11,10 +17,37 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
     public class SplitGroupService : ISplitGroupService
     {
         private readonly ISplitGroupRepository _groupRepository;
+        private readonly ISplitNotificationRepository _notificationRepository;
+        private readonly IEmailService? _emailService;
+        private readonly ISplitRealtimeService? _realtimeService;
+        private readonly AppLinkSettings _appLinkSettings;
+        private readonly ILogger<SplitGroupService> _logger;
 
         public SplitGroupService(ISplitGroupRepository groupRepository)
+            : this(
+                groupRepository,
+                new NullSplitNotificationRepository(),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<SplitGroupService>.Instance)
+        {
+        }
+
+        public SplitGroupService(
+            ISplitGroupRepository groupRepository,
+            ISplitNotificationRepository notificationRepository,
+            ILogger<SplitGroupService> logger,
+            IEmailService? emailService = null,
+            ISplitRealtimeService? realtimeService = null,
+            IOptions<AppLinkSettings>? appLinkSettings = null)
         {
             _groupRepository = groupRepository;
+            _notificationRepository = notificationRepository;
+            _logger = logger;
+            _emailService = emailService;
+            _realtimeService = realtimeService;
+            _appLinkSettings = appLinkSettings?.Value ?? new AppLinkSettings
+            {
+                InvitationBaseUrl = "http://localhost:5173"
+            };
         }
 
         public async Task<ApiResponse<SplitGroupSummaryDto>> CreateGroupAsync(CreateSplitGroupDto dto, Guid userId, string userName)
@@ -59,20 +92,16 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
         public async Task<ApiResponse<List<SplitGroupSummaryDto>>> GetMyGroupsAsync(Guid userId)
         {
             var groups = await _groupRepository.GetUserGroupsAsync(userId);
-            return ApiResponse<List<SplitGroupSummaryDto>>.SuccessResponse("Groups retrieved successfully.", groups);
+            return ApiResponse<List<SplitGroupSummaryDto>>.SuccessResponse("Split groups retrieved successfully.", groups);
         }
 
         public async Task<ApiResponse<SplitGroupDetailDto>> GetGroupDetailsAsync(Guid groupId, Guid userId)
         {
-            var membership = await _groupRepository.GetMembershipAsync(groupId, userId);
-            if (membership == null || !membership.IsActive)
-                return ApiResponse<SplitGroupDetailDto>.ForbiddenResponse("You are not an active member of this group.");
+            var detail = await _groupRepository.GetGroupDetailsAsync(groupId, userId);
+            if (detail == null)
+                return ApiResponse<SplitGroupDetailDto>.FailureResponse("Group not found or you are not an active member.");
 
-            var details = await _groupRepository.GetGroupDetailsAsync(groupId, userId);
-            if (details == null)
-                return ApiResponse<SplitGroupDetailDto>.FailureResponse("Group not found.");
-
-            return ApiResponse<SplitGroupDetailDto>.SuccessResponse("Group details retrieved successfully.", details);
+            return ApiResponse<SplitGroupDetailDto>.SuccessResponse("Group details retrieved successfully.", detail);
         }
 
         public async Task<ApiResponse<List<SplitGroupMemberDto>>> GetGroupMembersAsync(Guid groupId, Guid userId)
@@ -82,7 +111,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<List<SplitGroupMemberDto>>.ForbiddenResponse("You are not an active member of this group.");
 
             var members = await _groupRepository.GetGroupMembersAsync(groupId);
-            return ApiResponse<List<SplitGroupMemberDto>>.SuccessResponse("Group members retrieved successfully.", members);
+            return ApiResponse<List<SplitGroupMemberDto>>.SuccessResponse("Members retrieved successfully.", members);
         }
 
         public async Task<ApiResponse<bool>> UpdateGroupAsync(Guid groupId, UpdateSplitGroupDto dto, Guid userId, string userName)
@@ -92,14 +121,18 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<bool>.FailureResponse("Group not found.");
 
             if (group.OwnerId != userId)
-                return ApiResponse<bool>.ForbiddenResponse("Only the group owner can update group details.");
+                return ApiResponse<bool>.ForbiddenResponse("Only the group owner can update group settings.");
 
-            if (string.IsNullOrWhiteSpace(dto.Name))
-                return ApiResponse<bool>.FailureResponse("Group name cannot be empty.");
+            if (!string.IsNullOrWhiteSpace(dto.Name))
+                group.Name = dto.Name.Trim();
 
-            group.Name = dto.Name.Trim();
-            group.Description = dto.Description?.Trim();
-            group.Icon = dto.Icon?.Trim();
+            if (dto.Description != null)
+                group.Description = dto.Description.Trim();
+
+            if (dto.Icon != null)
+                group.Icon = dto.Icon.Trim();
+
+            group.UpdatedAt = DateTime.UtcNow;
 
             var success = await _groupRepository.UpdateGroupAsync(group, userId, userName);
             return success
@@ -114,7 +147,11 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<bool>.FailureResponse("Group not found.");
 
             if (group.OwnerId != userId)
-                return ApiResponse<bool>.ForbiddenResponse("Only the group owner can delete or archive this group.");
+                return ApiResponse<bool>.ForbiddenResponse("Only the group owner can delete this group.");
+
+            var hasFinances = await _groupRepository.HasFinancialRecordsAsync(groupId);
+            if (hasFinances)
+                return ApiResponse<bool>.FailureResponse("Cannot delete group because financial records (expenses or settlements) exist. You may deactivate it instead.");
 
             var success = await _groupRepository.SoftDeleteGroupAsync(groupId, userId, userName);
             return success
@@ -132,58 +169,271 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (group.OwnerId != currentUserId)
                 return ApiResponse<SplitGroupInvitationDto>.ForbiddenResponse("Only the group owner can invite members.");
 
-            if (string.IsNullOrWhiteSpace(dto.InvitedEmail) && !dto.InvitedUserId.HasValue)
+            // Extract email & user ID cleanly
+            var rawEmail = (dto.InvitedEmail ?? dto.Email)?.Trim();
+            var targetUserId = dto.InvitedUserId ?? dto.UserId;
+
+            if (string.IsNullOrWhiteSpace(rawEmail) && !targetUserId.HasValue)
                 return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Please provide an email address or user ID to invite.");
 
-            var targetUser = await _groupRepository.GetUserByEmailOrIdAsync(dto.InvitedEmail?.Trim(), dto.InvitedUserId);
-            if (targetUser == null)
-                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("The specified user does not exist in the system.");
+            // Prevent self-invitation
+            if (targetUserId.HasValue && targetUserId.Value == currentUserId)
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("You cannot invite yourself to the group.");
 
-            var effectiveEmail = targetUser.Email ?? dto.InvitedEmail?.Trim() ?? string.Empty;
+            // Look up existing user if any
+            var targetUser = await _groupRepository.GetUserByEmailOrIdAsync(rawEmail, targetUserId);
 
-            // Check if already an active member
-            var existingMembership = await _groupRepository.GetMembershipAsync(groupId, targetUser.Id);
-            if (existingMembership != null && existingMembership.IsActive)
-                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("User is already an active member of this group.");
+            if (targetUser != null && targetUser.Id == currentUserId)
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("You cannot invite yourself to the group.");
 
-            // Check if active pending invitation exists
+            string effectiveEmail;
+            Guid? effectiveUserId;
+
+            if (targetUser != null)
+            {
+                // CASE 1: Registered user
+                effectiveEmail = (targetUser.Email ?? rawEmail ?? string.Empty).Trim();
+                effectiveUserId = targetUser.Id;
+
+                // Check if already an active member
+                var existingMembership = await _groupRepository.GetMembershipAsync(groupId, targetUser.Id);
+                if (existingMembership != null && existingMembership.IsActive)
+                    return ApiResponse<SplitGroupInvitationDto>.FailureResponse("User is already an active member of this group.");
+            }
+            else
+            {
+                // CASE 2: Unregistered user
+                if (string.IsNullOrWhiteSpace(rawEmail))
+                    return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Please provide a valid email address.");
+
+                if (!new EmailAddressAttribute().IsValid(rawEmail))
+                    return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Please provide a valid email address.");
+
+                effectiveEmail = rawEmail;
+                effectiveUserId = null;
+            }
+
+            // Check if active pending invitation exists for this group + email
             var existingPendingInvite = await _groupRepository.GetPendingInvitationByEmailAsync(groupId, effectiveEmail);
             if (existingPendingInvite != null && existingPendingInvite.ExpiresAt > DateTime.UtcNow)
                 return ApiResponse<SplitGroupInvitationDto>.FailureResponse("An active pending invitation has already been sent to this user.");
 
+            // Generate secure unguessable invitation token
             var tokenBytes = RandomNumberGenerator.GetBytes(32);
-            var token = Convert.ToHexString(tokenBytes);
+            var rawToken = Convert.ToHexString(tokenBytes).ToLowerInvariant();
+            var tokenHash = TokenUtils.HashToken(rawToken);
 
+            var now = DateTime.UtcNow;
             var invitation = new SplitGroupInvitation
             {
                 Id = Guid.NewGuid(),
                 GroupId = groupId,
-                InvitedUserId = targetUser.Id,
+                InvitedUserId = effectiveUserId,
                 InvitedEmail = effectiveEmail,
                 InvitedBy = currentUserId,
                 Status = "Pending",
-                InvitationToken = token,
-                ExpiresAt = DateTime.UtcNow.AddDays(7),
-                CreatedAt = DateTime.UtcNow
+                InvitationToken = rawToken,
+                TokenHash = tokenHash,
+                ExpiresAt = now.AddDays(7),
+                CreatedAt = now,
+                LastSentAt = now,
+                ResendCount = 0
             };
 
             await _groupRepository.CreateInvitationAsync(invitation, currentUserName, group.Name);
+
+            // If registered user, create in-app notification & broadcast realtime
+            if (effectiveUserId.HasValue)
+            {
+                try
+                {
+                    var notification = new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = effectiveUserId.Value,
+                        Type = "GroupInvitationReceived",
+                        GroupId = groupId,
+                        ReferenceId = invitation.Id,
+                        Title = "Group Invitation",
+                        Message = $"{currentUserName} invited you to join '{group.Name}'.",
+                        IsRead = false,
+                        CreatedAt = now
+                    };
+
+                    await _notificationRepository.CreateNotificationAsync(notification);
+
+                    if (_realtimeService != null)
+                    {
+                        await _realtimeService.NotifyUserAsync(effectiveUserId.Value, "ReceiveSplitNotification", notification);
+                        await _realtimeService.NotifyEmailAsync(effectiveEmail, "ReceiveSplitNotification", notification);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to create in-app notification for user {UserId}", effectiveUserId.Value);
+                }
+            }
+
+            // Send invitation email
+            await TrySendInvitationEmailAsync(group.Name, currentUserName, effectiveEmail, rawToken, invitation.ExpiresAt);
 
             var resultDto = new SplitGroupInvitationDto
             {
                 Id = invitation.Id,
                 GroupId = groupId,
                 GroupName = group.Name,
-                InvitedUserId = targetUser.Id,
+                InvitedUserId = effectiveUserId,
                 InvitedEmail = effectiveEmail,
                 InvitedBy = currentUserId,
                 InvitedByName = currentUserName,
                 Status = invitation.Status,
                 ExpiresAt = invitation.ExpiresAt,
-                CreatedAt = invitation.CreatedAt
+                CreatedAt = invitation.CreatedAt,
+                LastSentAt = invitation.LastSentAt,
+                ResendCount = invitation.ResendCount,
+                InvitationToken = rawToken
             };
 
             return ApiResponse<SplitGroupInvitationDto>.SuccessResponse("Invitation sent successfully.", resultDto);
+        }
+
+        public async Task<ApiResponse<SplitGroupInvitationDto>> ResendInvitationAsync(
+            Guid groupId, Guid invitationId, Guid currentUserId, string currentUserName)
+        {
+            var group = await _groupRepository.GetGroupByIdAsync(groupId);
+            if (group == null)
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Group not found.");
+
+            if (group.OwnerId != currentUserId)
+                return ApiResponse<SplitGroupInvitationDto>.ForbiddenResponse("Only the group owner can resend invitations.");
+
+            var invitation = await _groupRepository.GetInvitationByIdAsync(invitationId);
+            if (invitation == null || invitation.GroupId != groupId)
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Invitation not found for this group.");
+
+            if (invitation.Status != "Pending")
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse($"Cannot resend invitation with status '{invitation.Status}'.");
+
+            // Throttle resending (at most once every 60 seconds)
+            if (invitation.LastSentAt.HasValue && invitation.LastSentAt.Value > DateTime.UtcNow.AddSeconds(-60))
+            {
+                var remainingSec = 60 - (int)(DateTime.UtcNow - invitation.LastSentAt.Value).TotalSeconds;
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse($"Please wait {Math.Max(1, remainingSec)}s before resending.");
+            }
+
+            await _groupRepository.UpdateInvitationResendAsync(invitationId);
+
+            // Send email
+            await TrySendInvitationEmailAsync(
+                group.Name,
+                currentUserName,
+                invitation.InvitedEmail,
+                invitation.InvitationToken ?? string.Empty,
+                invitation.ExpiresAt);
+
+            // If user has account, re-notify via realtime
+            if (invitation.InvitedUserId.HasValue && _realtimeService != null)
+            {
+                await _realtimeService.NotifyUserAsync(invitation.InvitedUserId.Value, "ReceiveSplitNotification", new
+                {
+                    Type = "GroupInvitationReceived",
+                    GroupId = groupId,
+                    ReferenceId = invitation.Id,
+                    Message = $"{currentUserName} resent the invitation to join '{group.Name}'."
+                });
+            }
+
+            var updatedInvite = await _groupRepository.GetInvitationByIdAsync(invitationId);
+
+            var resultDto = new SplitGroupInvitationDto
+            {
+                Id = invitation.Id,
+                GroupId = groupId,
+                GroupName = group.Name,
+                InvitedUserId = invitation.InvitedUserId,
+                InvitedEmail = invitation.InvitedEmail,
+                InvitedBy = currentUserId,
+                InvitedByName = currentUserName,
+                Status = invitation.Status,
+                ExpiresAt = invitation.ExpiresAt,
+                CreatedAt = invitation.CreatedAt,
+                LastSentAt = updatedInvite?.LastSentAt ?? DateTime.UtcNow,
+                ResendCount = updatedInvite?.ResendCount ?? (invitation.ResendCount + 1),
+                InvitationToken = invitation.InvitationToken
+            };
+
+            return ApiResponse<SplitGroupInvitationDto>.SuccessResponse("Invitation resent successfully.", resultDto);
+        }
+
+        public async Task<ApiResponse<SplitGroupInvitationDto>> GetInvitationByTokenAsync(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Token is required.");
+
+            var invite = await _groupRepository.GetInvitationByTokenAsync(token);
+            if (invite == null)
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Invitation not found or invalid token.");
+
+            var group = await _groupRepository.GetGroupByIdAsync(invite.GroupId);
+
+            var dto = new SplitGroupInvitationDto
+            {
+                Id = invite.Id,
+                GroupId = invite.GroupId,
+                GroupName = group?.Name ?? "Split Group",
+                InvitedUserId = invite.InvitedUserId,
+                InvitedEmail = invite.InvitedEmail,
+                InvitedBy = invite.InvitedBy,
+                Status = invite.Status,
+                ExpiresAt = invite.ExpiresAt,
+                CreatedAt = invite.CreatedAt,
+                RespondedAt = invite.RespondedAt
+            };
+
+            return ApiResponse<SplitGroupInvitationDto>.SuccessResponse("Invitation details retrieved.", dto);
+        }
+
+        public async Task<int> LinkPendingInvitationsOnAuthAsync(Guid userId, string email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return 0;
+
+            try
+            {
+                var linked = await _groupRepository.LinkPendingInvitationsForUserAsync(userId, email.Trim());
+                if (linked.Count == 0) return 0;
+
+                foreach (var invite in linked)
+                {
+                    var group = await _groupRepository.GetGroupByIdAsync(invite.GroupId);
+                    var notif = new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = userId,
+                        Type = "GroupInvitationReceived",
+                        GroupId = invite.GroupId,
+                        ReferenceId = invite.Id,
+                        Title = "Group Invitation",
+                        Message = $"You have a pending invitation to join '{group?.Name ?? "Split Group"}'.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _notificationRepository.CreateNotificationAsync(notif);
+
+                    if (_realtimeService != null)
+                    {
+                        await _realtimeService.NotifyUserAsync(userId, "ReceiveSplitNotification", notif);
+                    }
+                }
+
+                _logger.LogInformation("Linked {Count} pending Split Group invitations for user {UserId} ({Email})", linked.Count, userId, email);
+                return linked.Count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error linking pending split invitations for user {UserId}", userId);
+                return 0;
+            }
         }
 
         public async Task<ApiResponse<List<SplitGroupInvitationDto>>> GetPendingInvitationsAsync(Guid groupId, Guid currentUserId)
@@ -249,9 +499,52 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<bool>.ForbiddenResponse("You are not the designated recipient of this invitation.");
 
             var success = await _groupRepository.AcceptInvitationAsync(invitationId, currentUserId, currentUserName);
-            return success
-                ? ApiResponse<bool>.SuccessResponse("You have successfully joined the group.", true)
-                : ApiResponse<bool>.FailureResponse("Failed to accept invitation.");
+            if (!success)
+                return ApiResponse<bool>.FailureResponse("Failed to accept invitation.");
+
+            // Mark recipient's notification as read
+            try
+            {
+                await _notificationRepository.MarkInvitationNotificationAsReadAsync(invitationId, currentUserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to mark invitation notification read for {UserId}", currentUserId);
+            }
+
+            // Create notification for group owner
+            try
+            {
+                var group = await _groupRepository.GetGroupByIdAsync(invitation.GroupId);
+                if (group != null && group.OwnerId != currentUserId)
+                {
+                    var ownerNotif = new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = group.OwnerId,
+                        Type = "InvitationAccepted",
+                        GroupId = group.Id,
+                        ReferenceId = invitationId,
+                        Title = "Invitation Accepted",
+                        Message = $"{currentUserName} accepted your invitation to join '{group.Name}'.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _notificationRepository.CreateNotificationAsync(ownerNotif);
+
+                    if (_realtimeService != null)
+                    {
+                        await _realtimeService.NotifyUserAsync(group.OwnerId, "ReceiveSplitNotification", ownerNotif);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to notify owner of accepted invitation {InvitationId}", invitationId);
+            }
+
+            return ApiResponse<bool>.SuccessResponse("You have successfully joined the group.", true);
         }
 
         public async Task<ApiResponse<bool>> RejectInvitationAsync(
@@ -272,9 +565,52 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<bool>.ForbiddenResponse("You are not the designated recipient of this invitation.");
 
             var success = await _groupRepository.RejectInvitationAsync(invitationId, currentUserId, currentUserName);
-            return success
-                ? ApiResponse<bool>.SuccessResponse("Invitation declined.", true)
-                : ApiResponse<bool>.FailureResponse("Failed to decline invitation.");
+            if (!success)
+                return ApiResponse<bool>.FailureResponse("Failed to decline invitation.");
+
+            // Mark recipient's notification as read
+            try
+            {
+                await _notificationRepository.MarkInvitationNotificationAsReadAsync(invitationId, currentUserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to mark invitation notification read for {UserId}", currentUserId);
+            }
+
+            // Create notification for group owner
+            try
+            {
+                var group = await _groupRepository.GetGroupByIdAsync(invitation.GroupId);
+                if (group != null && group.OwnerId != currentUserId)
+                {
+                    var ownerNotif = new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = group.OwnerId,
+                        Type = "InvitationRejected",
+                        GroupId = group.Id,
+                        ReferenceId = invitationId,
+                        Title = "Invitation Declined",
+                        Message = $"{currentUserName} declined your invitation to join '{group.Name}'.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _notificationRepository.CreateNotificationAsync(ownerNotif);
+
+                    if (_realtimeService != null)
+                    {
+                        await _realtimeService.NotifyUserAsync(group.OwnerId, "ReceiveSplitNotification", ownerNotif);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to notify owner of declined invitation {InvitationId}", invitationId);
+            }
+
+            return ApiResponse<bool>.SuccessResponse("Invitation declined.", true);
         }
 
         public async Task<ApiResponse<bool>> RemoveMemberAsync(
@@ -288,15 +624,15 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<bool>.ForbiddenResponse("Only the group owner can remove members.");
 
             if (userIdToRemove == group.OwnerId)
-                return ApiResponse<bool>.FailureResponse("The group owner cannot be removed from the group.");
+                return ApiResponse<bool>.FailureResponse("The group owner cannot be removed.");
 
-            var targetMembership = await _groupRepository.GetMembershipAsync(groupId, userIdToRemove);
-            if (targetMembership == null || !targetMembership.IsActive)
-                return ApiResponse<bool>.FailureResponse("User is not an active member of this group.");
+            var membership = await _groupRepository.GetMembershipAsync(groupId, userIdToRemove);
+            if (membership == null || !membership.IsActive)
+                return ApiResponse<bool>.FailureResponse("Member not found in this group.");
 
             var success = await _groupRepository.RemoveMemberAsync(groupId, userIdToRemove, currentUserId, currentUserName);
             return success
-                ? ApiResponse<bool>.SuccessResponse("Member removed from group successfully.", true)
+                ? ApiResponse<bool>.SuccessResponse("Member removed successfully.", true)
                 : ApiResponse<bool>.FailureResponse("Failed to remove member.");
         }
 
@@ -304,9 +640,9 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
         {
             var membership = await _groupRepository.GetMembershipAsync(groupId, currentUserId);
             if (membership == null || !membership.IsActive)
-                return ApiResponse<List<SplitGroupActivityDto>>.ForbiddenResponse("You must be an active member of this group to view its activity history.");
+                return ApiResponse<List<SplitGroupActivityDto>>.ForbiddenResponse("You are not an active member of this group.");
 
-            var activities = await _groupRepository.GetGroupActivitiesAsync(groupId);
+            var activities = await _groupRepository.GetGroupActivitiesAsync(groupId, 50);
             return ApiResponse<List<SplitGroupActivityDto>>.SuccessResponse("Activities retrieved successfully.", activities);
         }
 
@@ -315,24 +651,109 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
         {
             var membership = await _groupRepository.GetMembershipAsync(groupId, currentUserId);
             if (membership == null || !membership.IsActive)
-                return ApiResponse<PagedGroupActivityResultDto>.ForbiddenResponse("You must be an active member of this group to view its activity history.");
+                return ApiResponse<PagedGroupActivityResultDto>.ForbiddenResponse("You are not an active member of this group.");
 
-            var paged = await _groupRepository.GetPagedGroupActivitiesAsync(groupId, parameters);
-            return ApiResponse<PagedGroupActivityResultDto>.SuccessResponse("Activities retrieved successfully.", paged);
+            var result = await _groupRepository.GetPagedGroupActivitiesAsync(groupId, parameters);
+            return ApiResponse<PagedGroupActivityResultDto>.SuccessResponse("Paged activities retrieved successfully.", result);
         }
 
-        public async Task<ApiResponse<SplitGroupActivityDto>> GetActivityByIdAsync(
-            Guid groupId, Guid activityId, Guid currentUserId)
+        public async Task<ApiResponse<SplitGroupActivityDto>> GetActivityByIdAsync(Guid groupId, Guid activityId, Guid currentUserId)
         {
             var membership = await _groupRepository.GetMembershipAsync(groupId, currentUserId);
             if (membership == null || !membership.IsActive)
-                return ApiResponse<SplitGroupActivityDto>.ForbiddenResponse("You must be an active member of this group to view activity details.");
+                return ApiResponse<SplitGroupActivityDto>.ForbiddenResponse("You are not an active member of this group.");
 
             var activity = await _groupRepository.GetActivityByIdAsync(groupId, activityId);
             if (activity == null)
-                return ApiResponse<SplitGroupActivityDto>.FailureResponse("Activity not found.");
+                return ApiResponse<SplitGroupActivityDto>.FailureResponse("Activity log entry not found.");
 
             return ApiResponse<SplitGroupActivityDto>.SuccessResponse("Activity retrieved successfully.", activity);
         }
+
+        private async Task TrySendInvitationEmailAsync(
+            string groupName, string inviterName, string toEmail, string token, DateTime expiresAt)
+        {
+            if (_emailService == null || string.IsNullOrWhiteSpace(toEmail))
+                return;
+
+            try
+            {
+                var baseUrl = _appLinkSettings?.InvitationBaseUrl?.TrimEnd('/') ?? "http://localhost:5173";
+                var inviteLink = $"{baseUrl}/split-expenses?inviteToken={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(toEmail)}";
+
+                var subject = $"Invitation to join '{groupName}' on Spendwise";
+                var body = BuildSplitInvitationHtml(groupName, inviterName, inviteLink, expiresAt);
+
+                var message = new EmailMessage
+                {
+                    ToEmail = toEmail,
+                    Subject = subject,
+                    Body = body,
+                    IsBodyHtml = true
+                };
+
+                var res = await _emailService.SendEmailAsync(message);
+                if (!res.Success)
+                {
+                    _logger.LogWarning("Email delivery failed for {Email}: {Message}", toEmail, res.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Non-fatal error sending split invitation email to {Email}", toEmail);
+            }
+        }
+
+        private static string BuildSplitInvitationHtml(
+            string groupName, string inviterName, string inviteLink, DateTime expiresAt)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("<!DOCTYPE html>");
+            sb.AppendLine("<html lang=\"en\">");
+            sb.AppendLine("<head><meta charset=\"UTF-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" /></head>");
+            sb.AppendLine("<body style=\"margin:0;padding:24px;background-color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;\">");
+            sb.AppendLine("  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:540px;margin:0 auto;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);\">");
+            sb.AppendLine("    <tr><td style=\"padding:28px 32px 20px;background:#0f172a;color:#ffffff;\">");
+            sb.AppendLine("      <h2 style=\"margin:0;font-size:20px;font-weight:700;\">Spendwise Split Expenses</h2>");
+            sb.AppendLine("    </td></tr>");
+            sb.AppendLine("    <tr><td style=\"padding:32px;\">");
+            sb.AppendLine($"      <p style=\"font-size:16px;color:#1e293b;margin:0 0 16px;\">Hi there,</p>");
+            sb.AppendLine($"      <p style=\"font-size:15px;color:#334155;line-height:1.6;margin:0 0 24px;\">");
+            sb.AppendLine($"        <strong>{System.Net.WebUtility.HtmlEncode(inviterName)}</strong> has invited you to join the expense sharing group <strong>'{System.Net.WebUtility.HtmlEncode(groupName)}'</strong>.");
+            sb.AppendLine("      </p>");
+            sb.AppendLine("      <div style=\"text-align:center;margin:32px 0;\">");
+            sb.AppendLine($"        <a href=\"{inviteLink}\" style=\"display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 28px;border-radius:8px;\">");
+            sb.AppendLine("          View & Accept Invitation");
+            sb.AppendLine("        </a>");
+            sb.AppendLine("      </div>");
+            sb.AppendLine($"      <p style=\"font-size:12px;color:#64748b;line-height:1.5;margin:24px 0 0;\">");
+            sb.AppendLine($"        This invitation link is valid until <strong>{expiresAt:MMM d, yyyy HH:mm} UTC</strong>.<br/>");
+            sb.AppendLine("        If you don't have a Spendwise account yet, you will be guided to register using this email.");
+            sb.AppendLine("      </p>");
+            sb.AppendLine("    </td></tr>");
+            sb.AppendLine("    <tr><td style=\"padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;\">");
+            sb.AppendLine("      Spendwise — Multi-workspace business cashbook & split expenses app");
+            sb.AppendLine("    </td></tr>");
+            sb.AppendLine("  </table>");
+            sb.AppendLine("</body>");
+            sb.AppendLine("</html>");
+            return sb.ToString();
+        }
+    }
+
+    internal class NullSplitNotificationRepository : ISplitNotificationRepository
+    {
+        public Task<PagedSplitNotificationResultDto> GetNotificationsByUserAsync(Guid userId, int pageNumber = 1, int pageSize = 20) =>
+            Task.FromResult(new PagedSplitNotificationResultDto());
+
+        public Task<int> GetUnreadCountAsync(Guid userId) => Task.FromResult(0);
+
+        public Task<bool> MarkAsReadAsync(Guid notificationId, Guid userId) => Task.FromResult(true);
+
+        public Task<int> MarkAllAsReadAsync(Guid userId) => Task.FromResult(0);
+
+        public Task<SplitNotification> CreateNotificationAsync(SplitNotification notification) => Task.FromResult(notification);
+
+        public Task<bool> MarkInvitationNotificationAsReadAsync(Guid invitationId, Guid userId) => Task.FromResult(true);
     }
 }

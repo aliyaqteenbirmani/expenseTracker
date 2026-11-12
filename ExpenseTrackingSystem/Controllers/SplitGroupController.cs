@@ -184,6 +184,34 @@ namespace SpendwiseSystem.API.Controllers
             return Ok(response);
         }
 
+        [HttpPost("{groupId:guid}/invitations/{invitationId:guid}/resend")]
+        public async Task<ActionResult<ApiResponse<SplitGroupInvitationDto>>> ResendInvitation(Guid groupId, Guid invitationId)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _splitGroupService.ResendInvitationAsync(groupId, invitationId, CurrentUserId, CurrentUserName);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("invitations/token/{token}")]
+        public async Task<ActionResult<ApiResponse<SplitGroupInvitationDto>>> GetInvitationByToken(string token)
+        {
+            var response = await _splitGroupService.GetInvitationByTokenAsync(token);
+            if (!response.Success)
+                return NotFound(response);
+
+            return Ok(response);
+        }
+
         [HttpPost("invitations/{invitationId:guid}/accept")]
         public async Task<ActionResult<ApiResponse<bool>>> AcceptInvitation(Guid invitationId)
         {

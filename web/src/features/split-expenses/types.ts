@@ -187,6 +187,9 @@ export interface SplitGroupInvitationDto {
   expiresAt: string
   createdAt: string
   respondedAt?: string
+  lastSentAt?: string
+  resendCount?: number
+  invitationToken?: string
 }
 
 export interface CreateSplitGroupDto {
@@ -234,5 +237,35 @@ export interface RecordSettlementDto {
 }
 
 export interface InviteSplitGroupMemberDto {
-  email: string
+  email?: string
+  invitedEmail?: string
+  userId?: string
+  invitedUserId?: string
+}
+
+export interface SplitNotificationDto {
+  id: string
+  userId: string
+  type: 'GroupInvitationReceived' | 'InvitationAccepted' | 'InvitationRejected' | string
+  groupId?: string
+  groupName?: string
+  referenceId?: string
+  title: string
+  message: string
+  isRead: boolean
+  createdAt: string
+  readAt?: string
+}
+
+export interface SplitNotificationUnreadCountDto {
+  unreadCount: number
+}
+
+export interface PagedSplitNotificationResultDto {
+  items: SplitNotificationDto[]
+  totalCount: number
+  unreadCount: number
+  pageNumber: number
+  pageSize: number
+  totalPages: number
 }

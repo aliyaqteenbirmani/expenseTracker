@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.DotNet.Scaffolding.Shared.Messaging;
 using SpendwiseSystem.Application.Helper;
+using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Application.Services.AuthService;
 using SpendwiseSystem.Application.Services.CurrentUserService;
 using SpendwiseSystem.Domain.DTOs;
@@ -20,12 +21,18 @@ namespace SpendwiseSystem.API.Controllers
         private readonly IAuthService _authService;
         private readonly ICurrentUserService _currentUser;
         private readonly IConfiguration _configuration;
+        private readonly ISplitGroupService? _splitGroupService;
 
-        public AuthController(IAuthService authService, ICurrentUserService currentUser, IConfiguration configuration)
+        public AuthController(
+            IAuthService authService,
+            ICurrentUserService currentUser,
+            IConfiguration configuration,
+            ISplitGroupService? splitGroupService = null)
         {
             _authService = authService;
             _currentUser = currentUser;
             _configuration = configuration;
+            _splitGroupService = splitGroupService;
         }
 
         [HttpPost("Registration")]
@@ -41,6 +48,19 @@ namespace SpendwiseSystem.API.Controllers
             if (!response.Success)
             {
                 return Conflict(ApiResponses.Conflict("REGISTRATION_FAILED"));
+            }
+
+            // Link any pending Split Group invitations for this new user
+            if (response.Data != null && !string.IsNullOrWhiteSpace(userDto.Email) && _splitGroupService != null)
+            {
+                try
+                {
+                    await _splitGroupService.LinkPendingInvitationsOnAuthAsync(response.Data.Id, userDto.Email);
+                }
+                catch
+                {
+                    // Non-fatal
+                }
             }
 
             userDto.Password = null;
@@ -79,6 +99,19 @@ namespace SpendwiseSystem.API.Controllers
                 }
 
                 return Unauthorized(ApiResponses.Unauthorized(errorMessage));
+            }
+
+            // Link any pending Split Group invitations for this user
+            if (serviceResponse.Data != null && !string.IsNullOrWhiteSpace(serviceResponse.Data.Email) && _splitGroupService != null)
+            {
+                try
+                {
+                    await _splitGroupService.LinkPendingInvitationsOnAuthAsync(serviceResponse.Data.Id, serviceResponse.Data.Email);
+                }
+                catch
+                {
+                    // Non-fatal
+                }
             }
 
             return Ok(ApiResponses.SuccessWithData(serviceResponse.Data, "Login successful"));

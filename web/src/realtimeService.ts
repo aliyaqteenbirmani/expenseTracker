@@ -73,11 +73,13 @@ export type RealtimeHandlers = {
   onTransactionCreated?: (payload: RealtimeTransactionPayload) => void
   onTransactionUpdated?: (payload: RealtimeTransactionUpdatePayload) => void
   onTransactionDeleted?: (payload: RealtimeTransactionDeletePayload) => void
+  onSplitNotification?: (payload: unknown) => void
 }
 
 class RealtimeService {
   private connection: signalR.HubConnection | null = null
   private handlers: RealtimeHandlers = {}
+  private splitNotificationListeners: Set<(payload: unknown) => void> = new Set()
   private currentCashbookId: string | null = null
   private currentBusinessId: string | null = null
   private isConnecting = false
@@ -133,7 +135,21 @@ class RealtimeService {
       this.handlers.onTransactionDeleted?.(payload)
     })
 
+    this.connection.on('ReceiveSplitNotification', (payload: unknown) => {
+      this.handlers.onSplitNotification?.(payload)
+      this.splitNotificationListeners.forEach((cb) => {
+        try { cb(payload) } catch {}
+      })
+    })
+
     void this.startConnection()
+  }
+
+  public subscribeSplitNotification(callback: (payload: unknown) => void): () => void {
+    this.splitNotificationListeners.add(callback)
+    return () => {
+      this.splitNotificationListeners.delete(callback)
+    }
   }
 
   public updateHandlers(handlers: RealtimeHandlers) {

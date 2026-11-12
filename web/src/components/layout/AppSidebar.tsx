@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { spring } from '@/lib/motion'
 import { AnimatedNumber } from '@/components/motion/animated-number'
+import { splitExpensesApi } from '@/features/split-expenses/splitExpensesApi'
+import { realtimeService } from '@/realtimeService'
 import {
   Sidebar,
   SidebarContent,
@@ -79,6 +81,7 @@ interface AppSidebarProps {
   onOpenProfile: () => void
   onOpenShortcuts: () => void
   unreadInvitesCount?: number
+  token?: string
 }
 
 export function AppSidebar({
@@ -93,9 +96,31 @@ export function AppSidebar({
   onOpenProfile,
   onOpenShortcuts,
   unreadInvitesCount = 0,
+  token,
 }: AppSidebarProps) {
   const { setTheme } = useTheme()
   const [hoveredNav, setHoveredNav] = useState<string | null>(null)
+  const [splitUnreadCount, setSplitUnreadCount] = useState(0)
+
+  useEffect(() => {
+    if (!token) return
+    const fetchCount = async () => {
+      try {
+        const res = await splitExpensesApi.getNotificationUnreadCount(token)
+        setSplitUnreadCount(res.unreadCount || 0)
+      } catch {}
+    }
+    void fetchCount()
+    const interval = setInterval(fetchCount, 45000)
+    const unsub = realtimeService.subscribeSplitNotification(fetchCount)
+    const onFocus = () => void fetchCount()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(interval)
+      unsub()
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [token])
   const fullName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'User'
   const initials = fullName.slice(0, 2).toUpperCase()
 
@@ -258,7 +283,12 @@ export function AppSidebar({
                     />
                   )}
                   <HandCoins className="size-4" />
-                  <span>Split Expenses</span>
+                  <span className="flex-1 truncate">Split Expenses</span>
+                  {splitUnreadCount > 0 && (
+                    <SidebarMenuBadge className="bg-primary text-primary-foreground font-bold">
+                      {splitUnreadCount > 99 ? '99+' : splitUnreadCount}
+                    </SidebarMenuBadge>
+                  )}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

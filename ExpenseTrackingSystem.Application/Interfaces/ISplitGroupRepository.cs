@@ -20,10 +20,13 @@ namespace SpendwiseSystem.Application.Interfaces
 
         Task<User?> GetUserByEmailOrIdAsync(string? email, Guid? userId);
         Task<SplitGroupInvitation?> GetInvitationByIdAsync(Guid invitationId);
+        Task<SplitGroupInvitation?> GetInvitationByTokenAsync(string token);
         Task<SplitGroupInvitation?> GetPendingInvitationByEmailAsync(Guid groupId, string email);
         Task<List<SplitGroupInvitationDto>> GetPendingInvitationsByGroupAsync(Guid groupId);
         Task<List<SplitGroupInvitationDto>> GetPendingInvitationsByUserAsync(Guid userId, string userEmail);
         Task<SplitGroupInvitation> CreateInvitationAsync(SplitGroupInvitation invitation, string inviterName, string groupName);
+        Task<bool> UpdateInvitationResendAsync(Guid invitationId);
+        Task<List<SplitGroupInvitation>> LinkPendingInvitationsForUserAsync(Guid userId, string email);
         Task<bool> RevokeInvitationAsync(Guid invitationId, Guid revokedByUserId, string revokerName, Guid groupId);
         Task<bool> AcceptInvitationAsync(Guid invitationId, Guid userId, string userName);
         Task<bool> RejectInvitationAsync(Guid invitationId, Guid userId, string userName);

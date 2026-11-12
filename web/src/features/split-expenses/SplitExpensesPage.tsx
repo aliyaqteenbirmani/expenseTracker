@@ -9,6 +9,7 @@ import { splitExpensesApi } from './splitExpensesApi'
 import { SplitGroupCard } from './components/SplitGroupCard'
 import { CreateGroupDialog } from './components/CreateGroupDialog'
 import { SplitGroupDetailsPage } from './components/SplitGroupDetailsPage'
+import { SplitNotificationBell } from './components/SplitNotificationBell'
 import { toast } from 'sonner'
 import type { SplitGroupSummaryDto, SplitGroupInvitationDto } from './types'
 import {
@@ -132,10 +133,13 @@ export function SplitExpensesPage({
         title="Split Expenses"
         description="Share expenses with friends, flatmates, and travel groups. Automatically divide costs and simplify debt."
         actions={
-          <Button onClick={() => setCreateGroupOpen(true)} className="gap-2 shadow-xs">
-            <Plus className="size-4" />
-            Create Group
-          </Button>
+          <div className="flex items-center gap-2">
+            <SplitNotificationBell token={token} onInvitationProcessed={loadData} />
+            <Button onClick={() => setCreateGroupOpen(true)} className="gap-2 shadow-xs">
+              <Plus className="size-4" />
+              Create Group
+            </Button>
+          </div>
         }
       />
 

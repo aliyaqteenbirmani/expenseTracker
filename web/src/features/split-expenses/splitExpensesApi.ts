@@ -17,6 +17,8 @@ import type {
   SettleUpOverviewDto,
   RecordSettlementDto,
   PagedGroupActivityResultDto,
+  PagedSplitNotificationResultDto,
+  SplitNotificationUnreadCountDto,
 } from './types'
 
 export const splitExpensesApi = {
@@ -48,11 +50,27 @@ export const splitExpensesApi = {
     }),
 
   // --- Member & Invitation APIs ---
-  inviteMember: (groupId: string, dto: InviteSplitGroupMemberDto, token?: string) =>
-    api<SplitGroupInvitationDto>(`/api/splitgroup/${groupId}/invite`, token, {
+  inviteMember: (groupId: string, dto: InviteSplitGroupMemberDto, token?: string) => {
+    const email = dto.email?.trim() || dto.invitedEmail?.trim()
+    const userId = dto.userId || dto.invitedUserId
+    return api<SplitGroupInvitationDto>(`/api/splitgroup/${groupId}/invite`, token, {
       method: 'POST',
-      body: JSON.stringify(dto),
+      body: JSON.stringify({
+        email,
+        invitedEmail: email,
+        userId,
+        invitedUserId: userId,
+      }),
+    })
+  },
+
+  resendInvitation: (groupId: string, invitationId: string, token?: string) =>
+    api<SplitGroupInvitationDto>(`/api/splitgroup/${groupId}/invitations/${invitationId}/resend`, token, {
+      method: 'POST',
     }),
+
+  getInvitationByToken: (tokenString: string) =>
+    api<SplitGroupInvitationDto>(`/api/splitgroup/invitations/token/${encodeURIComponent(tokenString)}`),
 
   getGroupInvitations: (groupId: string, token?: string) =>
     api<SplitGroupInvitationDto[]>(`/api/splitgroup/${groupId}/invitations`, token),
@@ -78,6 +96,23 @@ export const splitExpensesApi = {
   removeMember: (groupId: string, userId: string, token?: string) =>
     api<boolean>(`/api/splitgroup/${groupId}/members/${userId}`, token, {
       method: 'DELETE',
+    }),
+
+  // --- Split Notifications APIs ---
+  getMyNotifications: (pageNumber = 1, pageSize = 20, token?: string) =>
+    api<PagedSplitNotificationResultDto>(`/api/splitnotification?pageNumber=${pageNumber}&pageSize=${pageSize}`, token),
+
+  getNotificationUnreadCount: (token?: string) =>
+    api<SplitNotificationUnreadCountDto>('/api/splitnotification/unread-count', token),
+
+  markNotificationAsRead: (notificationId: string, token?: string) =>
+    api<boolean>(`/api/splitnotification/${notificationId}/read`, token, {
+      method: 'PUT',
+    }),
+
+  markAllNotificationsAsRead: (token?: string) =>
+    api<number>('/api/splitnotification/read-all', token, {
+      method: 'PUT',
     }),
 
   // --- Expense APIs ---
