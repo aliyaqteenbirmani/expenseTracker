@@ -1,0 +1,457 @@
+import { useState, useMemo, useEffect } from 'react'
+import { ResponsiveDialog } from '@/components/app/ResponsiveDialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { splitExpensesApi } from '../splitExpensesApi'
+import { toast } from 'sonner'
+import type { SplitGroupMemberDto, SplitExpenseDetailDto } from '../types'
+import { Users } from 'lucide-react'
+import { MemberSelector, getMemberDisplayName, getMemberInitials } from './MemberSelector'
+
+interface EditExpenseDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  groupId: string
+  expense: SplitExpenseDetailDto | null
+  members: SplitGroupMemberDto[]
+  currentUserId?: string
+  token?: string
+  onExpenseUpdated: (updatedExpense: SplitExpenseDetailDto) => void
+}
+
+const CATEGORIES = [
+  'Food & Dining',
+  'Groceries',
+  'Transport',
+  'Accommodation',
+  'Utilities',
+  'Entertainment',
+  'Shopping',
+  'Services',
+  'Other',
+]
+
+export function EditExpenseDialog({
+  open,
+  onOpenChange,
+  groupId,
+  expense,
+  members,
+  currentUserId,
+  token,
+  onExpenseUpdated,
+}: EditExpenseDialogProps) {
+  const activeMembers = useMemo(() => members.filter((m) => m.isActive), [members])
+
+  const [title, setTitle] = useState('')
+  const [amountStr, setAmountStr] = useState('')
+  const [payerId, setPayerId] = useState<string>('')
+  const [expenseDate, setExpenseDate] = useState<string>('')
+  const [category, setCategory] = useState<string>('Food & Dining')
+  const [note, setNote] = useState('')
+  const [receiptUrl, setReceiptUrl] = useState('')
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+  const [payerOnlyConfirmOpen, setPayerOnlyConfirmOpen] = useState(false)
+
+  // Populate form from existing expense
+  useEffect(() => {
+    if (open && expense) {
+      setTitle(expense.title || '')
+      setAmountStr(expense.amount ? expense.amount.toString() : '')
+      setPayerId(expense.payerId || '')
+      setExpenseDate(
+        expense.expenseDate
+          ? new Date(expense.expenseDate).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0]
+      )
+      setCategory(expense.category || 'Food & Dining')
+      setNote(expense.note || '')
+      setReceiptUrl(expense.receiptUrl || '')
+
+      const initialSelected = (expense.shares || [])
+        .map((s) => s.userId)
+        .filter((uid) => activeMembers.some((m) => m.userId === uid))
+
+      // If existing expense had no active shares, default to all active members
+      setSelectedUserIds(
+        initialSelected.length > 0
+          ? initialSelected
+          : activeMembers.map((m) => m.userId)
+      )
+      setPayerOnlyConfirmOpen(false)
+    }
+  }, [open, expense, activeMembers])
+
+  const handleSelectAll = () => {
+    setSelectedUserIds(activeMembers.map((m) => m.userId))
+  }
+
+  const handleClearAll = () => {
+    setSelectedUserIds([])
+  }
+
+  const toggleParticipant = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    )
+  }
+
+  const amount = parseFloat(amountStr) || 0
+
+  // Calculate dynamic split preview exactly matching backend deterministic penny distribution
+  const splitShares = useMemo(() => {
+    if (amount <= 0 || selectedUserIds.length === 0) return {}
+    const count = selectedUserIds.length
+    const totalCents = Math.round(amount * 100)
+    const baseCents = Math.floor(totalCents / count)
+    let remainder = totalCents % count
+
+    const sortedIds = [...selectedUserIds].sort((a, b) => a.localeCompare(b))
+    const result: Record<string, number> = {}
+
+    for (const id of sortedIds) {
+      let cents = baseCents
+      if (remainder > 0) {
+        cents += 1
+        remainder -= 1
+      }
+      result[id] = cents / 100
+    }
+    return result
+  }, [amount, selectedUserIds])
+
+  const executeSubmit = async () => {
+    if (!expense) return
+    try {
+      setLoading(true)
+      const res = await splitExpensesApi.updateExpense(
+        groupId,
+        expense.id,
+        {
+          title: title.trim(),
+          amount: amount,
+          payerId: payerId,
+          expenseDate: expenseDate ? new Date(expenseDate).toISOString() : undefined,
+          category: category || undefined,
+          note: note.trim() || undefined,
+          receiptUrl: receiptUrl.trim() || undefined,
+          participantUserIds: selectedUserIds,
+        },
+        token
+      )
+      toast.success('Expense updated successfully')
+      onOpenChange(false)
+      onExpenseUpdated(res)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update expense'
+      toast.error(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!expense) return
+
+    if (!title.trim()) {
+      toast.error('Expense title is required')
+      return
+    }
+
+    if (amount <= 0) {
+      toast.error('Amount must be greater than zero')
+      return
+    }
+
+    if (selectedUserIds.length === 0) {
+      toast.error('Select at least one member to split with')
+      return
+    }
+
+    if (!payerId) {
+      toast.error('Please select who paid for the expense')
+      return
+    }
+
+    // Payer-only warning: If only the payer is selected while the group has other active members
+    const isPayerOnly =
+      activeMembers.length > 1 &&
+      selectedUserIds.length === 1 &&
+      selectedUserIds[0] === payerId
+
+    if (isPayerOnly) {
+      setPayerOnlyConfirmOpen(true)
+      return
+    }
+
+    executeSubmit()
+  }
+
+  const selectedCount = selectedUserIds.length
+  const sampleShare = selectedCount > 0 ? (amount / selectedCount).toFixed(2) : '0.00'
+
+  const payerName = useMemo(() => {
+    const payer = activeMembers.find((m) => m.userId === payerId)
+    return payer ? getMemberDisplayName(payer) : 'the payer'
+  }, [activeMembers, payerId])
+
+  if (!expense) return null
+
+  return (
+    <>
+      <ResponsiveDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Edit Expense"
+        description="Update expense details and adjust split participants."
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5 md:col-span-2">
+              <Label htmlFor="edit-expense-title">Title *</Label>
+              <Input
+                id="edit-expense-title"
+                placeholder="e.g. Dinner at Monal, Groceries, Toll Plaza"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={loading}
+                required
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-expense-amount">Amount (Rs.) *</Label>
+              <div className="relative">
+                <Input
+                  id="edit-expense-amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="0.00"
+                  value={amountStr}
+                  onChange={(e) => setAmountStr(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-expense-payer">Paid by *</Label>
+              <MemberSelector
+                id="edit-expense-payer"
+                value={payerId}
+                onValueChange={setPayerId}
+                members={activeMembers}
+                currentUserId={currentUserId}
+                placeholder="Select payer"
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-expense-date">Date</Label>
+              <div className="relative">
+                <Input
+                  id="edit-expense-date"
+                  type="date"
+                  value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select value={category} onValueChange={(val) => setCategory(val ?? 'Food & Dining')} disabled={loading}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Dynamic Split Preview Banner */}
+          <div className="rounded-lg border bg-muted/40 p-3 text-xs space-y-1">
+            <div className="flex items-center justify-between font-medium text-foreground">
+              <span className="flex items-center gap-1.5">
+                <Users className="size-3.5 text-primary" />
+                Split Breakdown (Equal)
+              </span>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={handleSelectAll}
+                  disabled={loading || selectedCount === activeMembers.length}
+                  className="h-6 px-2 text-xs text-primary hover:text-primary font-normal"
+                >
+                  Select all
+                </Button>
+                <span className="text-muted-foreground/40 text-xs">·</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={handleClearAll}
+                  disabled={loading || selectedCount === 0}
+                  className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground font-normal"
+                >
+                  Clear all
+                </Button>
+              </div>
+            </div>
+            <div className="text-muted-foreground flex flex-wrap justify-between gap-1 pt-1">
+              <span>
+                Total: <strong>Rs. {amount > 0 ? amount.toLocaleString('en-PK', { minimumFractionDigits: 2 }) : '0.00'}</strong>
+              </span>
+              <span>
+                Selected: <strong>{selectedCount} members</strong>
+              </span>
+              <span>
+                Each member: <strong>Rs. {sampleShare}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Member Checkboxes with Dynamic Share Amount */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Split Among ({selectedCount}/{activeMembers.length})
+            </Label>
+            <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-lg border p-2">
+              {activeMembers.map((m) => {
+                const isChecked = selectedUserIds.includes(m.userId)
+                const share = splitShares[m.userId]
+                const name = getMemberDisplayName(m)
+                const initials = getMemberInitials(name || m.email)
+                const isYou = m.userId === currentUserId
+                return (
+                  <div
+                    key={m.userId}
+                    className={`flex items-center justify-between p-2 rounded-md transition-colors ${
+                      isChecked ? 'bg-primary/5' : 'hover:bg-muted/40'
+                    }`}
+                  >
+                    <label
+                      htmlFor={`edit-user-${m.userId}`}
+                      className="flex items-center gap-2.5 cursor-pointer select-none text-sm flex-1 truncate min-w-0"
+                    >
+                      <Checkbox
+                        id={`edit-user-${m.userId}`}
+                        checked={isChecked}
+                        onCheckedChange={() => toggleParticipant(m.userId)}
+                        disabled={loading}
+                      />
+                      <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                        {initials}
+                      </div>
+                      <div className="flex flex-col truncate min-w-0">
+                        <span className="truncate text-foreground font-medium text-xs">
+                          {name}
+                          {isYou && <span className="text-muted-foreground font-normal ml-1">(You)</span>}
+                        </span>
+                        {m.email && m.email !== name && (
+                          <span className="text-[11px] text-muted-foreground truncate">{m.email}</span>
+                        )}
+                      </div>
+                    </label>
+                    {isChecked && share !== undefined && (
+                      <span className="text-xs font-mono font-medium text-muted-foreground ml-2 shrink-0">
+                        Rs. {share.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-expense-note">Note (Optional)</Label>
+            <Input
+              id="edit-expense-note"
+              placeholder="Add any extra details or receipt link"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              disabled={loading}
+              maxLength={1000}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" loading={loading} disabled={selectedCount === 0 || amount <= 0}>
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </ResponsiveDialog>
+
+      {/* Payer-only Non-blocking Confirmation */}
+      <AlertDialog open={payerOnlyConfirmOpen} onOpenChange={setPayerOnlyConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Only payer included</AlertDialogTitle>
+            <AlertDialogDescription>
+              {payerId === currentUserId
+                ? 'Only you are included in this expense. Other active members will not share this cost. Do you want to continue?'
+                : `Only ${payerName} is included in this expense. Other active members will not share this cost. Do you want to continue?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Go back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setPayerOnlyConfirmOpen(false)
+                executeSubmit()
+              }}
+              disabled={loading}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}

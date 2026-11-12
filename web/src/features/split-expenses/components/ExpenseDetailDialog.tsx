@@ -2,11 +2,20 @@ import { useState } from 'react'
 import { ResponsiveDialog } from '@/components/app/ResponsiveDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { splitExpensesApi } from '../splitExpensesApi'
 import { toast } from 'sonner'
 import type { SplitExpenseDetailDto } from '../types'
-import { Tag, Trash2 } from 'lucide-react'
+import { Tag, Trash2, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import { getMemberInitials } from './MemberSelector'
 
@@ -18,6 +27,7 @@ interface ExpenseDetailDialogProps {
   isGroupOwner?: boolean
   token?: string
   onExpenseDeleted: (expenseId: string) => void
+  onEditExpense?: (expense: SplitExpenseDetailDto) => void
 }
 
 export function ExpenseDetailDialog({
@@ -28,6 +38,7 @@ export function ExpenseDetailDialog({
   isGroupOwner,
   token,
   onExpenseDeleted,
+  onEditExpense,
 }: ExpenseDetailDialogProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -55,6 +66,9 @@ export function ExpenseDetailDialog({
   const formattedDate = expense.expenseDate
     ? format(new Date(expense.expenseDate), 'MMM d, yyyy')
     : 'No date'
+
+  const myShare = expense.shares?.find((s) => s.userId === currentUserId)
+  const isIncluded = Boolean(myShare)
 
   return (
     <>
@@ -104,6 +118,31 @@ export function ExpenseDetailDialog({
             </span>
           </div>
 
+          {/* Current User Share Highlight */}
+          {currentUserId && (
+            <div
+              className={`rounded-lg border p-2.5 text-xs flex items-center justify-between ${
+                isIncluded
+                  ? 'border-primary/20 bg-primary/5 text-foreground'
+                  : 'border-border/60 bg-muted/30 text-muted-foreground'
+              }`}
+            >
+              <span className="font-medium">Your share in this expense</span>
+              {isIncluded && myShare ? (
+                <span className="font-mono font-semibold text-primary">
+                  Rs. {myShare.shareAmount.toFixed(2)}
+                </span>
+              ) : (
+                <span className="font-mono font-medium text-muted-foreground flex items-center gap-1.5">
+                  Rs. 0.00
+                  <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-sans border text-muted-foreground">
+                    Not included
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Shares Breakdown */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -140,17 +179,33 @@ export function ExpenseDetailDialog({
 
           {/* Dialog Action Buttons */}
           <div className="flex items-center justify-between pt-2">
-            <div>
+            <div className="flex items-center gap-2">
               {canModify && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setDeleteConfirmOpen(true)}
-                >
-                  <Trash2 className="size-3.5" />
-                  Delete Expense
-                </Button>
+                <>
+                  {onEditExpense && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        onOpenChange(false)
+                        onEditExpense(expense)
+                      }}
+                    >
+                      <Pencil className="size-3.5" />
+                      Edit Expense
+                    </Button>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                  >
+                    <Trash2 className="size-3.5" />
+                    Delete Expense
+                  </Button>
+                </>
               )}
             </div>
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
