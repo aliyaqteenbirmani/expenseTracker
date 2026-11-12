@@ -32,7 +32,7 @@ namespace SpendwiseSystem.API.Controllers
         private string CurrentUserEmail => _currentUserService.Email ?? string.Empty;
 
         [HttpPost]
-        public async Task<ActionResult<ApiResponse<SplitGroupSummaryDto>>> CreateGroup([FromBody] CreateSplitGroupDto dto)
+        public async Task<ActionResult<ApiResponse<CreateSplitGroupResultDto>>> CreateGroup([FromBody] CreateSplitGroupDto dto)
         {
             if (CurrentUserId == Guid.Empty)
                 return Unauthorized(ApiResponses.Unauthorized());
@@ -42,6 +42,16 @@ namespace SpendwiseSystem.API.Controllers
                 return BadRequest(response);
 
             return Created(string.Empty, response);
+        }
+
+        [HttpGet("search-users")]
+        public async Task<ActionResult<ApiResponse<List<SplitUserSearchResultDto>>>> SearchUsers([FromQuery] string query)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _splitGroupService.SearchUsersAsync(query, CurrentUserId);
+            return Ok(response);
         }
 
         [HttpGet]

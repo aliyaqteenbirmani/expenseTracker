@@ -194,6 +194,118 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             }
         }
 
+        public async Task<SplitGroup> CreateGroupWithMemberAndInvitationsAsync(
+            SplitGroup group,
+            Guid ownerId,
+            string ownerName,
+            List<SplitGroupInvitation> invitations,
+            List<SplitGroupActivity> activities)
+        {
+            using var connection = CreateConnection();
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+
+            try
+            {
+                const string insertGroupSql = @"
+                    INSERT INTO dbo.SplitGroups (Id, Name, Description, Icon, OwnerId, CreatedAt, UpdatedAt, IsActive, IsDeleted)
+                    VALUES (@Id, @Name, @Description, @Icon, @OwnerId, @CreatedAt, @UpdatedAt, @IsActive, @IsDeleted);";
+
+                await connection.ExecuteAsync(insertGroupSql, group, transaction);
+
+                const string insertMemberSql = @"
+                    INSERT INTO dbo.SplitGroupMembers (Id, GroupId, UserId, Role, JoinedAt, CreatedAt, UpdatedAt, IsActive)
+                    VALUES (@MemberId, @GroupId, @UserId, 'Owner', @JoinedAt, @CreatedAt, @UpdatedAt, 1);";
+
+                var memberId = Guid.NewGuid();
+                await connection.ExecuteAsync(insertMemberSql, new
+                {
+                    MemberId = memberId,
+                    GroupId = group.Id,
+                    UserId = ownerId,
+                    JoinedAt = group.CreatedAt,
+                    CreatedAt = group.CreatedAt,
+                    UpdatedAt = group.UpdatedAt
+                }, transaction);
+
+                const string insertActivitySql = @"
+                    INSERT INTO dbo.SplitGroupActivities (Id, GroupId, UserId, ActivityType, ReferenceId, Description, CreatedAt)
+                    VALUES (@Id, @GroupId, @UserId, @ActivityType, @ReferenceId, @Description, @CreatedAt);";
+
+                await connection.ExecuteAsync(insertActivitySql, new
+                {
+                    Id = Guid.NewGuid(),
+                    GroupId = group.Id,
+                    UserId = ownerId,
+                    ActivityType = "GroupCreated",
+                    ReferenceId = group.Id,
+                    Description = $"{ownerName} created the group \"{group.Name}\".",
+                    CreatedAt = group.CreatedAt
+                }, transaction);
+
+                if (invitations != null && invitations.Count > 0)
+                {
+                    const string insertInviteSql = @"
+                        INSERT INTO dbo.SplitGroupInvitations 
+                        (Id, GroupId, InvitedUserId, InvitedEmail, InvitedBy, Status, InvitationToken, TokenHash, ExpiresAt, CreatedAt, LastSentAt, ResendCount)
+                        VALUES 
+                        (@Id, @GroupId, @InvitedUserId, @InvitedEmail, @InvitedBy, @Status, @InvitationToken, @TokenHash, @ExpiresAt, @CreatedAt, @LastSentAt, @ResendCount);";
+
+                    foreach (var inv in invitations)
+                    {
+                        await connection.ExecuteAsync(insertInviteSql, inv, transaction);
+                    }
+                }
+
+                if (activities != null && activities.Count > 0)
+                {
+                    foreach (var act in activities)
+                    {
+                        await connection.ExecuteAsync(insertActivitySql, act, transaction);
+                    }
+                }
+
+                transaction.Commit();
+                return group;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+
+        public async Task<List<SplitUserSearchResultDto>> SearchUsersAsync(string query, Guid currentUserId, int limit = 10)
+        {
+            var cleanQuery = query?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(cleanQuery))
+                return new List<SplitUserSearchResultDto>();
+
+            const string sql = @"
+                SELECT TOP (@Limit)
+                    Id AS UserId,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(FirstName, ' ', LastName))), ''), Email) AS FullName,
+                    Email
+                FROM dbo.Users
+                WHERE Id <> @CurrentUserId
+                  AND (
+                      Email LIKE @SearchPattern
+                      OR FirstName LIKE @SearchPattern
+                      OR LastName LIKE @SearchPattern
+                  )
+                ORDER BY FirstName, LastName;";
+
+            using var connection = CreateConnection();
+            var results = await connection.QueryAsync<SplitUserSearchResultDto>(sql, new
+            {
+                Limit = limit > 0 ? limit : 10,
+                CurrentUserId = currentUserId,
+                SearchPattern = $"%{cleanQuery}%"
+            });
+
+            return results.ToList();
+        }
+
         public async Task<bool> UpdateGroupAsync(SplitGroup group, Guid userId, string userName)
         {
             using var connection = CreateConnection();

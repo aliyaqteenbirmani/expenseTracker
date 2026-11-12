@@ -4,6 +4,33 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
 {
+    public class CreateGroupInviteeInputDto
+    {
+        public Guid? UserId { get; set; }
+        public string? Email { get; set; }
+        public string? Name { get; set; }
+    }
+
+    public class CreateGroupInviteeResultDto
+    {
+        public string Identifier { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty; // "Invited", "AlreadyPending", "Skipped", "Failed"
+        public string Message { get; set; } = string.Empty;
+        public Guid? InvitationId { get; set; }
+    }
+
+    public class CreateSplitGroupResultDto : SplitGroupSummaryDto
+    {
+        public List<CreateGroupInviteeResultDto> Invitations { get; set; } = new();
+    }
+
+    public class SplitUserSearchResultDto
+    {
+        public Guid UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+    }
+
     public class CreateSplitGroupDto
     {
         [Required(ErrorMessage = "Group name is required.")]
@@ -15,6 +42,8 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
 
         [StringLength(100, ErrorMessage = "Icon cannot exceed 100 characters.")]
         public string? Icon { get; set; }
+
+        public List<CreateGroupInviteeInputDto>? Invitees { get; set; }
     }
 
     public class UpdateSplitGroupDto

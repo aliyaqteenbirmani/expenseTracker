@@ -8,7 +8,8 @@ namespace SpendwiseSystem.Application.Interfaces
 {
     public interface ISplitGroupService
     {
-        Task<ApiResponse<SplitGroupSummaryDto>> CreateGroupAsync(CreateSplitGroupDto dto, Guid userId, string userName);
+        Task<ApiResponse<CreateSplitGroupResultDto>> CreateGroupAsync(CreateSplitGroupDto dto, Guid userId, string userName);
+        Task<ApiResponse<List<SplitUserSearchResultDto>>> SearchUsersAsync(string query, Guid currentUserId);
         Task<ApiResponse<List<SplitGroupSummaryDto>>> GetMyGroupsAsync(Guid userId);
         Task<ApiResponse<SplitGroupDetailDto>> GetGroupDetailsAsync(Guid groupId, Guid userId);
         Task<ApiResponse<List<SplitGroupMemberDto>>> GetGroupMembersAsync(Guid groupId, Guid userId);

@@ -14,6 +14,13 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<SplitGroupDetailDto?> GetGroupDetailsAsync(Guid groupId, Guid userId);
         Task<List<SplitGroupMemberDto>> GetGroupMembersAsync(Guid groupId);
         Task<SplitGroup> CreateGroupWithMemberAndActivityAsync(SplitGroup group, Guid ownerId, string ownerName);
+        Task<SplitGroup> CreateGroupWithMemberAndInvitationsAsync(
+            SplitGroup group,
+            Guid ownerId,
+            string ownerName,
+            List<SplitGroupInvitation> invitations,
+            List<SplitGroupActivity> activities);
+        Task<List<SplitUserSearchResultDto>> SearchUsersAsync(string query, Guid currentUserId, int limit = 10);
         Task<bool> UpdateGroupAsync(SplitGroup group, Guid userId, string userName);
         Task<bool> SoftDeleteGroupAsync(Guid groupId, Guid userId, string userName);
         Task<bool> HasFinancialRecordsAsync(Guid groupId);

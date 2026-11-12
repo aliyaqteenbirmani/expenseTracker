@@ -115,6 +115,34 @@ namespace SpendwiseSystem.Tests
                 return Task.FromResult(group);
             }
 
+            public Task<SplitGroup> CreateGroupWithMemberAndInvitationsAsync(
+                SplitGroup group,
+                Guid ownerId,
+                string ownerName,
+                List<SplitGroupInvitation> invitations,
+                List<SplitGroupActivity> activities)
+            {
+                CreateGroupWithMemberAndActivityAsync(group, ownerId, ownerName);
+                if (invitations != null) Invitations.AddRange(invitations);
+                if (activities != null) Activities.AddRange(activities);
+                return Task.FromResult(group);
+            }
+
+            public Task<List<SplitUserSearchResultDto>> SearchUsersAsync(string query, Guid currentUserId, int limit = 10)
+            {
+                var list = Users.Where(u => u.Id != currentUserId &&
+                    ((u.Email != null && u.Email.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                     (u.FirstName != null && u.FirstName.Contains(query, StringComparison.OrdinalIgnoreCase))))
+                    .Take(limit)
+                    .Select(u => new SplitUserSearchResultDto
+                    {
+                        UserId = u.Id,
+                        FullName = $"{u.FirstName} {u.LastName}".Trim(),
+                        Email = u.Email ?? string.Empty
+                    }).ToList();
+                return Task.FromResult(list);
+            }
+
             public Task<bool> UpdateGroupAsync(SplitGroup group, Guid userId, string userName)
             {
                 var existing = Groups.FirstOrDefault(g => g.Id == group.Id);

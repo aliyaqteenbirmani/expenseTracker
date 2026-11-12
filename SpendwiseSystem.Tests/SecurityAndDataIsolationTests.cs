@@ -42,6 +42,13 @@ namespace SpendwiseSystem.Tests
             public Task<SplitGroup> CreateGroupWithMemberAndActivityAsync(SplitGroup group, Guid ownerId, string ownerName) =>
                 Task.FromResult(group);
 
+            public Task<SplitGroup> CreateGroupWithMemberAndInvitationsAsync(
+                SplitGroup group, Guid ownerId, string ownerName, List<SplitGroupInvitation> invitations, List<SplitGroupActivity> activities) =>
+                Task.FromResult(group);
+
+            public Task<List<SplitUserSearchResultDto>> SearchUsersAsync(string query, Guid currentUserId, int limit = 10) =>
+                Task.FromResult(new List<SplitUserSearchResultDto>());
+
             public Task<bool> UpdateGroupAsync(SplitGroup group, Guid userId, string userName) =>
                 Task.FromResult(true);
 

@@ -953,6 +953,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
               <SplitExpensesPage
                 token={token}
                 currentUserId={user.id ?? (user as unknown as { Id?: string }).Id}
+                currentUserEmail={user.email ?? (user as unknown as { Email?: string }).Email}
                 onToast={showToast}
               />
             )}

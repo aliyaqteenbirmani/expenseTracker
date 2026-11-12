@@ -192,10 +192,34 @@ export interface SplitGroupInvitationDto {
   invitationToken?: string
 }
 
+export interface CreateGroupInviteeInputDto {
+  userId?: string
+  email?: string
+  name?: string
+}
+
+export interface CreateGroupInviteeResultDto {
+  identifier: string
+  status: 'Invited' | 'AlreadyPending' | 'Skipped' | 'Failed'
+  message: string
+  invitationId?: string
+}
+
+export interface CreateSplitGroupResultDto extends SplitGroupSummaryDto {
+  invitations?: CreateGroupInviteeResultDto[]
+}
+
+export interface SplitUserSearchResultDto {
+  userId: string
+  fullName: string
+  email: string
+}
+
 export interface CreateSplitGroupDto {
   name: string
   description?: string
   icon?: string
+  invitees?: CreateGroupInviteeInputDto[]
 }
 
 export interface UpdateSplitGroupDto {

@@ -4,6 +4,8 @@ import type {
   SplitGroupDetailDto,
   SplitGroupMemberDto,
   CreateSplitGroupDto,
+  CreateSplitGroupResultDto,
+  SplitUserSearchResultDto,
   UpdateSplitGroupDto,
   InviteSplitGroupMemberDto,
   SplitGroupInvitationDto,
@@ -33,10 +35,13 @@ export const splitExpensesApi = {
     api<SplitGroupMemberDto[]>(`/api/splitgroup/${groupId}/members`, token),
 
   createGroup: (dto: CreateSplitGroupDto, token?: string) =>
-    api<SplitGroupSummaryDto>('/api/splitgroup', token, {
+    api<CreateSplitGroupResultDto>('/api/splitgroup', token, {
       method: 'POST',
       body: JSON.stringify(dto),
     }),
+
+  searchUsers: (query: string, token?: string) =>
+    api<SplitUserSearchResultDto[]>(`/api/splitgroup/search-users?query=${encodeURIComponent(query)}`, token),
 
   updateGroup: (groupId: string, dto: UpdateSplitGroupDto, token?: string) =>
     api<boolean>(`/api/splitgroup/${groupId}`, token, {

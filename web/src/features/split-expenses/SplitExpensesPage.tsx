@@ -33,12 +33,14 @@ import {
 interface SplitExpensesPageProps {
   token?: string
   currentUserId?: string
+  currentUserEmail?: string
   onToast?: (msg: string) => void
 }
 
 export function SplitExpensesPage({
   token,
   currentUserId,
+  currentUserEmail,
 }: SplitExpensesPageProps) {
   const { reduce, fadeOnly } = useMotionSafe()
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
@@ -309,6 +311,8 @@ export function SplitExpensesPage({
                 open={createGroupOpen}
                 onOpenChange={setCreateGroupOpen}
                 token={token}
+                currentUserId={currentUserId}
+                currentUserEmail={currentUserEmail}
                 onGroupCreated={(newGroup) => {
                   setGroups((prev) => [newGroup, ...prev])
                   setSelectedGroupId(newGroup.id)
