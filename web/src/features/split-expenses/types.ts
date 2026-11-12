@@ -180,6 +180,7 @@ export interface SplitGroupInvitationDto {
   groupId: string
   groupName: string
   invitedUserId?: string
+  invitedUserName?: string
   invitedEmail: string
   invitedBy: string
   invitedByName: string
@@ -192,6 +193,17 @@ export interface SplitGroupInvitationDto {
   invitationToken?: string
 }
 
+export interface BatchInviteMembersDto {
+  invitees: CreateGroupInviteeInputDto[]
+}
+
+export interface BatchInviteResultDto {
+  results: CreateGroupInviteeResultDto[]
+  totalCount: number
+  successCount: number
+  failureCount: number
+}
+
 export interface CreateGroupInviteeInputDto {
   userId?: string
   email?: string
@@ -200,7 +212,7 @@ export interface CreateGroupInviteeInputDto {
 
 export interface CreateGroupInviteeResultDto {
   identifier: string
-  status: 'Invited' | 'AlreadyPending' | 'Skipped' | 'Failed'
+  status: 'Invited' | 'AlreadyPending' | 'AlreadyMember' | 'Self' | 'Skipped' | 'Failed' | string
   message: string
   invitationId?: string
 }

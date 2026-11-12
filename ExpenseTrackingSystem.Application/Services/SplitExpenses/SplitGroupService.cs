@@ -338,6 +338,9 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (group == null)
                 return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Group not found.");
 
+            if (!group.IsActive)
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Cannot invite members to an inactive group.");
+
             if (group.OwnerId != currentUserId)
                 return ApiResponse<SplitGroupInvitationDto>.ForbiddenResponse("Only the group owner can invite members.");
 
@@ -469,12 +472,110 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             return ApiResponse<SplitGroupInvitationDto>.SuccessResponse("Invitation sent successfully.", resultDto);
         }
 
+        public async Task<ApiResponse<BatchInviteResultDto>> BatchInviteMembersAsync(
+            Guid groupId, BatchInviteMembersDto dto, Guid currentUserId, string currentUserName)
+        {
+            var group = await _groupRepository.GetGroupByIdAsync(groupId);
+            if (group == null)
+                return ApiResponse<BatchInviteResultDto>.FailureResponse("Group not found.");
+
+            if (!group.IsActive)
+                return ApiResponse<BatchInviteResultDto>.FailureResponse("Cannot invite members to an inactive group.");
+
+            if (group.OwnerId != currentUserId)
+                return ApiResponse<BatchInviteResultDto>.ForbiddenResponse("Only the group owner can invite members.");
+
+            if (dto?.Invitees == null || dto.Invitees.Count == 0)
+                return ApiResponse<BatchInviteResultDto>.FailureResponse("Please specify at least one member or email to invite.");
+
+            if (dto.Invitees.Count > 20)
+                return ApiResponse<BatchInviteResultDto>.FailureResponse("Cannot invite more than 20 members at once.");
+
+            var results = new List<CreateGroupInviteeResultDto>();
+
+            foreach (var invitee in dto.Invitees)
+            {
+                var identifier = !string.IsNullOrWhiteSpace(invitee.Name)
+                    ? invitee.Name.Trim()
+                    : (!string.IsNullOrWhiteSpace(invitee.Email) ? invitee.Email.Trim() : invitee.UserId?.ToString() ?? "Unknown");
+
+                try
+                {
+                    var singleDto = new InviteSplitGroupMemberDto
+                    {
+                        InvitedUserId = invitee.UserId,
+                        UserId = invitee.UserId,
+                        InvitedEmail = invitee.Email?.Trim(),
+                        Email = invitee.Email?.Trim()
+                    };
+
+                    var singleResult = await InviteMemberAsync(groupId, singleDto, currentUserId, currentUserName);
+                    if (singleResult.Success)
+                    {
+                        results.Add(new CreateGroupInviteeResultDto
+                        {
+                            Identifier = identifier,
+                            Status = "Invited",
+                            Message = singleResult.Message ?? "Invitation sent successfully.",
+                            InvitationId = singleResult.Data?.Id
+                        });
+                    }
+                    else
+                    {
+                        var status = "Failed";
+                        var msg = singleResult.Message ?? "Failed to invite.";
+                        if (msg.Contains("already an active member", StringComparison.OrdinalIgnoreCase))
+                        {
+                            status = "AlreadyMember";
+                        }
+                        else if (msg.Contains("pending invitation", StringComparison.OrdinalIgnoreCase))
+                        {
+                            status = "AlreadyPending";
+                        }
+                        else if (msg.Contains("yourself", StringComparison.OrdinalIgnoreCase))
+                        {
+                            status = "Self";
+                        }
+
+                        results.Add(new CreateGroupInviteeResultDto
+                        {
+                            Identifier = identifier,
+                            Status = status,
+                            Message = msg
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to process batch invitation for {Identifier}", identifier);
+                    results.Add(new CreateGroupInviteeResultDto
+                    {
+                        Identifier = identifier,
+                        Status = "Failed",
+                        Message = ex.Message
+                    });
+                }
+            }
+
+            var batchResult = new BatchInviteResultDto
+            {
+                Results = results
+            };
+
+            return ApiResponse<BatchInviteResultDto>.SuccessResponse(
+                $"Processed {batchResult.TotalCount} invitations: {batchResult.SuccessCount} sent, {batchResult.FailureCount} skipped or failed.",
+                batchResult);
+        }
+
         public async Task<ApiResponse<SplitGroupInvitationDto>> ResendInvitationAsync(
             Guid groupId, Guid invitationId, Guid currentUserId, string currentUserName)
         {
             var group = await _groupRepository.GetGroupByIdAsync(groupId);
             if (group == null)
                 return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Group not found.");
+
+            if (!group.IsActive)
+                return ApiResponse<SplitGroupInvitationDto>.FailureResponse("Cannot resend invitations for an inactive group.");
 
             if (group.OwnerId != currentUserId)
                 return ApiResponse<SplitGroupInvitationDto>.ForbiddenResponse("Only the group owner can resend invitations.");
@@ -608,7 +709,8 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             }
         }
 
-        public async Task<ApiResponse<List<SplitGroupInvitationDto>>> GetPendingInvitationsAsync(Guid groupId, Guid currentUserId)
+        public async Task<ApiResponse<List<SplitGroupInvitationDto>>> GetPendingInvitationsAsync(
+            Guid groupId, Guid currentUserId, bool includeHistory = false)
         {
             var group = await _groupRepository.GetGroupByIdAsync(groupId);
             if (group == null)
@@ -617,7 +719,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (group.OwnerId != currentUserId)
                 return ApiResponse<List<SplitGroupInvitationDto>>.ForbiddenResponse("Only the group owner can view pending invitations.");
 
-            var invitations = await _groupRepository.GetPendingInvitationsByGroupAsync(groupId);
+            var invitations = await _groupRepository.GetPendingInvitationsByGroupAsync(groupId, includeHistory);
             return ApiResponse<List<SplitGroupInvitationDto>>.SuccessResponse("Pending invitations retrieved successfully.", invitations);
         }
 
@@ -633,6 +735,9 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (group == null)
                 return ApiResponse<bool>.FailureResponse("Group not found.");
 
+            if (!group.IsActive)
+                return ApiResponse<bool>.FailureResponse("Cannot revoke invitations for an inactive group.");
+
             if (group.OwnerId != currentUserId)
                 return ApiResponse<bool>.ForbiddenResponse("Only the group owner can revoke invitations.");
 
@@ -644,9 +749,37 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<bool>.FailureResponse($"Cannot revoke invitation with status '{invitation.Status}'.");
 
             var success = await _groupRepository.RevokeInvitationAsync(invitationId, currentUserId, currentUserName, groupId);
-            return success
-                ? ApiResponse<bool>.SuccessResponse("Invitation revoked successfully.", true)
-                : ApiResponse<bool>.FailureResponse("Failed to revoke invitation.");
+            if (success)
+            {
+                // Neutralize notification so invitee cannot accept
+                try
+                {
+                    await _notificationRepository.MarkInvitationNotificationsAsReadAsync(invitationId);
+                    if (invitation.InvitedUserId.HasValue)
+                    {
+                        await _notificationRepository.MarkInvitationNotificationAsReadAsync(invitationId, invitation.InvitedUserId.Value);
+
+                        if (_realtimeService != null)
+                        {
+                            await _realtimeService.NotifyUserAsync(invitation.InvitedUserId.Value, "ReceiveSplitNotification", new
+                            {
+                                Type = "InvitationRevoked",
+                                GroupId = groupId,
+                                ReferenceId = invitation.Id,
+                                Message = $"{currentUserName} revoked the invitation to join '{group.Name}'."
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to neutralize notifications on revoke for invitation {InvitationId}", invitationId);
+                }
+
+                return ApiResponse<bool>.SuccessResponse("Invitation revoked successfully.", true);
+            }
+
+            return ApiResponse<bool>.FailureResponse("Failed to revoke invitation.");
         }
 
         public async Task<ApiResponse<bool>> AcceptInvitationAsync(
@@ -792,6 +925,9 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (group == null)
                 return ApiResponse<bool>.FailureResponse("Group not found.");
 
+            if (!group.IsActive)
+                return ApiResponse<bool>.FailureResponse("Cannot remove members from an inactive group.");
+
             if (group.OwnerId != currentUserId)
                 return ApiResponse<bool>.ForbiddenResponse("Only the group owner can remove members.");
 
@@ -927,5 +1063,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
         public Task<SplitNotification> CreateNotificationAsync(SplitNotification notification) => Task.FromResult(notification);
 
         public Task<bool> MarkInvitationNotificationAsReadAsync(Guid invitationId, Guid userId) => Task.FromResult(true);
+
+        public Task<int> MarkInvitationNotificationsAsReadAsync(Guid invitationId) => Task.FromResult(0);
     }
 }

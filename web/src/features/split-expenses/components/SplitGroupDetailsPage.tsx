@@ -66,6 +66,9 @@ import {
   Crown,
   Send,
   Loader2,
+  UserPlus,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -112,6 +115,7 @@ export function SplitGroupDetailsPage({
   // Member removal state
   const [memberToRemove, setMemberToRemove] = useState<string | null>(null)
   const [removingMember, setRemovingMember] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   const isOwner = group?.ownerId === currentUserId
 
@@ -166,7 +170,7 @@ export function SplitGroupDetailsPage({
 
   const loadInvitations = useCallback(async () => {
     try {
-      const data = await splitExpensesApi.getGroupInvitations(groupId, token)
+      const data = await splitExpensesApi.getGroupInvitations(groupId, token, true)
       setInvitations(data || [])
     } catch {
       // Handled silently
@@ -188,7 +192,10 @@ export function SplitGroupDetailsPage({
     if (tab === 'expenses') loadExpenses()
     if (tab === 'balances' || tab === 'settle') loadBalancesAndSettlements()
     if (tab === 'activity') loadActivities()
-    if (tab === 'members') loadInvitations()
+    if (tab === 'members') {
+      loadGroupDetails()
+      loadInvitations()
+    }
   }
 
   // Open expense details
@@ -287,6 +294,11 @@ export function SplitGroupDetailsPage({
   const isSettled = Math.abs(myBalance) < 0.005
   const isOwed = myBalance > 0.005
   const owes = myBalance < -0.005
+
+  const currentUserEmail =
+    group.members?.find((m) => m.userId === currentUserId)?.email || group.ownerEmail
+  const pendingInvites = invitations.filter((i) => i.status === 'Pending')
+  const pastInvites = invitations.filter((i) => i.status !== 'Pending')
 
   return (
     <div className="space-y-6">
@@ -811,15 +823,15 @@ export function SplitGroupDetailsPage({
 
         {/* 5. MEMBERS TAB */}
         <MotionTabsContent value="members" className="space-y-6 pt-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold">Active Members</h3>
-              <p className="text-xs text-muted-foreground">Members who can view and share expenses.</p>
+              <p className="text-xs text-muted-foreground">Members who can view and share expenses in this group.</p>
             </div>
             {isOwner && (
-              <Button onClick={() => setInviteOpen(true)} size="sm" className="gap-1.5">
-                <Plus className="size-4" />
-                Invite Member
+              <Button onClick={() => setInviteOpen(true)} size="sm" className="gap-1.5 shadow-xs">
+                <UserPlus className="size-4" />
+                Add Members
               </Button>
             )}
           </div>
@@ -828,50 +840,63 @@ export function SplitGroupDetailsPage({
             variants={reduce ? undefined : splitStaggerContainer}
             initial="hidden"
             animate="show"
-            className="rounded-xl border divide-y overflow-hidden bg-card"
+            className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs"
           >
             {group.members?.map((m) => (
               <motion.div
                 key={m.userId}
                 variants={reduce ? fadeOnly : splitCardVariants}
-                className="flex items-center justify-between p-3.5"
+                className="flex items-center justify-between p-3.5 hover:bg-muted/20 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs shrink-0">
                     {getMemberInitials(m.fullName || m.email)}
                   </div>
-                  <div>
-                    <div className="font-semibold text-sm flex items-center gap-2">
-                      {m.fullName}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm flex items-center gap-2 flex-wrap">
+                      <span className="truncate">{m.fullName}</span>
                       {m.userId === currentUserId && (
                         <Badge variant="outline" className="text-[10px] h-4">
                           You
                         </Badge>
                       )}
-                      {m.role === 'Owner' && (
+                      {m.role === 'Owner' ? (
                         <Badge variant="secondary" className="text-[10px] h-4 gap-1">
                           <Crown className="size-2.5" />
                           Owner
                         </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] h-4 text-muted-foreground">
+                          Member
+                        </Badge>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground">{m.email}</div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                      <span className="truncate font-mono">{m.email}</span>
+                      {m.joinedAt && (
+                        <>
+                          <span className="text-muted-foreground/60">·</span>
+                          <span>Joined {format(new Date(m.joinedAt), 'MMM d, yyyy')}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
                     <span className="text-xs font-mono font-medium block">
                       Balance: Rs. {m.balance.toFixed(2)}
                     </span>
                   </div>
-                  {isOwner && m.role !== 'Owner' && (
+                  {isOwner && m.role !== 'Owner' && m.userId !== currentUserId && (
                     <Button
                       variant="ghost"
                       size="icon"
                       className="size-8 text-destructive hover:bg-destructive/10"
                       onClick={() => setMemberToRemove(m.userId)}
                       aria-label="Remove member"
+                      title="Remove member"
                     >
                       <UserX className="size-4" />
                     </Button>
@@ -882,28 +907,63 @@ export function SplitGroupDetailsPage({
           </motion.div>
 
           {/* Pending Invitations Section */}
-          {invitations.length > 0 && (
+          {pendingInvites.length > 0 && (
             <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-foreground">Pending Invitations</h4>
-              <div className="rounded-xl border divide-y overflow-hidden bg-card">
-                {invitations.map((inv) => (
-                  <div key={inv.id} className="flex items-center justify-between p-3 text-sm">
-                    <div className="flex items-center gap-2.5">
-                      <Mail className="size-4 text-muted-foreground" />
-                      <div>
-                        <div className="font-medium text-xs">{inv.invitedEmail}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          Invited by {inv.invitedByName}
-                          {inv.resendCount && inv.resendCount > 0 ? ` · Resent ${inv.resendCount}x` : ''}
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Mail className="size-4 text-primary" />
+                  Pending Invitations ({pendingInvites.length})
+                </h4>
+                <span className="text-xs text-muted-foreground">
+                  Awaiting acceptance by invitees
+                </span>
+              </div>
+              <div className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs">
+                {pendingInvites.map((inv) => (
+                  <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 text-sm gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                        <Mail className="size-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-xs text-foreground flex items-center gap-2 flex-wrap">
+                          {inv.invitedUserName ? (
+                            <>
+                              <span className="font-semibold">{inv.invitedUserName}</span>
+                              <span className="text-muted-foreground font-mono">({inv.invitedEmail})</span>
+                            </>
+                          ) : (
+                            <span className="font-semibold font-mono">{inv.invitedEmail}</span>
+                          )}
+                          <Badge variant="outline" className="text-[9px] h-4 text-amber-600 dark:text-amber-400 border-amber-500/20 bg-amber-500/5">
+                            Pending
+                          </Badge>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span>Sent {format(new Date(inv.createdAt), 'MMM d, yyyy')}</span>
+                          <span>·</span>
+                          <span>Expires {format(new Date(inv.expiresAt), 'MMM d, yyyy')}</span>
+                          {inv.invitedByName && (
+                            <>
+                              <span>·</span>
+                              <span>by {inv.invitedByName}</span>
+                            </>
+                          )}
+                          {inv.resendCount && inv.resendCount > 0 ? (
+                            <>
+                              <span>·</span>
+                              <span className="text-primary font-medium">Resent {inv.resendCount}x</span>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                     </div>
                     {isOwner && (
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 text-xs gap-1"
+                          className="h-8 text-xs gap-1"
                           disabled={resendingInviteId === inv.id}
                           onClick={() => handleResendInvitation(inv.id)}
                         >
@@ -917,7 +977,7 @@ export function SplitGroupDetailsPage({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                          className="h-8 text-xs text-destructive hover:bg-destructive/10"
                           onClick={() => handleRevokeInvitation(inv.id)}
                         >
                           Revoke
@@ -927,6 +987,66 @@ export function SplitGroupDetailsPage({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Collapsible Invitation History (Accepted, Rejected, Revoked, Expired) */}
+          {pastInvites.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowHistory((prev) => !prev)}
+                className="text-xs text-muted-foreground gap-1.5 h-8 px-2 hover:text-foreground"
+              >
+                {showHistory ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                {showHistory ? 'Hide' : 'Show'} Invitation History ({pastInvites.length})
+              </Button>
+
+              {showHistory && (
+                <div className="rounded-xl border divide-y overflow-hidden bg-card/60 text-xs shadow-xs animate-in fade-in-50 duration-200">
+                  {pastInvites.map((inv) => (
+                    <div key={inv.id} className="flex items-center justify-between p-3">
+                      <div className="min-w-0">
+                        <div className="font-medium text-foreground truncate">
+                          {inv.invitedUserName ? `${inv.invitedUserName} (${inv.invitedEmail})` : inv.invitedEmail}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                          <span>Sent {format(new Date(inv.createdAt), 'MMM d, yyyy')}</span>
+                          {inv.respondedAt && (
+                            <>
+                              <span>·</span>
+                              <span>Responded {format(new Date(inv.respondedAt), 'MMM d, yyyy')}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        {inv.status === 'Accepted' && (
+                          <Badge variant="secondary" className="text-[9px] bg-inflow/10 text-inflow border-inflow/20">
+                            Accepted
+                          </Badge>
+                        )}
+                        {inv.status === 'Rejected' && (
+                          <Badge variant="outline" className="text-[9px] text-destructive border-destructive/20 bg-destructive/5">
+                            Declined
+                          </Badge>
+                        )}
+                        {inv.status === 'Revoked' && (
+                          <Badge variant="outline" className="text-[9px] text-muted-foreground">
+                            Revoked
+                          </Badge>
+                        )}
+                        {inv.status === 'Expired' && (
+                          <Badge variant="outline" className="text-[9px] text-amber-600 border-amber-500/20">
+                            Expired
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </MotionTabsContent>
@@ -1021,8 +1141,14 @@ export function SplitGroupDetailsPage({
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         groupId={groupId}
+        groupName={group.name}
+        existingMembers={group.members || []}
+        pendingInvitations={invitations}
+        currentUserId={currentUserId}
+        currentUserEmail={currentUserEmail}
         token={token}
-        onMemberInvited={() => {
+        onMembersInvited={() => {
+          loadGroupDetails()
           loadInvitations()
           loadActivities()
         }}

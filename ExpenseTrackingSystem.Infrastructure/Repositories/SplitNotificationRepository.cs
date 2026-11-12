@@ -137,5 +137,17 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             var rows = await connection.ExecuteAsync(sql, new { InvitationId = invitationId, UserId = userId });
             return rows > 0;
         }
+
+        public async Task<int> MarkInvitationNotificationsAsReadAsync(Guid invitationId)
+        {
+            const string sql = @"
+                UPDATE dbo.SplitNotifications
+                SET IsRead = 1,
+                    ReadAt = SYSUTCDATETIME()
+                WHERE ReferenceId = @InvitationId AND IsRead = 0;";
+
+            using var connection = CreateConnection();
+            return await connection.ExecuteAsync(sql, new { InvitationId = invitationId });
+        }
     }
 }

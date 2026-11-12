@@ -24,6 +24,19 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public List<CreateGroupInviteeResultDto> Invitations { get; set; } = new();
     }
 
+    public class BatchInviteMembersDto
+    {
+        public List<CreateGroupInviteeInputDto> Invitees { get; set; } = new();
+    }
+
+    public class BatchInviteResultDto
+    {
+        public List<CreateGroupInviteeResultDto> Results { get; set; } = new();
+        public int TotalCount => Results.Count;
+        public int SuccessCount => Results.FindAll(r => r.Status == "Invited").Count;
+        public int FailureCount => Results.FindAll(r => r.Status != "Invited").Count;
+    }
+
     public class SplitUserSearchResultDto
     {
         public Guid UserId { get; set; }
@@ -138,6 +151,7 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public Guid GroupId { get; set; }
         public string GroupName { get; set; } = string.Empty;
         public Guid? InvitedUserId { get; set; }
+        public string? InvitedUserName { get; set; }
         public string InvitedEmail { get; set; } = string.Empty;
         public Guid InvitedBy { get; set; }
         public string InvitedByName { get; set; } = string.Empty;

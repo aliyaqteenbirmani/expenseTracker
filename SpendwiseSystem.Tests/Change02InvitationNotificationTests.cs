@@ -239,6 +239,17 @@ namespace SpendwiseSystem.Tests
                 }
                 return Task.FromResult(false);
             }
+
+            public Task<int> MarkInvitationNotificationsAsReadAsync(Guid invitationId)
+            {
+                var list = Notifications.Where(x => x.ReferenceId == invitationId && !x.IsRead).ToList();
+                foreach (var n in list)
+                {
+                    n.IsRead = true;
+                    n.ReadAt = DateTime.UtcNow;
+                }
+                return Task.FromResult(list.Count);
+            }
         }
 
         [Fact]

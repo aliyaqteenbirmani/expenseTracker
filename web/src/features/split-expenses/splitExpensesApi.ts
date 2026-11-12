@@ -8,6 +8,8 @@ import type {
   SplitUserSearchResultDto,
   UpdateSplitGroupDto,
   InviteSplitGroupMemberDto,
+  BatchInviteMembersDto,
+  BatchInviteResultDto,
   SplitGroupInvitationDto,
   PagedExpenseResultDto,
   SplitExpenseDetailDto,
@@ -69,6 +71,12 @@ export const splitExpensesApi = {
     })
   },
 
+  batchInviteMembers: (groupId: string, dto: BatchInviteMembersDto, token?: string) =>
+    api<BatchInviteResultDto>(`/api/splitgroup/${groupId}/invitations/batch`, token, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
+
   resendInvitation: (groupId: string, invitationId: string, token?: string) =>
     api<SplitGroupInvitationDto>(`/api/splitgroup/${groupId}/invitations/${invitationId}/resend`, token, {
       method: 'POST',
@@ -77,8 +85,11 @@ export const splitExpensesApi = {
   getInvitationByToken: (tokenString: string) =>
     api<SplitGroupInvitationDto>(`/api/splitgroup/invitations/token/${encodeURIComponent(tokenString)}`),
 
-  getGroupInvitations: (groupId: string, token?: string) =>
-    api<SplitGroupInvitationDto[]>(`/api/splitgroup/${groupId}/invitations`, token),
+  getGroupInvitations: (groupId: string, token?: string, includeHistory?: boolean) =>
+    api<SplitGroupInvitationDto[]>(
+      `/api/splitgroup/${groupId}/invitations${includeHistory ? '?includeHistory=true' : ''}`,
+      token
+    ),
 
   getMyInvitations: (token?: string) =>
     api<SplitGroupInvitationDto[]>('/api/splitgroup/invitations/me', token),

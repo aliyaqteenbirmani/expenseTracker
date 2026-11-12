@@ -14,5 +14,6 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<int> MarkAllAsReadAsync(Guid userId);
         Task<SplitNotification> CreateNotificationAsync(SplitNotification notification);
         Task<bool> MarkInvitationNotificationAsReadAsync(Guid invitationId, Guid userId);
+        Task<int> MarkInvitationNotificationsAsReadAsync(Guid invitationId);
     }
 }

@@ -150,13 +150,33 @@ namespace SpendwiseSystem.API.Controllers
             return Ok(response);
         }
 
-        [HttpGet("{groupId:guid}/invitations")]
-        public async Task<ActionResult<ApiResponse<List<SplitGroupInvitationDto>>>> GetGroupPendingInvitations(Guid groupId)
+        [HttpPost("{groupId:guid}/invitations/batch")]
+        [HttpPost("{groupId:guid}/invite/batch")]
+        public async Task<ActionResult<ApiResponse<BatchInviteResultDto>>> BatchInviteMembers(
+            Guid groupId, [FromBody] BatchInviteMembersDto dto)
         {
             if (CurrentUserId == Guid.Empty)
                 return Unauthorized(ApiResponses.Unauthorized());
 
-            var response = await _splitGroupService.GetPendingInvitationsAsync(groupId, CurrentUserId);
+            var response = await _splitGroupService.BatchInviteMembersAsync(groupId, dto, CurrentUserId, CurrentUserName);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpGet("{groupId:guid}/invitations")]
+        public async Task<ActionResult<ApiResponse<List<SplitGroupInvitationDto>>>> GetGroupPendingInvitations(
+            Guid groupId, [FromQuery] bool includeHistory = false)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _splitGroupService.GetPendingInvitationsAsync(groupId, CurrentUserId, includeHistory);
             if (!response.Success)
             {
                 if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")

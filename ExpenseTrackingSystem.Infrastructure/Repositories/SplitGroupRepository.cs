@@ -459,7 +459,10 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             return await connection.QueryFirstOrDefaultAsync<SplitGroupInvitation>(sql, new { GroupId = groupId, Email = email });
         }
 
-        public async Task<List<SplitGroupInvitationDto>> GetPendingInvitationsByGroupAsync(Guid groupId)
+        public Task<List<SplitGroupInvitationDto>> GetPendingInvitationsByGroupAsync(Guid groupId) =>
+            GetPendingInvitationsByGroupAsync(groupId, false);
+
+        public async Task<List<SplitGroupInvitationDto>> GetPendingInvitationsByGroupAsync(Guid groupId, bool includeHistory)
         {
             const string sql = @"
                 SELECT 
@@ -467,6 +470,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     i.GroupId,
                     g.Name AS GroupName,
                     i.InvitedUserId,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(tu.FirstName, ' ', tu.LastName))), ''), tu.Email) AS InvitedUserName,
                     i.InvitedEmail,
                     i.InvitedBy,
                     ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.Email) AS InvitedByName,
@@ -480,11 +484,12 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 FROM dbo.SplitGroupInvitations i
                 INNER JOIN dbo.SplitGroups g ON g.Id = i.GroupId
                 LEFT JOIN dbo.Users u ON u.Id = i.InvitedBy
-                WHERE i.GroupId = @GroupId AND i.Status = 'Pending'
+                LEFT JOIN dbo.Users tu ON tu.Id = i.InvitedUserId
+                WHERE i.GroupId = @GroupId AND (@IncludeHistory = 1 OR i.Status = 'Pending')
                 ORDER BY i.CreatedAt DESC;";
 
             using var connection = CreateConnection();
-            var results = await connection.QueryAsync<SplitGroupInvitationDto>(sql, new { GroupId = groupId });
+            var results = await connection.QueryAsync<SplitGroupInvitationDto>(sql, new { GroupId = groupId, IncludeHistory = includeHistory });
             return results.ToList();
         }
 

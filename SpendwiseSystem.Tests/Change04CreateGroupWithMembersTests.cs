@@ -139,6 +139,7 @@ namespace SpendwiseSystem.Tests
             public Task<bool> MarkAsReadAsync(Guid notificationId, Guid userId) => Task.FromResult(true);
             public Task<int> MarkAllAsReadAsync(Guid userId) => Task.FromResult(1);
             public Task<bool> MarkInvitationNotificationAsReadAsync(Guid invitationId, Guid userId) => Task.FromResult(true);
+            public Task<int> MarkInvitationNotificationsAsReadAsync(Guid invitationId) => Task.FromResult(1);
         }
 
         private class TestEmailService : IEmailService

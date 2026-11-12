@@ -30,6 +30,7 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<SplitGroupInvitation?> GetInvitationByTokenAsync(string token);
         Task<SplitGroupInvitation?> GetPendingInvitationByEmailAsync(Guid groupId, string email);
         Task<List<SplitGroupInvitationDto>> GetPendingInvitationsByGroupAsync(Guid groupId);
+        Task<List<SplitGroupInvitationDto>> GetPendingInvitationsByGroupAsync(Guid groupId, bool includeHistory) => GetPendingInvitationsByGroupAsync(groupId);
         Task<List<SplitGroupInvitationDto>> GetPendingInvitationsByUserAsync(Guid userId, string userEmail);
         Task<SplitGroupInvitation> CreateInvitationAsync(SplitGroupInvitation invitation, string inviterName, string groupName);
         Task<bool> UpdateInvitationResendAsync(Guid invitationId);
