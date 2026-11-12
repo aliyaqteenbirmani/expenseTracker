@@ -340,6 +340,7 @@ namespace SpendwiseSystem.Tests
         {
             public List<SplitExpense> Expenses { get; } = new();
             public List<SplitExpenseShare> Shares { get; } = new();
+            public List<SplitNotification> Notifications { get; } = new();
 
             public Task<SplitExpense?> GetExpenseByIdAsync(Guid expenseId) =>
                 Task.FromResult(Expenses.FirstOrDefault(e => e.Id == expenseId && !e.IsDeleted));
@@ -369,14 +370,41 @@ namespace SpendwiseSystem.Tests
                 });
             }
 
-            public Task<PagedExpenseResultDto> GetExpensesListAsync(Guid groupId, Guid currentUserId, SplitExpenseQueryParameters parameters) =>
-                Task.FromResult(new PagedExpenseResultDto());
+            public Task<PagedExpenseResultDto> GetExpensesListAsync(Guid groupId, Guid currentUserId, SplitExpenseQueryParameters parameters)
+            {
+                var list = Expenses.Where(e => e.GroupId == groupId && !e.IsDeleted).Select(e =>
+                {
+                    var userShare = Shares.FirstOrDefault(s => s.ExpenseId == e.Id && s.UserId == currentUserId)?.ShareAmount ?? 0m;
+                    var partCount = Shares.Count(s => s.ExpenseId == e.Id);
+                    return new SplitExpenseListItemDto
+                    {
+                        Id = e.Id,
+                        GroupId = e.GroupId,
+                        PayerId = e.PayerId,
+                        Title = e.Title,
+                        Amount = e.Amount,
+                        ExpenseDate = e.ExpenseDate,
+                        ParticipantCount = partCount,
+                        CurrentUserShare = userShare
+                    };
+                }).ToList();
+
+                return Task.FromResult(new PagedExpenseResultDto
+                {
+                    Items = list,
+                    TotalCount = list.Count,
+                    PageNumber = 1,
+                    PageSize = 50
+                });
+            }
 
             public Task<SplitExpenseDetailDto> CreateExpenseWithSharesAndActivityAsync(
-                SplitExpense expense, List<SplitExpenseShare> shares, string creatorName, string groupName)
+                SplitExpense expense, List<SplitExpenseShare> shares, string creatorName, string groupName, List<SplitNotification>? notifications = null)
             {
                 Expenses.Add(expense);
                 Shares.AddRange(shares);
+                if (notifications != null) Notifications.AddRange(notifications);
+
                 return Task.FromResult(new SplitExpenseDetailDto
                 {
                     Id = expense.Id,
@@ -396,7 +424,7 @@ namespace SpendwiseSystem.Tests
             }
 
             public Task<SplitExpenseDetailDto?> UpdateExpenseWithSharesAndActivityAsync(
-                SplitExpense expense, List<SplitExpenseShare> newShares, string editorName, string groupName)
+                SplitExpense expense, List<SplitExpenseShare> newShares, string editorName, string groupName, List<SplitNotification>? notifications = null)
             {
                 var existing = Expenses.FirstOrDefault(e => e.Id == expense.Id);
                 if (existing == null) return Task.FromResult<SplitExpenseDetailDto?>(null);
@@ -405,10 +433,12 @@ namespace SpendwiseSystem.Tests
                 existing.Title = expense.Title;
                 existing.Description = expense.Description;
                 existing.ExpenseDate = expense.ExpenseDate;
+                existing.PayerId = expense.PayerId;
                 existing.UpdatedAt = DateTime.UtcNow;
 
                 Shares.RemoveAll(s => s.ExpenseId == expense.Id);
                 Shares.AddRange(newShares);
+                if (notifications != null) Notifications.AddRange(notifications);
 
                 return Task.FromResult<SplitExpenseDetailDto?>(new SplitExpenseDetailDto
                 {
@@ -429,12 +459,13 @@ namespace SpendwiseSystem.Tests
             }
 
             public Task<bool> SoftDeleteExpenseWithActivityAsync(
-                Guid expenseId, Guid groupId, Guid deletedByUserId, string deletedByName)
+                Guid expenseId, Guid groupId, Guid deletedByUserId, string deletedByName, List<SplitNotification>? notifications = null)
             {
                 var expense = Expenses.FirstOrDefault(e => e.Id == expenseId && e.GroupId == groupId);
                 if (expense == null) return Task.FromResult(false);
                 expense.IsDeleted = true;
                 expense.UpdatedAt = DateTime.UtcNow;
+                if (notifications != null) Notifications.AddRange(notifications);
                 return Task.FromResult(true);
             }
 
@@ -1163,6 +1194,468 @@ namespace SpendwiseSystem.Tests
 
             var balancesAfterDelete = await balanceRepo.GetGroupBalancesAsync(groupId);
             Assert.All(balancesAfterDelete, b => Assert.Equal(0m, b.NetBalance));
+        }
+
+        [Fact]
+        public async Task ExpenseTest_11_DefaultSelectionPayload_AllActiveMembersIncluded()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var m1 = Guid.NewGuid();
+            var m2 = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip Group", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = m1, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = m2, Role = "Member", IsActive = true });
+
+            var dto = new CreateSplitExpenseDto
+            {
+                Title = "Dinner",
+                Amount = 630.00m,
+                PayerId = ownerId,
+                ParticipantUserIds = new List<Guid> { ownerId, m1, m2 } // All active members
+            };
+
+            var res = await service.AddExpenseAsync(groupId, dto, ownerId, "Owner");
+
+            Assert.True(res.Success);
+            Assert.Equal(3, res.Data!.Shares.Count);
+            // 630 / 3 = 210 each
+            Assert.All(res.Data.Shares, s => Assert.Equal(210.00m, s.ShareAmount));
+            Assert.Equal(630.00m, res.Data.Shares.Sum(s => s.ShareAmount));
+        }
+
+        [Fact]
+        public async Task ExpenseTest_12_EditToAddParticipant_FromSinglePayerToTwoMembers_ReplacesSharesAtomically()
+        {
+            // Reproduces observed bug: Expense was created with only owner (750.00).
+            // Owner then uses Edit Expense to add the other member.
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var memberId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "SUNDUS-OGs", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = memberId, Role = "Member", IsActive = true });
+
+            // 1. Initial flawed creation: only owner included
+            var createDto = new CreateSplitExpenseDto
+            {
+                Title = "tukar",
+                Amount = 750.00m,
+                PayerId = ownerId,
+                ParticipantUserIds = new List<Guid> { ownerId }
+            };
+
+            var createRes = await service.AddExpenseAsync(groupId, createDto, ownerId, "Owner");
+            Assert.True(createRes.Success);
+            Assert.Single(createRes.Data!.Shares);
+            Assert.Equal(750.00m, createRes.Data.Shares[0].ShareAmount);
+
+            // Member screen initially shows 0.00 share and 0 balance
+            var initialListForMember = await service.GetExpensesListAsync(groupId, memberId, new SplitExpenseQueryParameters());
+            Assert.Equal(0.00m, initialListForMember.Data!.Items[0].CurrentUserShare);
+            var initialBalances = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(0m, initialBalances.First(b => b.UserId == memberId).NetBalance);
+            Assert.Equal(0m, initialBalances.First(b => b.UserId == ownerId).NetBalance);
+
+            // 2. Owner edits expense to include member
+            var editDto = new UpdateSplitExpenseDto
+            {
+                Title = "tukar",
+                Amount = 750.00m,
+                PayerId = ownerId,
+                ParticipantUserIds = new List<Guid> { ownerId, memberId } // now both
+            };
+
+            var editRes = await service.EditExpenseAsync(groupId, createRes.Data.Id, editDto, ownerId, "Owner");
+            Assert.True(editRes.Success);
+            Assert.Equal(2, editRes.Data!.Shares.Count);
+            Assert.Equal(375.00m, editRes.Data.Shares.First(s => s.UserId == ownerId).ShareAmount);
+            Assert.Equal(375.00m, editRes.Data.Shares.First(s => s.UserId == memberId).ShareAmount);
+            Assert.Equal(750.00m, editRes.Data.Shares.Sum(s => s.ShareAmount));
+
+            // Member screen now shows 375.00 share and negative net balance (owes money); owner shows positive
+            var updatedListForMember = await service.GetExpensesListAsync(groupId, memberId, new SplitExpenseQueryParameters());
+            Assert.Equal(375.00m, updatedListForMember.Data!.Items[0].CurrentUserShare);
+            var updatedBalances = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(-375.00m, updatedBalances.First(b => b.UserId == memberId).NetBalance);
+            Assert.Equal(375.00m, updatedBalances.First(b => b.UserId == ownerId).NetBalance);
+        }
+
+        [Fact]
+        public async Task ExpenseTest_13_ServerValidation_RejectsInactiveOrPendingMembers()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var activeMember = Guid.NewGuid();
+            var pendingUser = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Team", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = activeMember, Role = "Member", IsActive = true });
+            groupRepo.Invitations.Add(new SplitGroupInvitation { GroupId = groupId, InvitedUserId = pendingUser, Status = "Pending" });
+
+            // Try creating expense including the pending user
+            var addDto = new CreateSplitExpenseDto
+            {
+                Title = "Lunch",
+                Amount = 500m,
+                PayerId = ownerId,
+                ParticipantUserIds = new List<Guid> { ownerId, pendingUser }
+            };
+
+            var addRes = await service.AddExpenseAsync(groupId, addDto, ownerId, "Owner");
+            Assert.False(addRes.Success);
+            Assert.Contains("not active members", addRes.Message);
+
+            // Create valid expense first
+            var validDto = new CreateSplitExpenseDto
+            {
+                Title = "Lunch",
+                Amount = 500m,
+                PayerId = ownerId,
+                ParticipantUserIds = new List<Guid> { ownerId, activeMember }
+            };
+            var validRes = await service.AddExpenseAsync(groupId, validDto, ownerId, "Owner");
+            Assert.True(validRes.Success);
+
+            // Try editing expense to include the pending user
+            var editDto = new UpdateSplitExpenseDto
+            {
+                Title = "Lunch",
+                Amount = 500m,
+                PayerId = ownerId,
+                ParticipantUserIds = new List<Guid> { ownerId, pendingUser }
+            };
+            var editRes = await service.EditExpenseAsync(groupId, validRes.Data!.Id, editDto, ownerId, "Owner");
+            Assert.False(editRes.Success);
+            Assert.Contains("not active members", editRes.Message);
+        }
+
+        [Fact]
+        public async Task ExpenseTest_14_MemberViewCorrectness_IncludedVsNotIncludedMemberShares()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var owner = Guid.NewGuid();
+            var includedMember = Guid.NewGuid();
+            var notIncludedMember = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Group", OwnerId = owner, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = owner, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = includedMember, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = notIncludedMember, Role = "Member", IsActive = true });
+
+            var dto = new CreateSplitExpenseDto
+            {
+                Title = "Excluded Member Expense",
+                Amount = 630.00m,
+                PayerId = owner,
+                ParticipantUserIds = new List<Guid> { owner, includedMember } // notIncludedMember is omitted
+            };
+
+            var res = await service.AddExpenseAsync(groupId, dto, owner, "Owner");
+            Assert.True(res.Success);
+
+            // Verify included member sees their share: 315.00
+            var includedList = await service.GetExpensesListAsync(groupId, includedMember, new SplitExpenseQueryParameters());
+            Assert.Equal(315.00m, includedList.Data!.Items[0].CurrentUserShare);
+
+            // Verify not included member sees 0.00
+            var notIncludedList = await service.GetExpensesListAsync(groupId, notIncludedMember, new SplitExpenseQueryParameters());
+            Assert.Equal(0.00m, notIncludedList.Data!.Items[0].CurrentUserShare);
+        }
+
+        #endregion
+
+        #region 2b. Expense In-App Notification Tests (Phase 2 Step 2)
+
+        [Fact]
+        public async Task ExpenseNotification_01_AddExpense_NotifiesIncludedMembersWithShare_ActorExcluded()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var owner = Guid.NewGuid();
+            var member1 = Guid.NewGuid();
+            var member2 = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "SUNDUS-OGs", OwnerId = owner, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = owner, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = member1, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = member2, Role = "Member", IsActive = true });
+
+            var dto = new CreateSplitExpenseDto
+            {
+                Title = "tukar",
+                Amount = 750.00m,
+                PayerId = owner,
+                ParticipantUserIds = new List<Guid> { owner, member1 } // member2 excluded
+            };
+
+            var res = await service.AddExpenseAsync(groupId, dto, owner, "Ali");
+            Assert.True(res.Success);
+
+            // Member1 gets notification with correct share
+            var member1Notifs = expenseRepo.Notifications.Where(n => n.UserId == member1).ToList();
+            Assert.Single(member1Notifs);
+            Assert.Equal("ExpenseAdded", member1Notifs[0].Type);
+            Assert.Equal(groupId, member1Notifs[0].GroupId);
+            Assert.Equal(res.Data!.Id, member1Notifs[0].ReferenceId);
+            Assert.Contains("Ali added 'tukar' (Rs. 750.00). Your share: Rs. 375.00", member1Notifs[0].Message);
+
+            // Owner (actor) gets NO notification (Rule 1)
+            var ownerNotifs = expenseRepo.Notifications.Where(n => n.UserId == owner).ToList();
+            Assert.Empty(ownerNotifs);
+
+            // Member2 (not included, not payer) gets NO notification (Rule 2)
+            var member2Notifs = expenseRepo.Notifications.Where(n => n.UserId == member2).ToList();
+            Assert.Empty(member2Notifs);
+        }
+
+        [Fact]
+        public async Task ExpenseNotification_02_AddExpense_ThirdPartyPayer_ReceivesNotification()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var creator = Guid.NewGuid();
+            var payer = Guid.NewGuid();
+            var participant = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = creator, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = creator, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payer, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = participant, Role = "Member", IsActive = true });
+
+            // Creator records expense paid by 'payer', split between creator and 'participant'
+            var dto = new CreateSplitExpenseDto
+            {
+                Title = "Lunch",
+                Amount = 500.00m,
+                PayerId = payer,
+                ParticipantUserIds = new List<Guid> { creator, participant }
+            };
+
+            var res = await service.AddExpenseAsync(groupId, dto, creator, "Ali");
+            Assert.True(res.Success);
+
+            // Payer receives notification that they were listed as payer
+            var payerNotifs = expenseRepo.Notifications.Where(n => n.UserId == payer).ToList();
+            Assert.Single(payerNotifs);
+            Assert.Contains("Ali added 'Lunch' (Rs. 500.00) with you as payer.", payerNotifs[0].Message);
+
+            // Participant receives their share notification
+            var partNotifs = expenseRepo.Notifications.Where(n => n.UserId == participant).ToList();
+            Assert.Single(partNotifs);
+            Assert.Contains("Your share: Rs. 250.00", partNotifs[0].Message);
+
+            // Creator (actor) gets none
+            Assert.DoesNotContain(expenseRepo.Notifications, n => n.UserId == creator);
+        }
+
+        [Fact]
+        public async Task ExpenseNotification_03_EditExpense_AddedMember_RemovedMember_Wording()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var owner = Guid.NewGuid();
+            var m1 = Guid.NewGuid();
+            var m2 = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Group", OwnerId = owner, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = owner, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = m1, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = m2, Role = "Member", IsActive = true });
+
+            // Initial: owner and m1 (300 each)
+            var createRes = await service.AddExpenseAsync(groupId, new CreateSplitExpenseDto
+            {
+                Title = "Dinner",
+                Amount = 600.00m,
+                PayerId = owner,
+                ParticipantUserIds = new List<Guid> { owner, m1 }
+            }, owner, "Ali");
+
+            expenseRepo.Notifications.Clear(); // clear initial notifications
+
+            // Edit: replace m1 with m2
+            var editRes = await service.EditExpenseAsync(groupId, createRes.Data!.Id, new UpdateSplitExpenseDto
+            {
+                Title = "Dinner",
+                Amount = 600.00m,
+                PayerId = owner,
+                ParticipantUserIds = new List<Guid> { owner, m2 } // m1 removed, m2 added
+            }, owner, "Ali");
+            Assert.True(editRes.Success);
+
+            // m1 was removed
+            var m1Notifs = expenseRepo.Notifications.Where(n => n.UserId == m1).ToList();
+            Assert.Single(m1Notifs);
+            Assert.Equal("ExpenseUpdated", m1Notifs[0].Type);
+            Assert.Contains("Ali removed you from 'Dinner'.", m1Notifs[0].Message);
+
+            // m2 was added
+            var m2Notifs = expenseRepo.Notifications.Where(n => n.UserId == m2).ToList();
+            Assert.Single(m2Notifs);
+            Assert.Equal("ExpenseUpdated", m2Notifs[0].Type);
+            Assert.Contains("Ali updated 'Dinner'. Your share is now Rs. 300.00", m2Notifs[0].Message);
+
+            // Owner (actor) gets nothing
+            Assert.DoesNotContain(expenseRepo.Notifications, n => n.UserId == owner);
+        }
+
+        [Fact]
+        public async Task ExpenseNotification_04_EditExpense_ContinuingMemberShareChanged()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var owner = Guid.NewGuid();
+            var m1 = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Group", OwnerId = owner, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = owner, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = m1, Role = "Member", IsActive = true });
+
+            var createRes = await service.AddExpenseAsync(groupId, new CreateSplitExpenseDto
+            {
+                Title = "Groceries",
+                Amount = 300.00m,
+                PayerId = owner,
+                ParticipantUserIds = new List<Guid> { owner, m1 }
+            }, owner, "Ali");
+
+            expenseRepo.Notifications.Clear();
+
+            // Increase amount from 300 to 500 (share from 150 to 250)
+            await service.EditExpenseAsync(groupId, createRes.Data!.Id, new UpdateSplitExpenseDto
+            {
+                Title = "Groceries",
+                Amount = 500.00m,
+                PayerId = owner,
+                ParticipantUserIds = new List<Guid> { owner, m1 }
+            }, owner, "Ali");
+
+            var m1Notifs = expenseRepo.Notifications.Where(n => n.UserId == m1).ToList();
+            Assert.Single(m1Notifs);
+            Assert.Contains("Ali updated 'Groceries'. Your share is now Rs. 250.00", m1Notifs[0].Message);
+        }
+
+        [Fact]
+        public async Task ExpenseNotification_05_DeleteExpense_NotifiesParticipantsOnly_ActorExcluded()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var owner = Guid.NewGuid();
+            var m1 = Guid.NewGuid();
+            var m2 = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "SUNDUS-OGs", OwnerId = owner, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = owner, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = m1, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = m2, Role = "Member", IsActive = true });
+
+            var createRes = await service.AddExpenseAsync(groupId, new CreateSplitExpenseDto
+            {
+                Title = "tukar",
+                Amount = 750.00m,
+                PayerId = owner,
+                ParticipantUserIds = new List<Guid> { owner, m1 } // m2 not included
+            }, owner, "Ali");
+
+            expenseRepo.Notifications.Clear();
+
+            // Owner deletes expense
+            var delRes = await service.DeleteExpenseAsync(groupId, createRes.Data!.Id, owner, "Ali");
+            Assert.True(delRes.Success);
+
+            // m1 (participant) receives deletion notification
+            var m1Notifs = expenseRepo.Notifications.Where(n => n.UserId == m1).ToList();
+            Assert.Single(m1Notifs);
+            Assert.Equal("ExpenseDeleted", m1Notifs[0].Type);
+            Assert.Equal(groupId, m1Notifs[0].GroupId);
+            Assert.Equal(createRes.Data.Id, m1Notifs[0].ReferenceId);
+            Assert.Contains("Ali deleted 'tukar' (Rs. 750.00)", m1Notifs[0].Message);
+
+            // Actor (owner) receives none
+            Assert.DoesNotContain(expenseRepo.Notifications, n => n.UserId == owner);
+
+            // Non-participant (m2) receives none
+            Assert.DoesNotContain(expenseRepo.Notifications, n => n.UserId == m2);
+        }
+
+        [Fact]
+        public async Task ExpenseNotification_06_InactiveOrLeftMember_DoesNotReceiveNotification()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var owner = Guid.NewGuid();
+            var activeMember = Guid.NewGuid();
+            var inactiveMember = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Team", OwnerId = owner, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = owner, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = activeMember, Role = "Member", IsActive = true });
+            // Inactive / left member
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = inactiveMember, Role = "Member", IsActive = false });
+
+            var res = await service.AddExpenseAsync(groupId, new CreateSplitExpenseDto
+            {
+                Title = "Snacks",
+                Amount = 200.00m,
+                PayerId = owner,
+                ParticipantUserIds = new List<Guid> { owner, activeMember }
+            }, owner, "Ali");
+
+            Assert.True(res.Success);
+
+            // Inactive member gets 0 notifications
+            Assert.DoesNotContain(expenseRepo.Notifications, n => n.UserId == inactiveMember);
         }
 
         #endregion

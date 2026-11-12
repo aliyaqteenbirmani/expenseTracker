@@ -15,6 +15,9 @@ import {
   XCircle,
   Loader2,
   Inbox,
+  Receipt,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import { splitExpensesApi } from '../splitExpensesApi'
 import { realtimeService } from '@/realtimeService'
@@ -26,12 +29,14 @@ import { cn } from '@/lib/utils'
 interface SplitNotificationBellProps {
   token?: string
   onInvitationProcessed?: () => void
+  onNotificationClick?: (notification: SplitNotificationDto) => void
   className?: string
 }
 
 export function SplitNotificationBell({
   token,
   onInvitationProcessed,
+  onNotificationClick,
   className,
 }: SplitNotificationBellProps) {
   const [open, setOpen] = useState(false)
@@ -161,6 +166,16 @@ export function SplitNotificationBell({
     }
   }
 
+  const handleItemClick = (notif: SplitNotificationDto) => {
+    if (!notif.isRead) {
+      void handleMarkAsRead(notif.id)
+    }
+    if (onNotificationClick) {
+      setOpen(false)
+      onNotificationClick(notif)
+    }
+  }
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -222,16 +237,19 @@ export function SplitNotificationBell({
               const isInvited = notif.type === 'GroupInvitationReceived'
               const isAccepted = notif.type === 'InvitationAccepted'
               const isDeclined = notif.type === 'InvitationRejected'
+              const isExpenseAdded = notif.type === 'ExpenseAdded'
+              const isExpenseUpdated = notif.type === 'ExpenseUpdated'
+              const isExpenseDeleted = notif.type === 'ExpenseDeleted'
               const isBusy = actionInProgressId === notif.id
 
               return (
                 <div
                   key={notif.id}
                   className={cn(
-                    'p-3.5 text-xs transition-colors relative flex gap-3',
+                    'p-3.5 text-xs transition-colors relative flex gap-3 cursor-pointer select-none',
                     !notif.isRead ? 'bg-primary/5 hover:bg-primary/8' : 'hover:bg-muted/40'
                   )}
-                  onClick={() => !notif.isRead && !isInvited && handleMarkAsRead(notif.id)}
+                  onClick={() => handleItemClick(notif)}
                 >
                   <div className="shrink-0 mt-0.5">
                     {isInvited && (
@@ -249,7 +267,22 @@ export function SplitNotificationBell({
                         <XCircle className="size-3.5" />
                       </div>
                     )}
-                    {!isInvited && !isAccepted && !isDeclined && (
+                    {isExpenseAdded && (
+                      <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Receipt className="size-3.5" />
+                      </div>
+                    )}
+                    {isExpenseUpdated && (
+                      <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <Pencil className="size-3.5" />
+                      </div>
+                    )}
+                    {isExpenseDeleted && (
+                      <div className="flex size-7 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                        <Trash2 className="size-3.5" />
+                      </div>
+                    )}
+                    {!isInvited && !isAccepted && !isDeclined && !isExpenseAdded && !isExpenseUpdated && !isExpenseDeleted && (
                       <div className="flex size-7 items-center justify-center rounded-full bg-muted text-muted-foreground">
                         <Bell className="size-3.5" />
                       </div>

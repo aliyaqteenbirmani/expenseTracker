@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.DTOs.SplitExpenseDtos;
 using SpendwiseSystem.Domain.Entities;
@@ -13,15 +14,32 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
         private readonly ISplitExpenseRepository _expenseRepository;
         private readonly ISplitGroupRepository _groupRepository;
         private readonly ISplitCalculatorService _calculatorService;
+        private readonly ISplitNotificationRepository? _notificationRepository;
+        private readonly ISplitRealtimeService? _realtimeService;
+        private readonly ILogger<SplitExpenseService>? _logger;
 
         public SplitExpenseService(
             ISplitExpenseRepository expenseRepository,
             ISplitGroupRepository groupRepository,
             ISplitCalculatorService calculatorService)
+            : this(expenseRepository, groupRepository, calculatorService, null, null, null)
+        {
+        }
+
+        public SplitExpenseService(
+            ISplitExpenseRepository expenseRepository,
+            ISplitGroupRepository groupRepository,
+            ISplitCalculatorService calculatorService,
+            ISplitNotificationRepository? notificationRepository,
+            ISplitRealtimeService? realtimeService = null,
+            ILogger<SplitExpenseService>? logger = null)
         {
             _expenseRepository = expenseRepository;
             _groupRepository = groupRepository;
             _calculatorService = calculatorService;
+            _notificationRepository = notificationRepository;
+            _realtimeService = realtimeService;
+            _logger = logger;
         }
 
         public async Task<ApiResponse<SplitExpenseDetailDto>> AddExpenseAsync(
@@ -102,8 +120,75 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 UpdatedAt = expense.UpdatedAt
             }).ToList();
 
+            // Compute in-app expense notifications (In-app only, no emails)
+            var notifications = new List<SplitNotification>();
+            var notifiedUserIds = new HashSet<Guid>();
+
+            // 1. Every participant (has a share) except creator
+            foreach (var share in shares)
+            {
+                if (share.UserId == currentUserId) continue; // Rule 1: Never notify actor
+                if (!activeMemberIdSet.Contains(share.UserId)) continue; // Rule 8: Only active group members
+
+                notifiedUserIds.Add(share.UserId);
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = share.UserId,
+                    Type = "ExpenseAdded",
+                    GroupId = groupId,
+                    ReferenceId = expense.Id,
+                    Title = "Expense Added",
+                    Message = $"{currentUserName} added '{expense.Title}' (Rs. {expense.Amount:N2}). Your share: Rs. {share.ShareAmount:N2}",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // 2. Also the payer if payer != creator and not already notified as participant
+            if (payerId != currentUserId && !notifiedUserIds.Contains(payerId) && activeMemberIdSet.Contains(payerId))
+            {
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = payerId,
+                    Type = "ExpenseAdded",
+                    GroupId = groupId,
+                    ReferenceId = expense.Id,
+                    Title = "Expense Added",
+                    Message = $"{currentUserName} added '{expense.Title}' (Rs. {expense.Amount:N2}) with you as payer.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
             var result = await _expenseRepository.CreateExpenseWithSharesAndActivityAsync(
-                expense, shares, currentUserName, group.Name);
+                expense, shares, currentUserName, group.Name, notifications);
+
+            // In-memory test repository support
+            if (_notificationRepository != null && _notificationRepository.GetType().Name != "SplitNotificationRepository")
+            {
+                foreach (var notif in notifications)
+                {
+                    await _notificationRepository.CreateNotificationAsync(notif);
+                }
+            }
+
+            // Broadcast realtime notifications
+            if (_realtimeService != null && notifications.Count > 0)
+            {
+                foreach (var notif in notifications)
+                {
+                    try
+                    {
+                        await _realtimeService.NotifyUserAsync(notif.UserId, "ReceiveSplitNotification", notif);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to send realtime notification to user {UserId}", notif.UserId);
+                    }
+                }
+            }
 
             return ApiResponse<SplitExpenseDetailDto>.SuccessResponse("Expense added successfully.", result);
         }
@@ -180,6 +265,13 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                     return ApiResponse<SplitExpenseDetailDto>.FailureResponse("One or more selected participants are not active members of this group.");
             }
 
+            // Capture old state for computing diff notifications
+            var oldAmount = existingExpense.Amount;
+            var oldPayerId = existingExpense.PayerId;
+            var oldTitle = existingExpense.Title;
+            var oldShares = await _expenseRepository.GetExpenseSharesAsync(existingExpense.Id);
+            var oldShareMap = oldShares.ToDictionary(s => s.UserId, s => s.ShareAmount);
+
             // Recalculate shares
             var calculatedShares = _calculatorService.CalculateEqualSplit(dto.Amount, participantIds);
 
@@ -203,11 +295,109 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 UpdatedAt = DateTime.UtcNow
             }).ToList();
 
+            var newShareMap = calculatedShares;
+            var newTitle = dto.Title.Trim();
+            var newAmount = dto.Amount;
+            var newPayerId = dto.PayerId;
+
+            var notifications = new List<SplitNotification>();
+            var candidateUserIds = oldShareMap.Keys.Union(newShareMap.Keys).ToHashSet();
+            if (oldPayerId != Guid.Empty) candidateUserIds.Add(oldPayerId);
+            if (newPayerId != Guid.Empty) candidateUserIds.Add(newPayerId);
+
+            foreach (var userId in candidateUserIds)
+            {
+                if (userId == currentUserId) continue; // Never notify actor
+                if (!activeMemberIdSet.Contains(userId)) continue; // Only active members
+
+                bool inOldShares = oldShareMap.TryGetValue(userId, out var oldShare);
+                bool inNewShares = newShareMap.TryGetValue(userId, out var newShare);
+
+                string? message = null;
+
+                if (!inOldShares && inNewShares)
+                {
+                    // Newly added participant
+                    message = $"{currentUserName} updated '{newTitle}'. Your share is now Rs. {newShare:N2}";
+                }
+                else if (inOldShares && !inNewShares)
+                {
+                    // Removed participant
+                    message = $"{currentUserName} removed you from '{newTitle}'.";
+                }
+                else if (inOldShares && inNewShares)
+                {
+                    // Continuing participant: check if share amount changed
+                    if (oldShare != newShare)
+                    {
+                        message = $"{currentUserName} updated '{newTitle}'. Your share is now Rs. {newShare:N2}";
+                    }
+                    else if (oldAmount != newAmount || oldPayerId != newPayerId || oldTitle != newTitle)
+                    {
+                        // Share stayed identical, but expense details changed
+                        message = $"{currentUserName} updated '{newTitle}'.";
+                    }
+                }
+                else
+                {
+                    // Payer role changes
+                    if (userId == newPayerId && oldPayerId != newPayerId)
+                    {
+                        message = $"{currentUserName} updated '{newTitle}'. You are now listed as payer.";
+                    }
+                    else if (userId == oldPayerId && oldPayerId != newPayerId)
+                    {
+                        message = $"{currentUserName} updated '{newTitle}'.";
+                    }
+                }
+
+                if (message != null)
+                {
+                    notifications.Add(new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = userId,
+                        Type = "ExpenseUpdated",
+                        GroupId = groupId,
+                        ReferenceId = existingExpense.Id,
+                        Title = "Expense Updated",
+                        Message = message,
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
             var updated = await _expenseRepository.UpdateExpenseWithSharesAndActivityAsync(
-                existingExpense, newShares, currentUserName, group.Name);
+                existingExpense, newShares, currentUserName, group.Name, notifications);
 
             if (updated == null)
                 return ApiResponse<SplitExpenseDetailDto>.FailureResponse("Failed to update expense.");
+
+            // In-memory test repository support
+            if (_notificationRepository != null && _notificationRepository.GetType().Name != "SplitNotificationRepository")
+            {
+                foreach (var notif in notifications)
+                {
+                    await _notificationRepository.CreateNotificationAsync(notif);
+                }
+            }
+
+            // Realtime SignalR broadcast
+            if (_realtimeService != null && notifications.Count > 0)
+            {
+                foreach (var notif in notifications)
+                {
+                    try
+                    {
+                        await _realtimeService.NotifyUserAsync(notif.UserId, "ReceiveSplitNotification", notif);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to send realtime notification to user {UserId}", notif.UserId);
+                    }
+                }
+            }
 
             return ApiResponse<SplitExpenseDetailDto>.SuccessResponse("Expense updated successfully.", updated);
         }
@@ -230,8 +420,66 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (!isCreator && !isGroupOwner)
                 return ApiResponse<bool>.ForbiddenResponse("Only the expense creator or the group owner can delete this expense.");
 
+            var shares = await _expenseRepository.GetExpenseSharesAsync(expenseId);
+            var activeMembers = await _groupRepository.GetGroupMembersAsync(groupId);
+            var activeMemberIdSet = activeMembers.Where(m => m.IsActive).Select(m => m.UserId).ToHashSet();
+
+            var candidateUserIds = shares.Select(s => s.UserId).ToHashSet();
+            if (existingExpense.PayerId != Guid.Empty)
+            {
+                candidateUserIds.Add(existingExpense.PayerId);
+            }
+
+            var notifications = new List<SplitNotification>();
+            foreach (var userId in candidateUserIds)
+            {
+                if (userId == currentUserId) continue; // Rule 1: Never notify actor
+                if (!activeMemberIdSet.Contains(userId)) continue; // Rule 8: Only active group members
+
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    Type = "ExpenseDeleted",
+                    GroupId = groupId,
+                    ReferenceId = expenseId,
+                    Title = "Expense Deleted",
+                    Message = $"{currentUserName} deleted '{existingExpense.Title}' (Rs. {existingExpense.Amount:N2})",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
             var success = await _expenseRepository.SoftDeleteExpenseWithActivityAsync(
-                expenseId, groupId, currentUserId, currentUserName);
+                expenseId, groupId, currentUserId, currentUserName, notifications);
+
+            if (success)
+            {
+                // In-memory test repository support
+                if (_notificationRepository != null && _notificationRepository.GetType().Name != "SplitNotificationRepository")
+                {
+                    foreach (var notif in notifications)
+                    {
+                        await _notificationRepository.CreateNotificationAsync(notif);
+                    }
+                }
+
+                // Broadcast realtime notifications
+                if (_realtimeService != null && notifications.Count > 0)
+                {
+                    foreach (var notif in notifications)
+                    {
+                        try
+                        {
+                            await _realtimeService.NotifyUserAsync(notif.UserId, "ReceiveSplitNotification", notif);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "Failed to send realtime notification to user {UserId}", notif.UserId);
+                        }
+                    }
+                }
+            }
 
             return success
                 ? ApiResponse<bool>.SuccessResponse("Expense deleted successfully.", true)

@@ -128,15 +128,15 @@ namespace SpendwiseSystem.Tests
                 Task.FromResult(new PagedExpenseResultDto());
 
             public Task<SplitExpenseDetailDto> CreateExpenseWithSharesAndActivityAsync(
-                SplitExpense expense, List<SplitExpenseShare> shares, string creatorName, string groupName) =>
+                SplitExpense expense, List<SplitExpenseShare> shares, string creatorName, string groupName, List<SplitNotification>? notifications = null) =>
                 Task.FromResult(new SplitExpenseDetailDto());
 
             public Task<SplitExpenseDetailDto?> UpdateExpenseWithSharesAndActivityAsync(
-                SplitExpense expense, List<SplitExpenseShare> newShares, string editorName, string groupName) =>
+                SplitExpense expense, List<SplitExpenseShare> newShares, string editorName, string groupName, List<SplitNotification>? notifications = null) =>
                 Task.FromResult<SplitExpenseDetailDto?>(null);
 
             public Task<bool> SoftDeleteExpenseWithActivityAsync(
-                Guid expenseId, Guid groupId, Guid deletedByUserId, string deletedByName) =>
+                Guid expenseId, Guid groupId, Guid deletedByUserId, string deletedByName, List<SplitNotification>? notifications = null) =>
                 Task.FromResult(true);
 
             public Task<List<SplitExpenseShare>> GetExpenseSharesAsync(Guid expenseId) =>

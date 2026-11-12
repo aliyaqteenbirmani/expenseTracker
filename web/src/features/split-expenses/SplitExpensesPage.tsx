@@ -18,7 +18,7 @@ import {
 } from './components/SplitPageTransition'
 import { useMotionSafe } from '@/hooks/use-motion-safe'
 import { toast } from 'sonner'
-import type { SplitGroupSummaryDto, SplitGroupInvitationDto } from './types'
+import type { SplitGroupSummaryDto, SplitGroupInvitationDto, SplitNotificationDto } from './types'
 import {
   Plus,
   Scale,
@@ -44,11 +44,24 @@ export function SplitExpensesPage({
 }: SplitExpensesPageProps) {
   const { reduce, fadeOnly } = useMotionSafe()
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const [initialExpenseId, setInitialExpenseId] = useState<string | null>(null)
   const [groups, setGroups] = useState<SplitGroupSummaryDto[]>([])
   const [myInvitations, setMyInvitations] = useState<SplitGroupInvitationDto[]>([])
   const [loading, setLoading] = useState(true)
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
   const [respondingInviteId, setRespondingInviteId] = useState<string | null>(null)
+
+  const handleNotificationClick = (notif: SplitNotificationDto) => {
+    if (notif.groupId) {
+      setSelectedGroupId(notif.groupId)
+      if (notif.type === 'ExpenseDeleted') {
+        toast.info('This expense has been deleted.')
+        setInitialExpenseId(null)
+      } else if (notif.referenceId) {
+        setInitialExpenseId(notif.referenceId)
+      }
+    }
+  }
 
   const loadData = useCallback(async () => {
     try {
@@ -125,12 +138,15 @@ export function SplitExpensesPage({
             groupId={selectedGroupId}
             currentUserId={currentUserId}
             token={token}
+            initialExpenseId={initialExpenseId}
             onBack={() => {
               setSelectedGroupId(null)
+              setInitialExpenseId(null)
               loadData()
             }}
             onGroupDeleted={() => {
               setSelectedGroupId(null)
+              setInitialExpenseId(null)
               loadData()
             }}
           />
@@ -147,7 +163,11 @@ export function SplitExpensesPage({
                 description="Share expenses with friends, flatmates, and travel groups. Automatically divide costs and simplify debt."
                 actions={
                   <div className="flex items-center gap-2">
-                    <SplitNotificationBell token={token} onInvitationProcessed={loadData} />
+                    <SplitNotificationBell
+                      token={token}
+                      onInvitationProcessed={loadData}
+                      onNotificationClick={handleNotificationClick}
+                    />
                     <Button onClick={() => setCreateGroupOpen(true)} className="gap-2 shadow-xs">
                       <Plus className="size-4" />
                       Create Group

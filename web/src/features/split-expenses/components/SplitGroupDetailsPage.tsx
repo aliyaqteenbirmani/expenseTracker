@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { splitExpensesApi } from '../splitExpensesApi'
 import { AddExpenseDialog } from './AddExpenseDialog'
+import { EditExpenseDialog } from './EditExpenseDialog'
 import { ExpenseDetailDialog } from './ExpenseDetailDialog'
 import { SettleUpDialog } from './SettleUpDialog'
 import { InviteMemberDialog } from './InviteMemberDialog'
@@ -46,6 +47,7 @@ import type {
   SplitSettlementDto,
   SplitGroupActivityDto,
   SplitGroupInvitationDto,
+  SplitNotificationDto,
   SuggestedSettlementDto,
 } from '../types'
 import {
@@ -76,6 +78,7 @@ interface SplitGroupDetailsPageProps {
   groupId: string
   currentUserId?: string
   token?: string
+  initialExpenseId?: string | null
   onBack: () => void
   onGroupDeleted?: () => void
 }
@@ -84,6 +87,7 @@ export function SplitGroupDetailsPage({
   groupId,
   currentUserId,
   token,
+  initialExpenseId,
   onBack,
   onGroupDeleted,
 }: SplitGroupDetailsPageProps) {
@@ -106,6 +110,7 @@ export function SplitGroupDetailsPage({
   // Dialog controls
   const [addExpenseOpen, setAddExpenseOpen] = useState(false)
   const [selectedExpense, setSelectedExpense] = useState<SplitExpenseDetailDto | null>(null)
+  const [editingExpense, setEditingExpense] = useState<SplitExpenseDetailDto | null>(null)
   const [settleUpOpen, setSettleUpOpen] = useState(false)
   const [activeSuggestion, setActiveSuggestion] = useState<SuggestedSettlementDto | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -202,12 +207,38 @@ export function SplitGroupDetailsPage({
   const handleOpenExpense = async (expenseId: string) => {
     try {
       const detail = await splitExpensesApi.getExpenseDetails(groupId, expenseId, token)
+      if (!detail) {
+        toast.info('This expense has been deleted.')
+        setActiveTab('expenses')
+        return
+      }
       setSelectedExpense(detail)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load expense details'
-      toast.error(msg)
+    } catch {
+      toast.info('This expense has been deleted.')
+      setActiveTab('expenses')
     }
   }
+
+  // Handle clicking on an expense notification
+  const handleNotificationClick = (notif: SplitNotificationDto) => {
+    if (!notif.groupId) return
+    if (notif.groupId === groupId) {
+      if (notif.type === 'ExpenseDeleted') {
+        toast.info('This expense has been deleted.')
+        setActiveTab('expenses')
+        loadExpenses()
+      } else if (notif.referenceId) {
+        void handleOpenExpense(notif.referenceId)
+      }
+    }
+  }
+
+  // Auto-open initial expense from notification if provided
+  useEffect(() => {
+    if (initialExpenseId) {
+      void handleOpenExpense(initialExpenseId)
+    }
+  }, [initialExpenseId, groupId])
 
   // Member removal
   const handleConfirmRemoveMember = async () => {
@@ -338,7 +369,11 @@ export function SplitGroupDetailsPage({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <SplitNotificationBell token={token} onInvitationProcessed={loadGroupDetails} />
+          <SplitNotificationBell
+            token={token}
+            onInvitationProcessed={loadGroupDetails}
+            onNotificationClick={handleNotificationClick}
+          />
           <Button
             onClick={() => setAddExpenseOpen(true)}
             size="sm"
@@ -549,8 +584,13 @@ export function SplitGroupDetailsPage({
                       <div className="font-mono font-semibold text-sm">
                         Rs. {exp.amount.toFixed(2)}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Your share: Rs. {exp.currentUserShare.toFixed(2)}
+                      <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1">
+                        <span>Your share: Rs. {exp.currentUserShare.toFixed(2)}</span>
+                        {exp.currentUserShare === 0 && (
+                          <span className="text-[10px] text-muted-foreground/80 bg-muted px-1.5 py-0.2 rounded font-sans border border-border/50">
+                            Not included
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -631,8 +671,13 @@ export function SplitGroupDetailsPage({
                     <div className="font-mono font-semibold text-sm">
                       Rs. {exp.amount.toFixed(2)}
                     </div>
-                    <div className="text-xs text-muted-foreground font-mono">
-                      Your share: Rs. {exp.currentUserShare.toFixed(2)}
+                    <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1">
+                      <span>Your share: Rs. {exp.currentUserShare.toFixed(2)}</span>
+                      {exp.currentUserShare === 0 && (
+                        <span className="text-[10px] text-muted-foreground/80 bg-muted px-1.5 py-0.2 rounded font-sans border border-border/50">
+                          Not included
+                        </span>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -1113,6 +1158,24 @@ export function SplitGroupDetailsPage({
         isGroupOwner={isOwner}
         token={token}
         onExpenseDeleted={() => {
+          loadGroupDetails()
+          loadExpenses()
+          loadBalancesAndSettlements()
+          loadActivities()
+        }}
+        onEditExpense={(exp) => setEditingExpense(exp)}
+      />
+
+      {/* Edit Expense Dialog */}
+      <EditExpenseDialog
+        open={!!editingExpense}
+        onOpenChange={(v) => !v && setEditingExpense(null)}
+        groupId={groupId}
+        expense={editingExpense}
+        members={group?.members || []}
+        currentUserId={currentUserId}
+        token={token}
+        onExpenseUpdated={() => {
           loadGroupDetails()
           loadExpenses()
           loadBalancesAndSettlements()

@@ -193,7 +193,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
         }
 
         public async Task<SplitExpenseDetailDto> CreateExpenseWithSharesAndActivityAsync(
-            SplitExpense expense, List<SplitExpenseShare> shares, string creatorName, string groupName)
+            SplitExpense expense, List<SplitExpenseShare> shares, string creatorName, string groupName, List<SplitNotification>? notifications = null)
         {
             using var connection = CreateConnection();
             await connection.OpenAsync();
@@ -234,6 +234,17 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     Description = $"{creatorName} added {expense.Title} expense of Rs. {expense.Amount:N2}."
                 }, transaction);
 
+                if (notifications != null && notifications.Count > 0)
+                {
+                    const string insertNotifSql = @"
+                        INSERT INTO dbo.SplitNotifications
+                            (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                        VALUES
+                            (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+
+                    await connection.ExecuteAsync(insertNotifSql, notifications, transaction);
+                }
+
                 transaction.Commit();
             }
             catch
@@ -246,7 +257,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
         }
 
         public async Task<SplitExpenseDetailDto?> UpdateExpenseWithSharesAndActivityAsync(
-            SplitExpense expense, List<SplitExpenseShare> newShares, string editorName, string groupName)
+            SplitExpense expense, List<SplitExpenseShare> newShares, string editorName, string groupName, List<SplitNotification>? notifications = null)
         {
             using var connection = CreateConnection();
             await connection.OpenAsync();
@@ -315,6 +326,17 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     Description = $"{editorName} updated the {expense.Title} expense."
                 }, transaction);
 
+                if (notifications != null && notifications.Count > 0)
+                {
+                    const string insertNotifSql = @"
+                        INSERT INTO dbo.SplitNotifications
+                            (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                        VALUES
+                            (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+
+                    await connection.ExecuteAsync(insertNotifSql, notifications, transaction);
+                }
+
                 transaction.Commit();
             }
             catch
@@ -327,7 +349,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
         }
 
         public async Task<bool> SoftDeleteExpenseWithActivityAsync(
-            Guid expenseId, Guid groupId, Guid deletedByUserId, string deletedByName)
+            Guid expenseId, Guid groupId, Guid deletedByUserId, string deletedByName, List<SplitNotification>? notifications = null)
         {
             using var connection = CreateConnection();
             await connection.OpenAsync();
@@ -383,6 +405,17 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     ReferenceId = expenseId,
                     Description = $"{deletedByName} deleted {title} expense."
                 }, transaction);
+
+                if (notifications != null && notifications.Count > 0)
+                {
+                    const string insertNotifSql = @"
+                        INSERT INTO dbo.SplitNotifications
+                            (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                        VALUES
+                            (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+
+                    await connection.ExecuteAsync(insertNotifSql, notifications, transaction);
+                }
 
                 transaction.Commit();
                 return true;
