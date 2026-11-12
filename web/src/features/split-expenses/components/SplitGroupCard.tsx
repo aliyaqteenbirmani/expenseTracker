@@ -17,7 +17,7 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
   return (
     <Card
       onClick={onClick}
-      className="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-xs transition-all hover:border-primary/40 hover:shadow-sm active:scale-[0.99]"
+      className="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-xs transition-[border-color,box-shadow,transform] duration-(--duration-fast) ease-out hover:border-primary/40 hover:shadow-sm active:scale-[0.99]"
     >
       <CardContent className="p-0 space-y-3">
         {/* Top Header: Icon, Title, Role */}

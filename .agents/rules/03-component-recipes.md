@@ -22,6 +22,7 @@
 | Bulk actions | floating bar | slide up `spring.smooth` |
 | Loading | shimmer `Skeleton` + `useDelayedFlag(150)` | crossfade to content, no shift |
 | Route change | `AnimatedOutlet` + `RouteProgressBar` (`components/motion/route-progress-bar.tsx`) | `pageTransition`, top-level segment only |
+| Split module transitions | `SplitPageTransition` (`components/motion/split-page-transition.tsx`) | fade + 6px slide/0.99 scale 280/140ms (`duration.slow`/`fast`); `useMotionSafe` reduced-motion clamp; `splitStaggerContainer` + `splitCardVariants` for grids |
 | Active item between siblings | `layoutId` (`nav-active`, `active-cashbook`) | `spring.snappy` |
 | Grid ↔ list | Motion `layout` | `spring.smooth` |
 | Form error | field `animate-shake` + layout message | focus first invalid |

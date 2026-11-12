@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -12,6 +13,12 @@ import {
   MotionTabsTrigger,
   MotionTabsContent,
 } from '@/components/motion/motion-tabs'
+import { useMotionSafe } from '@/hooks/use-motion-safe'
+import {
+  splitStaggerContainer,
+  splitCardVariants,
+} from './SplitPageTransition'
+import { SplitGroupDetailsSkeleton } from './SplitGroupDetailsSkeleton'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,6 +84,7 @@ export function SplitGroupDetailsPage({
   onBack,
   onGroupDeleted,
 }: SplitGroupDetailsPageProps) {
+  const { reduce, fadeOnly } = useMotionSafe()
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [group, setGroup] = useState<SplitGroupDetailDto | null>(null)
@@ -257,23 +265,7 @@ export function SplitGroupDetailsPage({
   }
 
   if (loading && !group) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="size-10 rounded-lg" />
-          <div className="space-y-1">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Skeleton className="h-24 rounded-xl" />
-          <Skeleton className="h-24 rounded-xl" />
-          <Skeleton className="h-24 rounded-xl" />
-          <Skeleton className="h-24 rounded-xl" />
-        </div>
-      </div>
-    )
+    return <SplitGroupDetailsSkeleton />
   }
 
   if (!group) {
@@ -394,46 +386,59 @@ export function SplitGroupDetailsPage({
 
         {/* 1. OVERVIEW TAB */}
         <MotionTabsContent value="overview" className="space-y-6 pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              label="Total Group Expenses"
-              value={group.totalExpenses}
-              formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
-              icon={Receipt}
-              trend="up"
-              delta="Recorded ledger"
-            />
-            <StatCard
-              label="Your Net Balance"
-              value={myBalance}
-              formatFn={(val) =>
-                isSettled
-                  ? 'Settled up'
-                  : isOwed
-                  ? `+Rs. ${Math.abs(val).toFixed(2)}`
-                  : `-Rs. ${Math.abs(val).toFixed(2)}`
-              }
-              icon={Scale}
-              trend={isOwed ? 'up' : owes ? 'down' : 'neutral'}
-              delta={isOwed ? 'You get back' : owes ? 'You owe' : 'All clear'}
-            />
-            <StatCard
-              label="Total Settled"
-              value={settleOverview?.totalOutstandingDebt || 0}
-              formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
-              icon={HandCoins}
-              trend="neutral"
-              delta="Outstanding debt"
-            />
-            <StatCard
-              label="Group Members"
-              value={group.memberCount}
-              formatFn={(val) => `${val}`}
-              icon={Users}
-              trend="neutral"
-              delta={`Owner: ${group.ownerName}`}
-            />
-          </div>
+          <motion.div
+            variants={reduce ? undefined : splitStaggerContainer}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          >
+            <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+              <StatCard
+                label="Total Group Expenses"
+                value={group.totalExpenses}
+                formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
+                icon={Receipt}
+                trend="up"
+                delta="Recorded ledger"
+              />
+            </motion.div>
+            <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+              <StatCard
+                label="Your Net Balance"
+                value={myBalance}
+                formatFn={(val) =>
+                  isSettled
+                    ? 'Settled up'
+                    : isOwed
+                    ? `+Rs. ${Math.abs(val).toFixed(2)}`
+                    : `-Rs. ${Math.abs(val).toFixed(2)}`
+                }
+                icon={Scale}
+                trend={isOwed ? 'up' : owes ? 'down' : 'neutral'}
+                delta={isOwed ? 'You get back' : owes ? 'You owe' : 'All clear'}
+              />
+            </motion.div>
+            <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+              <StatCard
+                label="Total Settled"
+                value={settleOverview?.totalOutstandingDebt || 0}
+                formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
+                icon={HandCoins}
+                trend="neutral"
+                delta="Outstanding debt"
+              />
+            </motion.div>
+            <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+              <StatCard
+                label="Group Members"
+                value={group.memberCount}
+                formatFn={(val) => `${val}`}
+                icon={Users}
+                trend="neutral"
+                delta={`Owner: ${group.ownerName}`}
+              />
+            </motion.div>
+          </motion.div>
 
           {/* Quick Settle Suggestions Banner */}
           {settleOverview?.suggestedTransactions && settleOverview.suggestedTransactions.length > 0 && (
@@ -578,10 +583,16 @@ export function SplitGroupDetailsPage({
               }
             />
           ) : (
-            <div className="rounded-xl border divide-y overflow-hidden bg-card">
+            <motion.div
+              variants={reduce ? undefined : splitStaggerContainer}
+              initial="hidden"
+              animate="show"
+              className="rounded-xl border divide-y overflow-hidden bg-card"
+            >
               {expenses.map((exp) => (
-                <div
+                <motion.div
                   key={exp.id}
+                  variants={reduce ? fadeOnly : splitCardVariants}
                   onClick={() => handleOpenExpense(exp.id)}
                   className="flex items-center justify-between p-3.5 hover:bg-muted/40 cursor-pointer transition-colors"
                 >
@@ -612,9 +623,9 @@ export function SplitGroupDetailsPage({
                       Your share: Rs. {exp.currentUserShare.toFixed(2)}
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           )}
         </MotionTabsContent>
 
@@ -626,7 +637,12 @@ export function SplitGroupDetailsPage({
               Net balance calculates total paid minus total share, plus net settlement payments.
             </p>
 
-            <div className="space-y-3">
+            <motion.div
+              variants={reduce ? undefined : splitStaggerContainer}
+              initial="hidden"
+              animate="show"
+              className="space-y-3"
+            >
               {balances.map((m) => {
                 const bal = m.netBalance
                 const isZero = Math.abs(bal) < 0.005
@@ -634,8 +650,9 @@ export function SplitGroupDetailsPage({
                 const isNegative = bal < -0.005
 
                 return (
-                  <div
+                  <motion.div
                     key={m.userId}
+                    variants={reduce ? fadeOnly : splitCardVariants}
                     className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-lg border bg-muted/20 gap-3"
                   >
                     <div className="flex items-center gap-3">
@@ -685,10 +702,10 @@ export function SplitGroupDetailsPage({
                         </span>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 )
               })}
-            </div>
+            </motion.div>
           </div>
         </MotionTabsContent>
 
@@ -725,30 +742,37 @@ export function SplitGroupDetailsPage({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <motion.div
+                variants={reduce ? undefined : splitStaggerContainer}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+              >
                 {settleOverview?.suggestedTransactions.map((item, idx) => (
-                  <Card key={idx} className="rounded-xl p-3.5 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs text-muted-foreground">Payment {idx + 1}</div>
-                      <div className="text-sm font-semibold">
-                        {item.fromUserName} → {item.toUserName}
+                  <motion.div key={idx} variants={reduce ? fadeOnly : splitCardVariants}>
+                    <Card className="rounded-xl p-3.5 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Payment {idx + 1}</div>
+                        <div className="text-sm font-semibold">
+                          {item.fromUserName} → {item.toUserName}
+                        </div>
+                        <div className="text-sm font-mono font-bold text-foreground mt-0.5">
+                          Rs. {item.amount.toFixed(2)}
+                        </div>
                       </div>
-                      <div className="text-sm font-mono font-bold text-foreground mt-0.5">
-                        Rs. {item.amount.toFixed(2)}
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setActiveSuggestion(item)
-                        setSettleUpOpen(true)
-                      }}
-                    >
-                      Record Payment
-                    </Button>
-                  </Card>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setActiveSuggestion(item)
+                          setSettleUpOpen(true)
+                        }}
+                      >
+                        Record Payment
+                      </Button>
+                    </Card>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
           </div>
 
@@ -800,9 +824,18 @@ export function SplitGroupDetailsPage({
             )}
           </div>
 
-          <div className="rounded-xl border divide-y overflow-hidden bg-card">
+          <motion.div
+            variants={reduce ? undefined : splitStaggerContainer}
+            initial="hidden"
+            animate="show"
+            className="rounded-xl border divide-y overflow-hidden bg-card"
+          >
             {group.members?.map((m) => (
-              <div key={m.userId} className="flex items-center justify-between p-3.5">
+              <motion.div
+                key={m.userId}
+                variants={reduce ? fadeOnly : splitCardVariants}
+                className="flex items-center justify-between p-3.5"
+              >
                 <div className="flex items-center gap-3">
                   <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
                     {getMemberInitials(m.fullName || m.email)}
@@ -844,9 +877,9 @@ export function SplitGroupDetailsPage({
                     </Button>
                   )}
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Pending Invitations Section */}
           {invitations.length > 0 && (
@@ -906,9 +939,18 @@ export function SplitGroupDetailsPage({
             {activities.length === 0 ? (
               <p className="text-xs text-muted-foreground">No activities recorded yet.</p>
             ) : (
-              <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-px before:bg-border">
+              <motion.div
+                variants={reduce ? undefined : splitStaggerContainer}
+                initial="hidden"
+                animate="show"
+                className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-px before:bg-border"
+              >
                 {activities.map((act) => (
-                  <div key={act.id} className="relative flex items-start gap-3">
+                  <motion.div
+                    key={act.id}
+                    variants={reduce ? fadeOnly : splitCardVariants}
+                    className="relative flex items-start gap-3"
+                  >
                     <div className="absolute -left-6 mt-1 flex size-5 items-center justify-center rounded-full bg-primary/10 text-primary border border-background">
                       <History className="size-2.5" />
                     </div>
@@ -918,9 +960,9 @@ export function SplitGroupDetailsPage({
                         {format(new Date(act.createdAt), 'MMM d, yyyy · h:mm a')}
                       </p>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
           </div>
         </MotionTabsContent>

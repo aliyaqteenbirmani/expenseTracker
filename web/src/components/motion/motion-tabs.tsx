@@ -3,6 +3,7 @@ import { motion } from "motion/react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { spring, duration, ease } from "@/lib/motion"
+import { useMotionSafe } from "@/hooks/use-motion-safe"
 
 type Ctx = {
   value: string
@@ -104,13 +105,19 @@ export function MotionTabsContent({
   ...props
 }: React.ComponentProps<typeof TabsContent>) {
   const ctx = useTabsCtx()
+  const { reduce } = useMotionSafe()
+
   return (
     <TabsContent value={value} className={className} {...props}>
       <motion.div
         key={value}
-        initial={{ opacity: 0, x: 6 * ctx.dir }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: duration.base, ease: ease.out }}
+        initial={reduce ? { opacity: 0 } : { opacity: 0, x: 6 * ctx.dir }}
+        animate={reduce ? { opacity: 1 } : { opacity: 1, x: 0 }}
+        transition={
+          reduce
+            ? { duration: duration.fast }
+            : { duration: duration.base, ease: ease.out }
+        }
       >
         {children}
       </motion.div>

@@ -267,12 +267,13 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Split Expenses</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu onMouseLeave={() => setHoveredNav(null)}>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={currentView === 'split-expenses'}
                   tooltip="Split Expenses"
                   onClick={() => onNavigate('split-expenses')}
+                  onMouseEnter={() => setHoveredNav('split-expenses')}
                   className="relative cursor-pointer transition-colors duration-(--duration-fast)"
                 >
                   {currentView === 'split-expenses' && (
@@ -280,6 +281,13 @@ export function AppSidebar({
                       layoutId="nav-active"
                       transition={spring.snappy}
                       className="absolute inset-0 rounded-md bg-sidebar-accent -z-10"
+                    />
+                  )}
+                  {currentView !== 'split-expenses' && hoveredNav === 'split-expenses' && (
+                    <motion.span
+                      layoutId="nav-hover-glide"
+                      transition={spring.snappy}
+                      className="absolute inset-0 rounded-md bg-sidebar-accent/50 -z-10"
                     />
                   )}
                   <HandCoins className="size-4" />
