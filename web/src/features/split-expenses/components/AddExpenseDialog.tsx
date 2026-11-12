@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ResponsiveDialog } from '@/components/app/ResponsiveDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,7 @@ import { splitExpensesApi } from '../splitExpensesApi'
 import { toast } from 'sonner'
 import type { SplitGroupMemberDto, SplitExpenseDetailDto } from '../types'
 import { Users } from 'lucide-react'
+import { MemberSelector, getMemberDisplayName, getMemberInitials } from './MemberSelector'
 
 interface AddExpenseDialogProps {
   open: boolean
@@ -64,6 +65,18 @@ export function AddExpenseDialog({
     activeMembers.map((m) => m.userId)
   )
   const [loading, setLoading] = useState(false)
+
+  // Sync state when dialog opens or active members change
+  useEffect(() => {
+    if (open) {
+      if (!payerId && activeMembers.length > 0) {
+        setPayerId(currentUserId || activeMembers[0].userId)
+      }
+      if (selectedUserIds.length === 0 && activeMembers.length > 0) {
+        setSelectedUserIds(activeMembers.map((m) => m.userId))
+      }
+    }
+  }, [open, activeMembers, currentUserId, payerId, selectedUserIds.length])
 
   // When dialog opens or members update, initialize selected user IDs
   const handleSelectAll = () => {
@@ -196,19 +209,17 @@ export function AddExpenseDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Paid by *</Label>
-            <Select value={payerId} onValueChange={(val) => setPayerId(val ?? '')} disabled={loading}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select payer" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeMembers.map((m) => (
-                  <SelectItem key={m.userId} value={m.userId}>
-                    {m.fullName || m.email} {m.userId === currentUserId ? '(You)' : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="expense-payer">Paid by *</Label>
+            <MemberSelector
+              id="expense-payer"
+              value={payerId}
+              onValueChange={setPayerId}
+              members={activeMembers}
+              currentUserId={currentUserId}
+              placeholder="Select payer"
+              disabled={loading}
+              required
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -278,6 +289,9 @@ export function AddExpenseDialog({
             {activeMembers.map((m) => {
               const isChecked = selectedUserIds.includes(m.userId)
               const share = splitShares[m.userId]
+              const name = getMemberDisplayName(m)
+              const initials = getMemberInitials(name || m.email)
+              const isYou = m.userId === currentUserId
               return (
                 <div
                   key={m.userId}
@@ -287,7 +301,7 @@ export function AddExpenseDialog({
                 >
                   <label
                     htmlFor={`user-${m.userId}`}
-                    className="flex items-center gap-2.5 cursor-pointer select-none text-sm flex-1 truncate"
+                    className="flex items-center gap-2.5 cursor-pointer select-none text-sm flex-1 truncate min-w-0"
                   >
                     <Checkbox
                       id={`user-${m.userId}`}
@@ -295,13 +309,21 @@ export function AddExpenseDialog({
                       onCheckedChange={() => toggleParticipant(m.userId)}
                       disabled={loading}
                     />
-                    <span className="truncate">
-                      {m.fullName || m.email}
-                      {m.userId === currentUserId && ' (You)'}
-                    </span>
+                    <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                      {initials}
+                    </div>
+                    <div className="flex flex-col truncate min-w-0">
+                      <span className="truncate text-foreground font-medium text-xs">
+                        {name}
+                        {isYou && <span className="text-muted-foreground font-normal ml-1">(You)</span>}
+                      </span>
+                      {m.email && m.email !== name && (
+                        <span className="text-[11px] text-muted-foreground truncate">{m.email}</span>
+                      )}
+                    </div>
                   </label>
                   {isChecked && share !== undefined && (
-                    <span className="text-xs font-mono font-medium text-muted-foreground ml-2">
+                    <span className="text-xs font-mono font-medium text-muted-foreground ml-2 shrink-0">
                       Rs. {share.toFixed(2)}
                     </span>
                   )}

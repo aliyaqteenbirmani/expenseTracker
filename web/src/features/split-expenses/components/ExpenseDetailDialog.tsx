@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import type { SplitExpenseDetailDto } from '../types'
 import { Tag, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
+import { getMemberInitials } from './MemberSelector'
 
 interface ExpenseDetailDialogProps {
   open: boolean
@@ -90,12 +91,12 @@ export function ExpenseDetailDialog({
           {/* Paid by info */}
           <div className="flex items-center gap-3 p-3 rounded-lg border bg-card text-sm">
             <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
-              {expense.payerName.slice(0, 2).toUpperCase()}
+              {getMemberInitials(expense.payerName || expense.payerEmail)}
             </div>
             <div className="flex-1 truncate">
               <span className="text-muted-foreground text-xs block">Paid by</span>
               <span className="font-semibold text-foreground truncate">
-                {expense.payerName} {expense.payerId === currentUserId && '(You)'}
+                {expense.payerName || expense.payerEmail || 'Member'} {expense.payerId === currentUserId && '(You)'}
               </span>
             </div>
             <span className="font-mono text-sm font-semibold text-inflow">
@@ -113,11 +114,11 @@ export function ExpenseDetailDialog({
                 <div key={share.userId} className="flex items-center justify-between p-2.5">
                   <div className="flex items-center gap-2.5 truncate">
                     <div className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                      {share.userName.slice(0, 2).toUpperCase()}
+                      {getMemberInitials(share.userName || share.userEmail)}
                     </div>
                     <div className="truncate">
                       <div className="font-medium truncate">
-                        {share.userName} {share.userId === currentUserId && '(You)'}
+                        {share.userName || share.userEmail || 'Member'} {share.userId === currentUserId && '(You)'}
                       </div>
                       <div className="text-xs text-muted-foreground truncate">{share.userEmail}</div>
                     </div>

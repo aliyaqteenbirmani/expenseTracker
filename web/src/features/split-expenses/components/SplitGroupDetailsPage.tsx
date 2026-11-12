@@ -28,6 +28,7 @@ import { ExpenseDetailDialog } from './ExpenseDetailDialog'
 import { SettleUpDialog } from './SettleUpDialog'
 import { InviteMemberDialog } from './InviteMemberDialog'
 import { toast } from 'sonner'
+import { getMemberInitials } from './MemberSelector'
 import type {
   SplitGroupDetailDto,
   SplitExpenseListItemDto,
@@ -619,7 +620,7 @@ export function SplitGroupDetailsPage({
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
-                        {m.fullName.slice(0, 2).toUpperCase()}
+                        {getMemberInitials(m.fullName || m.email)}
                       </div>
                       <div>
                         <div className="font-semibold text-sm flex items-center gap-2">
@@ -784,7 +785,7 @@ export function SplitGroupDetailsPage({
               <div key={m.userId} className="flex items-center justify-between p-3.5">
                 <div className="flex items-center gap-3">
                   <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
-                    {m.fullName.slice(0, 2).toUpperCase()}
+                    {getMemberInitials(m.fullName || m.email)}
                   </div>
                   <div>
                     <div className="font-semibold text-sm flex items-center gap-2">

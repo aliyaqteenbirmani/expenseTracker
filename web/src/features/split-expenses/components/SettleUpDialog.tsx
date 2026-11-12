@@ -1,19 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ResponsiveDialog } from '@/components/app/ResponsiveDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { splitExpensesApi } from '../splitExpensesApi'
 import { toast } from 'sonner'
 import type { SplitGroupMemberDto, SplitSettlementDto, SuggestedSettlementDto } from '../types'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { MemberSelector, getMemberDisplayName } from './MemberSelector'
 
 interface SettleUpDialogProps {
   open: boolean
@@ -42,7 +36,7 @@ export function SettleUpDialog({
     initialSuggestion?.fromUserId || currentUserId || (activeMembers[0]?.userId ?? '')
   )
   const [toUserId, setToUserId] = useState<string>(
-    initialSuggestion?.toUserId || (activeMembers.find((m) => m.userId !== fromUserId)?.userId ?? '')
+    initialSuggestion?.toUserId || (activeMembers.find((m) => m.userId !== (initialSuggestion?.fromUserId || currentUserId))?.userId ?? '')
   )
   const [amountStr, setAmountStr] = useState<string>(
     initialSuggestion?.amount ? initialSuggestion.amount.toString() : ''
@@ -50,6 +44,26 @@ export function SettleUpDialog({
   const [note, setNote] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
   const [confirmed, setConfirmed] = useState<boolean>(false)
+
+  // Sync with initialSuggestion or defaults when dialog opens or suggestion changes
+  useEffect(() => {
+    if (open) {
+      if (initialSuggestion) {
+        setFromUserId(initialSuggestion.fromUserId)
+        setToUserId(initialSuggestion.toUserId)
+        setAmountStr(initialSuggestion.amount ? initialSuggestion.amount.toString() : '')
+      } else {
+        const defaultFrom = currentUserId || (activeMembers[0]?.userId ?? '')
+        setFromUserId((prev) => prev || defaultFrom)
+        setToUserId((prev) => {
+          if (prev && prev !== defaultFrom) return prev
+          const other = activeMembers.find((m) => m.userId !== defaultFrom)
+          return other?.userId ?? ''
+        })
+      }
+      setConfirmed(false)
+    }
+  }, [open, initialSuggestion, currentUserId, activeMembers])
 
   const amount = parseFloat(amountStr) || 0
 
@@ -121,37 +135,38 @@ export function SettleUpDialog({
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Payer (Who paid?)</Label>
-                <Select value={fromUserId} onValueChange={(val) => setFromUserId(val ?? '')} disabled={loading}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select payer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeMembers.map((m) => (
-                      <SelectItem key={m.userId} value={m.userId}>
-                        {m.fullName || m.email} {m.userId === currentUserId && '(You)'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="settle-from-user">Payer (Who paid?) *</Label>
+                <MemberSelector
+                  id="settle-from-user"
+                  value={fromUserId}
+                  onValueChange={(val) => {
+                    setFromUserId(val)
+                    if (toUserId === val) {
+                      const next = activeMembers.find((m) => m.userId !== val)
+                      setToUserId(next?.userId ?? '')
+                    }
+                  }}
+                  members={activeMembers}
+                  currentUserId={currentUserId}
+                  placeholder="Select payer"
+                  disabled={loading}
+                  required
+                />
               </div>
 
               <div className="space-y-1.5">
-                <Label>Receiver (Who received?)</Label>
-                <Select value={toUserId} onValueChange={(val) => setToUserId(val ?? '')} disabled={loading}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select receiver" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeMembers
-                      .filter((m) => m.userId !== fromUserId)
-                      .map((m) => (
-                        <SelectItem key={m.userId} value={m.userId}>
-                          {m.fullName || m.email} {m.userId === currentUserId && '(You)'}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="settle-to-user">Receiver (Who received?) *</Label>
+                <MemberSelector
+                  id="settle-to-user"
+                  value={toUserId}
+                  onValueChange={setToUserId}
+                  members={activeMembers}
+                  currentUserId={currentUserId}
+                  excludeUserIds={fromUserId ? [fromUserId] : []}
+                  placeholder="Select receiver"
+                  disabled={loading}
+                  required
+                />
               </div>
             </div>
 
@@ -212,9 +227,9 @@ export function SettleUpDialog({
               </div>
 
               <div className="flex items-center justify-center gap-2 py-2 text-sm font-medium">
-                <span className="font-semibold">{fromMember?.fullName || 'Sender'}</span>
+                <span className="font-semibold">{getMemberDisplayName(fromMember) || 'Sender'}</span>
                 <ArrowRight className="size-4 text-muted-foreground" />
-                <span className="font-semibold">{toMember?.fullName || 'Receiver'}</span>
+                <span className="font-semibold">{getMemberDisplayName(toMember) || 'Receiver'}</span>
               </div>
 
               <div className="text-2xl font-bold font-mono text-foreground">
