@@ -109,22 +109,27 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             var senderDebt = Math.Abs(sender.NetBalance);
             var receiverCredit = receiver.NetBalance;
 
-            // Reserved amounts check: Confirmed + Pending from payer to receiver must not exceed outstanding debt/credit
-            var existingPending = await _settlementRepository.GetPendingPayerToReceiverAmountAsync(
-                groupId, dto.FromUserId, dto.ToUserId);
+            // Reserved amounts check: Confirmed + Pending from payer across ALL receivers,
+            // and Confirmed + Pending to receiver across ALL payers
+            var existingPendingPaid = await _settlementRepository.GetPendingPaidByUserAmountAsync(
+                groupId, dto.FromUserId);
+            var existingPendingReceived = await _settlementRepository.GetPendingReceivedByUserAmountAsync(
+                groupId, dto.ToUserId);
 
-            if (amount + existingPending > senderDebt + 0.01m)
+            if (amount + existingPendingPaid > senderDebt + 0.01m)
             {
-                var pendingNote = existingPending > 0 ? $" (plus Rs. {existingPending:N2} already pending)" : "";
+                var remaining = Math.Max(0m, senderDebt - existingPendingPaid);
+                var pendingNote = existingPendingPaid > 0 ? $" (plus Rs. {existingPendingPaid:N2} already pending)" : "";
                 return ApiResponse<SplitSettlementDto>.FailureResponse(
-                    $"Settlement amount of Rs. {amount:N2}{pendingNote} exceeds {sender.FullName}'s outstanding debt of Rs. {senderDebt:N2}.");
+                    $"Settlement amount of Rs. {amount:N2}{pendingNote} exceeds {sender.FullName}'s remaining debt of Rs. {remaining:N2}.");
             }
 
-            if (amount + existingPending > receiverCredit + 0.01m)
+            if (amount + existingPendingReceived > receiverCredit + 0.01m)
             {
-                var pendingNote = existingPending > 0 ? $" (plus Rs. {existingPending:N2} already pending)" : "";
+                var remaining = Math.Max(0m, receiverCredit - existingPendingReceived);
+                var pendingNote = existingPendingReceived > 0 ? $" (plus Rs. {existingPendingReceived:N2} already pending)" : "";
                 return ApiResponse<SplitSettlementDto>.FailureResponse(
-                    $"Settlement amount of Rs. {amount:N2}{pendingNote} exceeds {receiver.FullName}'s outstanding credit of Rs. {receiverCredit:N2}.");
+                    $"Settlement amount of Rs. {amount:N2}{pendingNote} exceeds {receiver.FullName}'s remaining credit of Rs. {remaining:N2}.");
             }
 
             // Determine initial status and audit trail
@@ -306,7 +311,12 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 }
             }
 
-            var result = await _settlementRepository.CreateSettlementAsync(settlement, notifications);
+            var creationResult = await _settlementRepository.CreateSettlementAtomicAsync(settlement, notifications);
+            if (!creationResult.Success)
+            {
+                return ApiResponse<SplitSettlementDto>.FailureResponse(creationResult.ErrorMessage ?? "Failed to record settlement.");
+            }
+            var result = creationResult.Settlement!;
             await BroadcastNotificationsAsync(notifications);
             EnrichSettlementFlags(result, currentUserId, isOwner);
 
@@ -354,13 +364,15 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
 
             var senderDebt = Math.Abs(sender.NetBalance);
             var receiverCredit = receiver.NetBalance;
-            var otherPending = await _settlementRepository.GetPendingPayerToReceiverAmountAsync(
-                groupId, settlement.FromUserId, settlement.ToUserId, excludeSettlementId: settlement.Id);
+            var otherPendingPaid = await _settlementRepository.GetPendingPaidByUserAmountAsync(
+                groupId, settlement.FromUserId, excludeSettlementId: settlement.Id);
+            var otherPendingReceived = await _settlementRepository.GetPendingReceivedByUserAmountAsync(
+                groupId, settlement.ToUserId, excludeSettlementId: settlement.Id);
 
-            if (settlement.Amount + otherPending > senderDebt + 0.01m || settlement.Amount + otherPending > receiverCredit + 0.01m)
+            if (settlement.Amount + otherPendingPaid > senderDebt + 0.01m || settlement.Amount + otherPendingReceived > receiverCredit + 0.01m)
             {
                 return ApiResponse<SplitSettlementDto>.FailureResponse(
-                    $"Cannot confirm settlement: Amount (Rs. {settlement.Amount:N2}) exceeds remaining debt (Rs. {senderDebt:N2}) or credit (Rs. {receiverCredit:N2}). You may decline this request.");
+                    $"Cannot confirm settlement: Amount (Rs. {settlement.Amount:N2}) exceeds remaining debt (Rs. {Math.Max(0m, senderDebt - otherPendingPaid):N2}) or credit (Rs. {Math.Max(0m, receiverCredit - otherPendingReceived):N2}). You may decline this request.");
             }
 
             // Determine next status:
@@ -431,6 +443,11 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             }
 
             int rows = await _settlementRepository.ConfirmByReceiverAsync(settlement.Id, nextStatus, currentUserId, notifications);
+            if (rows == -1)
+            {
+                return ApiResponse<SplitSettlementDto>.FailureResponse(
+                    $"Cannot confirm settlement: Amount (Rs. {settlement.Amount:N2}) exceeds remaining debt or credit after recent changes. You may decline this request.");
+            }
             if (rows == 0)
             {
                 var current = await _settlementRepository.GetSettlementByIdAsync(settlementId);
@@ -537,13 +554,15 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
 
             var senderDebt = Math.Abs(sender.NetBalance);
             var receiverCredit = receiver.NetBalance;
-            var otherPending = await _settlementRepository.GetPendingPayerToReceiverAmountAsync(
-                groupId, settlement.FromUserId, settlement.ToUserId, excludeSettlementId: settlement.Id);
+            var otherPendingPaid = await _settlementRepository.GetPendingPaidByUserAmountAsync(
+                groupId, settlement.FromUserId, excludeSettlementId: settlement.Id);
+            var otherPendingReceived = await _settlementRepository.GetPendingReceivedByUserAmountAsync(
+                groupId, settlement.ToUserId, excludeSettlementId: settlement.Id);
 
-            if (settlement.Amount + otherPending > senderDebt + 0.01m || settlement.Amount + otherPending > receiverCredit + 0.01m)
+            if (settlement.Amount + otherPendingPaid > senderDebt + 0.01m || settlement.Amount + otherPendingReceived > receiverCredit + 0.01m)
             {
                 return ApiResponse<SplitSettlementDto>.FailureResponse(
-                    $"Cannot approve settlement: Amount (Rs. {settlement.Amount:N2}) exceeds remaining debt (Rs. {senderDebt:N2}) or credit (Rs. {receiverCredit:N2}). You may decline this request.");
+                    $"Cannot approve settlement: Amount (Rs. {settlement.Amount:N2}) exceeds remaining debt (Rs. {Math.Max(0m, senderDebt - otherPendingPaid):N2}) or credit (Rs. {Math.Max(0m, receiverCredit - otherPendingReceived):N2}). You may decline this request.");
             }
 
             var notifications = new List<SplitNotification>();
@@ -583,6 +602,11 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             }
 
             int rows = await _settlementRepository.ApproveByOwnerAsync(settlement.Id, currentUserId, notifications);
+            if (rows == -1)
+            {
+                return ApiResponse<SplitSettlementDto>.FailureResponse(
+                    $"Cannot approve settlement: Amount (Rs. {settlement.Amount:N2}) exceeds remaining debt or credit after recent changes. You may decline this request.");
+            }
             if (rows == 0)
             {
                 var current = await _settlementRepository.GetSettlementByIdAsync(settlementId);

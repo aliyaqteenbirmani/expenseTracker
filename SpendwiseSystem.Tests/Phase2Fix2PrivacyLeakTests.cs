@@ -260,10 +260,36 @@ namespace SpendwiseSystem.Tests
             public Task<decimal> GetPendingPayerToReceiverAmountAsync(Guid groupId, Guid fromUserId, Guid toUserId, Guid? excludeSettlementId = null) =>
                 Task.FromResult(0m);
 
+            public Task<decimal> GetPendingPaidByUserAmountAsync(Guid groupId, Guid userId, Guid? excludeSettlementId = null)
+            {
+                var sum = Settlements.Where(s => s.GroupId == groupId && s.FromUserId == userId && !s.IsDeleted &&
+                    (s.Status == SplitSettlementStatus.PendingReceiver || s.Status == SplitSettlementStatus.PendingOwner) &&
+                    (excludeSettlementId == null || s.Id != excludeSettlementId.Value))
+                    .Sum(s => s.Amount);
+                return Task.FromResult(sum);
+            }
+
+            public Task<decimal> GetPendingReceivedByUserAmountAsync(Guid groupId, Guid userId, Guid? excludeSettlementId = null)
+            {
+                var sum = Settlements.Where(s => s.GroupId == groupId && s.ToUserId == userId && !s.IsDeleted &&
+                    (s.Status == SplitSettlementStatus.PendingReceiver || s.Status == SplitSettlementStatus.PendingOwner) &&
+                    (excludeSettlementId == null || s.Id != excludeSettlementId.Value))
+                    .Sum(s => s.Amount);
+                return Task.FromResult(sum);
+            }
+
             public Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement, List<SplitNotification>? notifications = null)
             {
                 Settlements.Add(settlement);
                 return Task.FromResult(MapDto(settlement));
+            }
+
+            public Task<SettlementCreationResult> CreateSettlementAtomicAsync(SplitSettlement settlement, List<SplitNotification>? notifications = null)
+            {
+                Settlements.Add(settlement);
+                if (notifications != null && notifications.Count > 0)
+                    Notifications.AddRange(notifications);
+                return Task.FromResult(SettlementCreationResult.Succeeded(MapDto(settlement)));
             }
 
             public Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId, List<SplitNotification>? notifications = null)

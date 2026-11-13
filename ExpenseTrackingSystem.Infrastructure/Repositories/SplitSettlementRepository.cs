@@ -238,25 +238,188 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             });
         }
 
-        public async Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement, List<SplitNotification>? notifications = null)
+        public async Task<decimal> GetPendingPaidByUserAmountAsync(Guid groupId, Guid userId, Guid? excludeSettlementId = null)
         {
-            const string insertSql = @"
-                INSERT INTO dbo.SplitSettlements
-                    (Id, GroupId, FromUserId, ToUserId, Amount, SettlementDate, Note, Status, CreatedBy, 
-                     ReceiverActionBy, ReceiverActionAt, OwnerActionBy, OwnerActionAt, DeclineReason, CancelledAt, CancelledBy,
-                     CreatedAt, UpdatedAt, IsDeleted)
-                VALUES
-                    (@Id, @GroupId, @FromUserId, @ToUserId, @Amount, @SettlementDate, @Note, @Status, @CreatedBy, 
-                     @ReceiverActionBy, @ReceiverActionAt, @OwnerActionBy, @OwnerActionAt, @DeclineReason, @CancelledAt, @CancelledBy,
-                     @CreatedAt, @UpdatedAt, @IsDeleted);";
+            const string sql = @"
+                SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2)))
+                FROM dbo.SplitSettlements
+                WHERE GroupId = @GroupId 
+                  AND FromUserId = @UserId 
+                  AND Status IN ('PendingReceiver', 'PendingOwner') 
+                  AND IsDeleted = 0
+                  AND (@ExcludeSettlementId IS NULL OR Id <> @ExcludeSettlementId);";
 
             using var connection = CreateConnection();
+            return await connection.ExecuteScalarAsync<decimal>(sql, new
+            {
+                GroupId = groupId,
+                UserId = userId,
+                ExcludeSettlementId = excludeSettlementId
+            });
+        }
+
+        public async Task<decimal> GetPendingReceivedByUserAmountAsync(Guid groupId, Guid userId, Guid? excludeSettlementId = null)
+        {
+            const string sql = @"
+                SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2)))
+                FROM dbo.SplitSettlements
+                WHERE GroupId = @GroupId 
+                  AND ToUserId = @UserId 
+                  AND Status IN ('PendingReceiver', 'PendingOwner') 
+                  AND IsDeleted = 0
+                  AND (@ExcludeSettlementId IS NULL OR Id <> @ExcludeSettlementId);";
+
+            using var connection = CreateConnection();
+            return await connection.ExecuteScalarAsync<decimal>(sql, new
+            {
+                GroupId = groupId,
+                UserId = userId,
+                ExcludeSettlementId = excludeSettlementId
+            });
+        }
+
+        public async Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement, List<SplitNotification>? notifications = null)
+        {
+            var result = await CreateSettlementAtomicAsync(settlement, notifications);
+            if (!result.Success)
+                throw new InvalidOperationException(result.ErrorMessage ?? "Failed to create settlement.");
+            return result.Settlement!;
+        }
+
+        public async Task<SettlementCreationResult> CreateSettlementAtomicAsync(
+            SplitSettlement settlement, List<SplitNotification>? notifications = null)
+        {
+            using var connection = CreateConnection();
             await connection.OpenAsync();
-            using var transaction = connection.BeginTransaction();
+            using var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
             try
             {
+                // 1. Acquire transaction lock on group to serialize settlement operations
+                const string lockSql = @"
+                    DECLARE @res INT;
+                    EXEC @res = sp_getapplock 
+                        @Resource = @LockResource, 
+                        @LockMode = 'Exclusive', 
+                        @LockOwner = 'Transaction';";
+
+                string lockResource = "SplitSettlement_Group_" + settlement.GroupId.ToString("N");
+                await connection.ExecuteAsync(lockSql, new { LockResource = lockResource }, transaction);
+
+                // 2. Compute confirmed debt of payer inside transaction
+                const string balanceSql = @"
+                    WITH ExpensePaid AS (
+                        SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2))) AS TotalPaid
+                        FROM dbo.SplitExpenses
+                        WHERE GroupId = @GroupId AND PayerId = @UserId AND IsDeleted = 0
+                    ),
+                    ExpenseShares AS (
+                        SELECT ISNULL(SUM(s.ShareAmount), CAST(0 AS DECIMAL(18,2))) AS TotalShare
+                        FROM dbo.SplitExpenseShares s
+                        INNER JOIN dbo.SplitExpenses e ON e.Id = s.ExpenseId
+                        WHERE e.GroupId = @GroupId AND s.UserId = @UserId AND e.IsDeleted = 0
+                    ),
+                    SettlementsPaid AS (
+                        SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2))) AS TotalSettlementsPaid
+                        FROM dbo.SplitSettlements
+                        WHERE GroupId = @GroupId AND FromUserId = @UserId AND IsDeleted = 0 AND Status = 'Confirmed'
+                    ),
+                    SettlementsReceived AS (
+                        SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2))) AS TotalSettlementsReceived
+                        FROM dbo.SplitSettlements
+                        WHERE GroupId = @GroupId AND ToUserId = @UserId AND IsDeleted = 0 AND Status = 'Confirmed'
+                    )
+                    SELECT (ep.TotalPaid - es.TotalShare + sp.TotalSettlementsPaid - sr.TotalSettlementsReceived) AS NetBalance
+                    FROM ExpensePaid ep, ExpenseShares es, SettlementsPaid sp, SettlementsReceived sr;";
+
+                decimal senderNet = await connection.ExecuteScalarAsync<decimal>(balanceSql, new
+                {
+                    GroupId = settlement.GroupId,
+                    UserId = settlement.FromUserId
+                }, transaction);
+
+                if (senderNet >= -0.005m)
+                {
+                    transaction.Rollback();
+                    return SettlementCreationResult.Failed("Sender currently has no outstanding debt to settle.");
+                }
+
+                decimal senderDebt = Math.Abs(senderNet);
+
+                // 3. Compute total pending settlements paid by payer across ALL receivers
+                const string pendingPaidSql = @"
+                    SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2)))
+                    FROM dbo.SplitSettlements
+                    WHERE GroupId = @GroupId 
+                      AND FromUserId = @UserId 
+                      AND Status IN ('PendingReceiver', 'PendingOwner') 
+                      AND IsDeleted = 0;";
+
+                decimal pendingPaid = await connection.ExecuteScalarAsync<decimal>(pendingPaidSql, new
+                {
+                    GroupId = settlement.GroupId,
+                    UserId = settlement.FromUserId
+                }, transaction);
+
+                if (settlement.Amount + pendingPaid > senderDebt + 0.01m)
+                {
+                    transaction.Rollback();
+                    decimal remaining = Math.Max(0m, senderDebt - pendingPaid);
+                    string note = pendingPaid > 0 ? $" (plus Rs. {pendingPaid:N2} already pending)" : "";
+                    return SettlementCreationResult.Failed($"Settlement amount of Rs. {settlement.Amount:N2}{note} exceeds remaining debt of Rs. {remaining:N2}.");
+                }
+
+                // 4. Compute confirmed credit of receiver inside transaction
+                decimal receiverNet = await connection.ExecuteScalarAsync<decimal>(balanceSql, new
+                {
+                    GroupId = settlement.GroupId,
+                    UserId = settlement.ToUserId
+                }, transaction);
+
+                if (receiverNet <= 0.005m)
+                {
+                    transaction.Rollback();
+                    return SettlementCreationResult.Failed("Receiver is not currently owed any money in this group.");
+                }
+
+                decimal receiverCredit = receiverNet;
+
+                // 5. Compute total pending settlements received by receiver across ALL payers
+                const string pendingRecvSql = @"
+                    SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2)))
+                    FROM dbo.SplitSettlements
+                    WHERE GroupId = @GroupId 
+                      AND ToUserId = @UserId 
+                      AND Status IN ('PendingReceiver', 'PendingOwner') 
+                      AND IsDeleted = 0;";
+
+                decimal pendingRecv = await connection.ExecuteScalarAsync<decimal>(pendingRecvSql, new
+                {
+                    GroupId = settlement.GroupId,
+                    UserId = settlement.ToUserId
+                }, transaction);
+
+                if (settlement.Amount + pendingRecv > receiverCredit + 0.01m)
+                {
+                    transaction.Rollback();
+                    decimal remaining = Math.Max(0m, receiverCredit - pendingRecv);
+                    string note = pendingRecv > 0 ? $" (plus Rs. {pendingRecv:N2} already pending)" : "";
+                    return SettlementCreationResult.Failed($"Settlement amount of Rs. {settlement.Amount:N2}{note} exceeds receiver's remaining credit of Rs. {remaining:N2}.");
+                }
+
+                // 6. Insert settlement
+                const string insertSql = @"
+                    INSERT INTO dbo.SplitSettlements
+                        (Id, GroupId, FromUserId, ToUserId, Amount, SettlementDate, Note, Status, CreatedBy, 
+                         ReceiverActionBy, ReceiverActionAt, OwnerActionBy, OwnerActionAt, DeclineReason, CancelledAt, CancelledBy,
+                         CreatedAt, UpdatedAt, IsDeleted)
+                    VALUES
+                        (@Id, @GroupId, @FromUserId, @ToUserId, @Amount, @SettlementDate, @Note, @Status, @CreatedBy, 
+                         @ReceiverActionBy, @ReceiverActionAt, @OwnerActionBy, @OwnerActionAt, @DeclineReason, @CancelledAt, @CancelledBy,
+                         @CreatedAt, @UpdatedAt, @IsDeleted);";
+
                 await connection.ExecuteAsync(insertSql, settlement, transaction);
 
+                // 7. Insert notifications if any
                 if (notifications != null && notifications.Count > 0)
                 {
                     const string notifSql = @"
@@ -275,25 +438,109 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 throw;
             }
 
-            return (await GetSettlementDetailsAsync(settlement.Id, settlement.GroupId))!;
+            var details = await GetSettlementDetailsAsync(settlement.Id, settlement.GroupId);
+            return SettlementCreationResult.Succeeded(details!);
         }
 
         public async Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId, List<SplitNotification>? notifications = null)
         {
-            const string sql = @"
-                UPDATE dbo.SplitSettlements
-                SET Status = @NewStatus,
-                    ReceiverActionBy = @ReceiverUserId,
-                    ReceiverActionAt = SYSUTCDATETIME(),
-                    UpdatedAt = SYSUTCDATETIME()
-                WHERE Id = @SettlementId AND Status = 'PendingReceiver' AND IsDeleted = 0;";
-
             using var connection = CreateConnection();
             await connection.OpenAsync();
             using var transaction = connection.BeginTransaction();
             try
             {
-                var rows = await connection.ExecuteAsync(sql, new
+                const string getSql = @"
+                    SELECT Id, GroupId, FromUserId, ToUserId, Amount, Status
+                    FROM dbo.SplitSettlements
+                    WHERE Id = @SettlementId AND Status = 'PendingReceiver' AND IsDeleted = 0;";
+
+                var s = await connection.QueryFirstOrDefaultAsync<dynamic>(getSql, new { SettlementId = settlementId }, transaction);
+                if (s == null)
+                {
+                    transaction.Rollback();
+                    return 0; // Already processed or not found
+                }
+
+                Guid groupId = s.GroupId;
+                Guid fromUserId = s.FromUserId;
+                Guid toUserId = s.ToUserId;
+                decimal amount = s.Amount;
+
+                const string lockSql = @"
+                    DECLARE @res INT;
+                    EXEC @res = sp_getapplock 
+                        @Resource = @LockResource, 
+                        @LockMode = 'Exclusive', 
+                        @LockOwner = 'Transaction';";
+                await connection.ExecuteAsync(lockSql, new { LockResource = "SplitSettlement_Group_" + groupId.ToString("N") }, transaction);
+
+                const string balanceSql = @"
+                    WITH ExpensePaid AS (
+                        SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2))) AS TotalPaid
+                        FROM dbo.SplitExpenses
+                        WHERE GroupId = @GroupId AND PayerId = @UserId AND IsDeleted = 0
+                    ),
+                    ExpenseShares AS (
+                        SELECT ISNULL(SUM(s.ShareAmount), CAST(0 AS DECIMAL(18,2))) AS TotalShare
+                        FROM dbo.SplitExpenseShares s
+                        INNER JOIN dbo.SplitExpenses e ON e.Id = s.ExpenseId
+                        WHERE e.GroupId = @GroupId AND s.UserId = @UserId AND e.IsDeleted = 0
+                    ),
+                    SettlementsPaid AS (
+                        SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2))) AS TotalSettlementsPaid
+                        FROM dbo.SplitSettlements
+                        WHERE GroupId = @GroupId AND FromUserId = @UserId AND IsDeleted = 0 AND Status = 'Confirmed'
+                    ),
+                    SettlementsReceived AS (
+                        SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2))) AS TotalSettlementsReceived
+                        FROM dbo.SplitSettlements
+                        WHERE GroupId = @GroupId AND ToUserId = @UserId AND IsDeleted = 0 AND Status = 'Confirmed'
+                    )
+                    SELECT (ep.TotalPaid - es.TotalShare + sp.TotalSettlementsPaid - sr.TotalSettlementsReceived) AS NetBalance
+                    FROM ExpensePaid ep, ExpenseShares es, SettlementsPaid sp, SettlementsReceived sr;";
+
+                decimal senderNet = await connection.ExecuteScalarAsync<decimal>(balanceSql, new { GroupId = groupId, UserId = fromUserId }, transaction);
+                decimal receiverNet = await connection.ExecuteScalarAsync<decimal>(balanceSql, new { GroupId = groupId, UserId = toUserId }, transaction);
+
+                if (senderNet >= -0.005m || receiverNet <= 0.005m)
+                {
+                    transaction.Rollback();
+                    return -1; // Debt or credit eliminated
+                }
+
+                decimal senderDebt = Math.Abs(senderNet);
+                decimal receiverCredit = receiverNet;
+
+                const string pendingPaidSql = @"
+                    SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2)))
+                    FROM dbo.SplitSettlements
+                    WHERE GroupId = @GroupId AND FromUserId = @UserId AND Status IN ('PendingReceiver', 'PendingOwner') 
+                      AND IsDeleted = 0 AND Id <> @SettlementId;";
+
+                const string pendingRecvSql = @"
+                    SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2)))
+                    FROM dbo.SplitSettlements
+                    WHERE GroupId = @GroupId AND ToUserId = @UserId AND Status IN ('PendingReceiver', 'PendingOwner') 
+                      AND IsDeleted = 0 AND Id <> @SettlementId;";
+
+                decimal otherPendingPaid = await connection.ExecuteScalarAsync<decimal>(pendingPaidSql, new { GroupId = groupId, UserId = fromUserId, SettlementId = settlementId }, transaction);
+                decimal otherPendingRecv = await connection.ExecuteScalarAsync<decimal>(pendingRecvSql, new { GroupId = groupId, UserId = toUserId, SettlementId = settlementId }, transaction);
+
+                if (amount + otherPendingPaid > senderDebt + 0.01m || amount + otherPendingRecv > receiverCredit + 0.01m)
+                {
+                    transaction.Rollback();
+                    return -1; // Exceeds remaining debt or credit
+                }
+
+                const string updateSql = @"
+                    UPDATE dbo.SplitSettlements
+                    SET Status = @NewStatus,
+                        ReceiverActionBy = @ReceiverUserId,
+                        ReceiverActionAt = SYSUTCDATETIME(),
+                        UpdatedAt = SYSUTCDATETIME()
+                    WHERE Id = @SettlementId AND Status = 'PendingReceiver' AND IsDeleted = 0;";
+
+                var rows = await connection.ExecuteAsync(updateSql, new
                 {
                     SettlementId = settlementId,
                     NewStatus = newStatus,
@@ -385,20 +632,103 @@ namespace SpendwiseSystem.Infrastructure.Repositories
 
         public async Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId, List<SplitNotification>? notifications = null)
         {
-            const string sql = @"
-                UPDATE dbo.SplitSettlements
-                SET Status = 'Confirmed',
-                    OwnerActionBy = @OwnerUserId,
-                    OwnerActionAt = SYSUTCDATETIME(),
-                    UpdatedAt = SYSUTCDATETIME()
-                WHERE Id = @SettlementId AND Status = 'PendingOwner' AND IsDeleted = 0;";
-
             using var connection = CreateConnection();
             await connection.OpenAsync();
             using var transaction = connection.BeginTransaction();
             try
             {
-                var rows = await connection.ExecuteAsync(sql, new
+                const string getSql = @"
+                    SELECT Id, GroupId, FromUserId, ToUserId, Amount, Status
+                    FROM dbo.SplitSettlements
+                    WHERE Id = @SettlementId AND Status = 'PendingOwner' AND IsDeleted = 0;";
+
+                var s = await connection.QueryFirstOrDefaultAsync<dynamic>(getSql, new { SettlementId = settlementId }, transaction);
+                if (s == null)
+                {
+                    transaction.Rollback();
+                    return 0; // Already processed
+                }
+
+                Guid groupId = s.GroupId;
+                Guid fromUserId = s.FromUserId;
+                Guid toUserId = s.ToUserId;
+                decimal amount = s.Amount;
+
+                const string lockSql = @"
+                    DECLARE @res INT;
+                    EXEC @res = sp_getapplock 
+                        @Resource = @LockResource, 
+                        @LockMode = 'Exclusive', 
+                        @LockOwner = 'Transaction';";
+                await connection.ExecuteAsync(lockSql, new { LockResource = "SplitSettlement_Group_" + groupId.ToString("N") }, transaction);
+
+                const string balanceSql = @"
+                    WITH ExpensePaid AS (
+                        SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2))) AS TotalPaid
+                        FROM dbo.SplitExpenses
+                        WHERE GroupId = @GroupId AND PayerId = @UserId AND IsDeleted = 0
+                    ),
+                    ExpenseShares AS (
+                        SELECT ISNULL(SUM(s.ShareAmount), CAST(0 AS DECIMAL(18,2))) AS TotalShare
+                        FROM dbo.SplitExpenseShares s
+                        INNER JOIN dbo.SplitExpenses e ON e.Id = s.ExpenseId
+                        WHERE e.GroupId = @GroupId AND s.UserId = @UserId AND e.IsDeleted = 0
+                    ),
+                    SettlementsPaid AS (
+                        SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2))) AS TotalSettlementsPaid
+                        FROM dbo.SplitSettlements
+                        WHERE GroupId = @GroupId AND FromUserId = @UserId AND IsDeleted = 0 AND Status = 'Confirmed'
+                    ),
+                    SettlementsReceived AS (
+                        SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2))) AS TotalSettlementsReceived
+                        FROM dbo.SplitSettlements
+                        WHERE GroupId = @GroupId AND ToUserId = @UserId AND IsDeleted = 0 AND Status = 'Confirmed'
+                    )
+                    SELECT (ep.TotalPaid - es.TotalShare + sp.TotalSettlementsPaid - sr.TotalSettlementsReceived) AS NetBalance
+                    FROM ExpensePaid ep, ExpenseShares es, SettlementsPaid sp, SettlementsReceived sr;";
+
+                decimal senderNet = await connection.ExecuteScalarAsync<decimal>(balanceSql, new { GroupId = groupId, UserId = fromUserId }, transaction);
+                decimal receiverNet = await connection.ExecuteScalarAsync<decimal>(balanceSql, new { GroupId = groupId, UserId = toUserId }, transaction);
+
+                if (senderNet >= -0.005m || receiverNet <= 0.005m)
+                {
+                    transaction.Rollback();
+                    return -1; // Debt or credit eliminated
+                }
+
+                decimal senderDebt = Math.Abs(senderNet);
+                decimal receiverCredit = receiverNet;
+
+                const string pendingPaidSql = @"
+                    SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2)))
+                    FROM dbo.SplitSettlements
+                    WHERE GroupId = @GroupId AND FromUserId = @UserId AND Status IN ('PendingReceiver', 'PendingOwner') 
+                      AND IsDeleted = 0 AND Id <> @SettlementId;";
+
+                const string pendingRecvSql = @"
+                    SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2)))
+                    FROM dbo.SplitSettlements
+                    WHERE GroupId = @GroupId AND ToUserId = @UserId AND Status IN ('PendingReceiver', 'PendingOwner') 
+                      AND IsDeleted = 0 AND Id <> @SettlementId;";
+
+                decimal otherPendingPaid = await connection.ExecuteScalarAsync<decimal>(pendingPaidSql, new { GroupId = groupId, UserId = fromUserId, SettlementId = settlementId }, transaction);
+                decimal otherPendingRecv = await connection.ExecuteScalarAsync<decimal>(pendingRecvSql, new { GroupId = groupId, UserId = toUserId, SettlementId = settlementId }, transaction);
+
+                if (amount + otherPendingPaid > senderDebt + 0.01m || amount + otherPendingRecv > receiverCredit + 0.01m)
+                {
+                    transaction.Rollback();
+                    return -1; // Exceeds remaining debt or credit
+                }
+
+                const string updateSql = @"
+                    UPDATE dbo.SplitSettlements
+                    SET Status = 'Confirmed',
+                        OwnerActionBy = @OwnerUserId,
+                        OwnerActionAt = SYSUTCDATETIME(),
+                        UpdatedAt = SYSUTCDATETIME()
+                    WHERE Id = @SettlementId AND Status = 'PendingOwner' AND IsDeleted = 0;";
+
+                var rows = await connection.ExecuteAsync(updateSql, new
                 {
                     SettlementId = settlementId,
                     OwnerUserId = ownerUserId

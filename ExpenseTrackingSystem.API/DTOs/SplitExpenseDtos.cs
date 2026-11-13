@@ -475,6 +475,19 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public bool CanReverse { get; set; }
     }
 
+    public class SettlementCreationResult
+    {
+        public bool Success { get; set; }
+        public string? ErrorMessage { get; set; }
+        public SplitSettlementDto? Settlement { get; set; }
+
+        public static SettlementCreationResult Succeeded(SplitSettlementDto settlement) =>
+            new() { Success = true, Settlement = settlement };
+
+        public static SettlementCreationResult Failed(string errorMessage) =>
+            new() { Success = false, ErrorMessage = errorMessage };
+    }
+
     public class SuggestedSettlementDto
     {
         public Guid FromUserId { get; set; }

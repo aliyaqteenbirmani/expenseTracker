@@ -15,7 +15,11 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<List<SplitSettlementDto>> GetPendingActionsAsync(Guid groupId, Guid currentUserId, bool isOwner);
         Task<List<SplitSettlement>> GetPendingSettlementsAsync(Guid groupId);
         Task<decimal> GetPendingPayerToReceiverAmountAsync(Guid groupId, Guid fromUserId, Guid toUserId, Guid? excludeSettlementId = null);
+        Task<decimal> GetPendingPaidByUserAmountAsync(Guid groupId, Guid userId, Guid? excludeSettlementId = null) => Task.FromResult(0m);
+        Task<decimal> GetPendingReceivedByUserAmountAsync(Guid groupId, Guid userId, Guid? excludeSettlementId = null) => Task.FromResult(0m);
         Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement, List<SplitNotification>? notifications = null);
+        Task<SettlementCreationResult> CreateSettlementAtomicAsync(SplitSettlement settlement, List<SplitNotification>? notifications = null) =>
+            CreateSettlementAsync(settlement, notifications).ContinueWith(t => SettlementCreationResult.Succeeded(t.Result));
         Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId, List<SplitNotification>? notifications = null);
         Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId, List<SplitNotification>? notifications = null);
         Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId, List<SplitNotification>? notifications = null);
