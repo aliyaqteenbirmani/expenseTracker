@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Popover,
   PopoverContent,
@@ -61,6 +61,10 @@ export function SplitNotificationBell({
   const [loading, setLoading] = useState(false)
   const [actionInProgressId, setActionInProgressId] = useState<string | null>(null)
 
+  // Accept confirmation dialog state
+  const [acceptTarget, setAcceptTarget] = useState<SplitNotificationDto | null>(null)
+  const [isAccepting, setIsAccepting] = useState(false)
+
   // Decline dialog state
   const [declineTarget, setDeclineTarget] = useState<SplitNotificationDto | null>(null)
   const [declineReason, setDeclineReason] = useState('')
@@ -80,7 +84,7 @@ export function SplitNotificationBell({
     if (!token) return
     try {
       setLoading(true)
-      const res = await splitExpensesApi.getMyNotifications(1, 20, token)
+      const res = await splitExpensesApi.getMyNotifications(1, 30, token)
       setNotifications(res.items || [])
       setUnreadCount(res.unreadCount || 0)
     } catch (err: unknown) {
@@ -90,7 +94,11 @@ export function SplitNotificationBell({
     }
   }, [token])
 
-  // Initial load & polling fallback (45s) & window focus
+  const notifySync = () => {
+    window.dispatchEvent(new CustomEvent('split-notifications-updated'))
+  }
+
+  // Initial load & polling fallback (45s) & window focus & custom sync event
   useEffect(() => {
     void fetchUnreadCount()
 
@@ -104,6 +112,12 @@ export function SplitNotificationBell({
     }
     window.addEventListener('focus', onFocus)
 
+    const onSync = () => {
+      void fetchUnreadCount()
+      if (open) void fetchNotifications()
+    }
+    window.addEventListener('split-notifications-updated', onSync)
+
     // SignalR realtime event listener
     const unsubscribe = realtimeService.subscribeSplitNotification(() => {
       void fetchUnreadCount()
@@ -113,6 +127,7 @@ export function SplitNotificationBell({
     return () => {
       clearInterval(interval)
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener('split-notifications-updated', onSync)
       unsubscribe()
     }
   }, [fetchUnreadCount, fetchNotifications, open])
@@ -133,6 +148,7 @@ export function SplitNotificationBell({
         prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
       )
       setUnreadCount((c) => Math.max(0, c - 1))
+      notifySync()
       onInvitationProcessed?.()
       void fetchNotifications()
     } catch (err: unknown) {
@@ -152,6 +168,7 @@ export function SplitNotificationBell({
         prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
       )
       setUnreadCount((c) => Math.max(0, c - 1))
+      notifySync()
       onInvitationProcessed?.()
       void fetchNotifications()
     } catch (err: unknown) {
@@ -162,21 +179,20 @@ export function SplitNotificationBell({
     }
   }
 
-  const handleAcceptSettlement = async (notif: SplitNotificationDto) => {
-    if (!notif.groupId || !notif.referenceId) return
+  const handleConfirmAcceptSettlement = async () => {
+    if (!acceptTarget || !acceptTarget.groupId || !acceptTarget.referenceId) return
     try {
-      setActionInProgressId(notif.id)
-      if (notif.type === 'SettlementAwaitingOwner') {
-        await splitExpensesApi.approveSettlementByOwner(notif.groupId, notif.referenceId, token)
+      setIsAccepting(true)
+      if (acceptTarget.type === 'SettlementAwaitingOwner') {
+        await splitExpensesApi.approveSettlementByOwner(acceptTarget.groupId, acceptTarget.referenceId, token)
         toast.success('Settlement approved and confirmed!')
       } else {
         try {
-          await splitExpensesApi.confirmSettlement(notif.groupId, notif.referenceId, token)
+          await splitExpensesApi.confirmSettlement(acceptTarget.groupId, acceptTarget.referenceId, token)
           toast.success('Payment receipt confirmed!')
         } catch (err: any) {
-          // If error indicates only owner can approve (e.g. reminder for owner), try owner approval
           if (err?.message?.toLowerCase().includes('owner')) {
-            await splitExpensesApi.approveSettlementByOwner(notif.groupId, notif.referenceId, token)
+            await splitExpensesApi.approveSettlementByOwner(acceptTarget.groupId, acceptTarget.referenceId, token)
             toast.success('Settlement approved and confirmed!')
           } else {
             throw err
@@ -185,9 +201,11 @@ export function SplitNotificationBell({
       }
 
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
+        prev.map((n) => (n.id === acceptTarget.id ? { ...n, isRead: true } : n))
       )
       setUnreadCount((c) => Math.max(0, c - 1))
+      setAcceptTarget(null)
+      notifySync()
       onSettlementProcessed?.()
       void fetchNotifications()
     } catch (err: unknown) {
@@ -195,7 +213,7 @@ export function SplitNotificationBell({
       toast.error(msg)
       void fetchNotifications()
     } finally {
-      setActionInProgressId(null)
+      setIsAccepting(false)
     }
   }
 
@@ -239,6 +257,7 @@ export function SplitNotificationBell({
       setUnreadCount((c) => Math.max(0, c - 1))
       setDeclineTarget(null)
       setDeclineReason('')
+      notifySync()
       onSettlementProcessed?.()
       void fetchNotifications()
     } catch (err: unknown) {
@@ -257,6 +276,7 @@ export function SplitNotificationBell({
         prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
       )
       setUnreadCount((c) => Math.max(0, c - 1))
+      notifySync()
     } catch {
       // Non-fatal
     }
@@ -267,6 +287,7 @@ export function SplitNotificationBell({
       await splitExpensesApi.markAllNotificationsAsRead(token)
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
       setUnreadCount(0)
+      notifySync()
       toast.success('All notifications marked as read')
     } catch {
       toast.error('Failed to mark all as read')
@@ -281,6 +302,274 @@ export function SplitNotificationBell({
       setOpen(false)
       onNotificationClick(notif)
     }
+  }
+
+  // Partition notifications by Today and Earlier
+  const { todayNotifications, earlierNotifications } = useMemo(() => {
+    const isToday = (dateStr: string) => {
+      try {
+        const d = new Date(dateStr)
+        const today = new Date()
+        return (
+          d.getDate() === today.getDate() &&
+          d.getMonth() === today.getMonth() &&
+          d.getFullYear() === today.getFullYear()
+        )
+      } catch {
+        return false
+      }
+    }
+
+    const today: SplitNotificationDto[] = []
+    const earlier: SplitNotificationDto[] = []
+
+    for (const notif of notifications) {
+      if (isToday(notif.createdAt)) {
+        today.push(notif)
+      } else {
+        earlier.push(notif)
+      }
+    }
+
+    return { todayNotifications: today, earlierNotifications: earlier }
+  }, [notifications])
+
+  const renderNotificationItem = (notif: SplitNotificationDto) => {
+    const isInvited = notif.type === 'GroupInvitationReceived'
+    const isAccepted = notif.type === 'InvitationAccepted'
+    const isDeclined = notif.type === 'InvitationRejected'
+    const isExpenseAdded = notif.type === 'ExpenseAdded'
+    const isExpenseUpdated = notif.type === 'ExpenseUpdated'
+    const isExpenseDeleted = notif.type === 'ExpenseDeleted'
+
+    // Settlement notification types
+    const isSettlementRequested = notif.type === 'SettlementRequested'
+    const isSettlementAwaitingOwner = notif.type === 'SettlementAwaitingOwner'
+    const isSettlementReminder = notif.type === 'SettlementReminder'
+    const isSettlementConfirmed =
+      notif.type === 'SettlementConfirmed' || notif.type === 'SettlementReceiverConfirmed'
+    const isSettlementDeclined = notif.type === 'SettlementDeclined'
+    const isSettlementCancelled = notif.type === 'SettlementCancelled'
+    const isSettlementReversed = notif.type === 'SettlementReversed'
+    const isSettlementRecordedForYou = notif.type === 'SettlementRecordedForYou'
+
+    const isSettlementActionable =
+      (isSettlementRequested || isSettlementAwaitingOwner || isSettlementReminder) &&
+      !notif.isRead &&
+      !!notif.referenceId &&
+      !!notif.groupId
+
+    const isBusy = actionInProgressId === notif.id
+
+    return (
+      <div
+        key={notif.id}
+        className={cn(
+          'p-3.5 text-xs transition-colors relative flex gap-3 cursor-pointer select-none',
+          !notif.isRead ? 'bg-primary/5 hover:bg-primary/8' : 'hover:bg-muted/40'
+        )}
+        onClick={() => handleItemClick(notif)}
+      >
+        <div className="shrink-0 mt-0.5">
+          {isInvited && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Users className="size-3.5" />
+            </div>
+          )}
+          {isAccepted && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="size-3.5" />
+            </div>
+          )}
+          {isDeclined && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+              <XCircle className="size-3.5" />
+            </div>
+          )}
+          {isExpenseAdded && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Receipt className="size-3.5" />
+            </div>
+          )}
+          {isExpenseUpdated && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <Pencil className="size-3.5" />
+            </div>
+          )}
+          {isExpenseDeleted && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+              <Trash2 className="size-3.5" />
+            </div>
+          )}
+          {isSettlementRequested && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <HandCoins className="size-3.5" />
+            </div>
+          )}
+          {isSettlementAwaitingOwner && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+              <ShieldCheck className="size-3.5" />
+            </div>
+          )}
+          {isSettlementReminder && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <Clock className="size-3.5" />
+            </div>
+          )}
+          {isSettlementConfirmed && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="size-3.5" />
+            </div>
+          )}
+          {isSettlementDeclined && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+              <XCircle className="size-3.5" />
+            </div>
+          )}
+          {isSettlementCancelled && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <XCircle className="size-3.5" />
+            </div>
+          )}
+          {isSettlementReversed && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <RotateCcw className="size-3.5" />
+            </div>
+          )}
+          {isSettlementRecordedForYou && (
+            <div className="flex size-7 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <Info className="size-3.5" />
+            </div>
+          )}
+          {!isInvited &&
+            !isAccepted &&
+            !isDeclined &&
+            !isExpenseAdded &&
+            !isExpenseUpdated &&
+            !isExpenseDeleted &&
+            !isSettlementRequested &&
+            !isSettlementAwaitingOwner &&
+            !isSettlementReminder &&
+            !isSettlementConfirmed &&
+            !isSettlementDeclined &&
+            !isSettlementCancelled &&
+            !isSettlementReversed &&
+            !isSettlementRecordedForYou && (
+              <div className="flex size-7 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Bell className="size-3.5" />
+              </div>
+            )}
+        </div>
+
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-center justify-between gap-1">
+            <span className="font-semibold text-foreground text-xs truncate">
+              {notif.title}
+            </span>
+            <span className="text-[10px] text-muted-foreground shrink-0 font-normal">
+              {formatRelativeDate(notif.createdAt)}
+            </span>
+          </div>
+
+          <p className="text-muted-foreground text-xs leading-relaxed line-clamp-2">
+            {notif.message}
+          </p>
+
+          {/* Final status badge if acted on */}
+          {notif.isRead && (
+            <div className="pt-0.5">
+              {isSettlementConfirmed && (
+                <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+                  Confirmed
+                </span>
+              )}
+              {isSettlementDeclined && (
+                <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium">
+                  Declined
+                </span>
+              )}
+              {isSettlementCancelled && (
+                <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                  Cancelled
+                </span>
+              )}
+              {isSettlementReversed && (
+                <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
+                  Reversed
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Invitation Actions */}
+          {isInvited && notif.referenceId && !notif.isRead && (
+            <div className="flex items-center gap-2 pt-2">
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1 px-2.5 font-medium"
+                disabled={isBusy}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleAcceptInvitation(notif.referenceId!, notif.id)
+                }}
+              >
+                {isBusy ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
+                Accept
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1 px-2.5 font-medium"
+                disabled={isBusy}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDeclineInvitation(notif.referenceId!, notif.id)
+                }}
+              >
+                <X className="size-3" />
+                Decline
+              </Button>
+            </div>
+          )}
+
+          {/* Settlement Inline Actions (with confirmation) */}
+          {isSettlementActionable && (
+            <div className="flex items-center gap-2 pt-2">
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1 px-2.5 font-medium"
+                disabled={isBusy}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setAcceptTarget(notif)
+                }}
+              >
+                <Check className="size-3" />
+                Accept
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1 px-2.5 font-medium"
+                disabled={isBusy}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDeclineTarget(notif)
+                  setDeclineReason('')
+                }}
+              >
+                <X className="size-3" />
+                Decline
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {!notif.isRead && (
+          <span className="size-2 rounded-full bg-primary shrink-0 self-start mt-1.5" />
+        )}
+      </div>
+    )
   }
 
   return (
@@ -341,247 +630,71 @@ export function SplitNotificationBell({
                 <p className="text-xs">No notifications for your Split Expenses groups.</p>
               </div>
             ) : (
-              notifications.map((notif) => {
-                const isInvited = notif.type === 'GroupInvitationReceived'
-                const isAccepted = notif.type === 'InvitationAccepted'
-                const isDeclined = notif.type === 'InvitationRejected'
-                const isExpenseAdded = notif.type === 'ExpenseAdded'
-                const isExpenseUpdated = notif.type === 'ExpenseUpdated'
-                const isExpenseDeleted = notif.type === 'ExpenseDeleted'
-
-                // Settlement notification types
-                const isSettlementRequested = notif.type === 'SettlementRequested'
-                const isSettlementAwaitingOwner = notif.type === 'SettlementAwaitingOwner'
-                const isSettlementReminder = notif.type === 'SettlementReminder'
-                const isSettlementConfirmed =
-                  notif.type === 'SettlementConfirmed' || notif.type === 'SettlementReceiverConfirmed'
-                const isSettlementDeclined = notif.type === 'SettlementDeclined'
-                const isSettlementCancelled = notif.type === 'SettlementCancelled'
-                const isSettlementReversed = notif.type === 'SettlementReversed'
-                const isSettlementRecordedForYou = notif.type === 'SettlementRecordedForYou'
-
-                const isSettlementActionable =
-                  (isSettlementRequested || isSettlementAwaitingOwner || isSettlementReminder) &&
-                  !notif.isRead &&
-                  !!notif.referenceId &&
-                  !!notif.groupId
-
-                const isBusy = actionInProgressId === notif.id
-
-                return (
-                  <div
-                    key={notif.id}
-                    className={cn(
-                      'p-3.5 text-xs transition-colors relative flex gap-3 cursor-pointer select-none',
-                      !notif.isRead ? 'bg-primary/5 hover:bg-primary/8' : 'hover:bg-muted/40'
-                    )}
-                    onClick={() => handleItemClick(notif)}
-                  >
-                    <div className="shrink-0 mt-0.5">
-                      {isInvited && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-                          <Users className="size-3.5" />
-                        </div>
-                      )}
-                      {isAccepted && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                          <CheckCircle2 className="size-3.5" />
-                        </div>
-                      )}
-                      {isDeclined && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                          <XCircle className="size-3.5" />
-                        </div>
-                      )}
-                      {isExpenseAdded && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-                          <Receipt className="size-3.5" />
-                        </div>
-                      )}
-                      {isExpenseUpdated && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          <Pencil className="size-3.5" />
-                        </div>
-                      )}
-                      {isExpenseDeleted && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                          <Trash2 className="size-3.5" />
-                        </div>
-                      )}
-                      {isSettlementRequested && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          <HandCoins className="size-3.5" />
-                        </div>
-                      )}
-                      {isSettlementAwaitingOwner && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                          <ShieldCheck className="size-3.5" />
-                        </div>
-                      )}
-                      {isSettlementReminder && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          <Clock className="size-3.5" />
-                        </div>
-                      )}
-                      {isSettlementConfirmed && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                          <CheckCircle2 className="size-3.5" />
-                        </div>
-                      )}
-                      {isSettlementDeclined && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                          <XCircle className="size-3.5" />
-                        </div>
-                      )}
-                      {isSettlementCancelled && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                          <XCircle className="size-3.5" />
-                        </div>
-                      )}
-                      {isSettlementReversed && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          <RotateCcw className="size-3.5" />
-                        </div>
-                      )}
-                      {isSettlementRecordedForYou && (
-                        <div className="flex size-7 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                          <Info className="size-3.5" />
-                        </div>
-                      )}
-                      {!isInvited &&
-                        !isAccepted &&
-                        !isDeclined &&
-                        !isExpenseAdded &&
-                        !isExpenseUpdated &&
-                        !isExpenseDeleted &&
-                        !isSettlementRequested &&
-                        !isSettlementAwaitingOwner &&
-                        !isSettlementReminder &&
-                        !isSettlementConfirmed &&
-                        !isSettlementDeclined &&
-                        !isSettlementCancelled &&
-                        !isSettlementReversed &&
-                        !isSettlementRecordedForYou && (
-                          <div className="flex size-7 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                            <Bell className="size-3.5" />
-                          </div>
-                        )}
+              <div>
+                {/* Today Section */}
+                {todayNotifications.length > 0 && (
+                  <div>
+                    <div className="bg-muted/40 px-3.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Today
                     </div>
-
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-semibold text-foreground text-xs truncate">
-                          {notif.title}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground shrink-0 font-normal">
-                          {formatRelativeDate(notif.createdAt)}
-                        </span>
-                      </div>
-
-                      <p className="text-muted-foreground text-xs leading-relaxed line-clamp-2">
-                        {notif.message}
-                      </p>
-
-                      {/* Final status badge if acted on */}
-                      {notif.isRead && (
-                        <div className="pt-0.5">
-                          {isSettlementConfirmed && (
-                            <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-                              Confirmed
-                            </span>
-                          )}
-                          {isSettlementDeclined && (
-                            <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium">
-                              Declined
-                            </span>
-                          )}
-                          {isSettlementCancelled && (
-                            <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
-                              Cancelled
-                            </span>
-                          )}
-                          {isSettlementReversed && (
-                            <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
-                              Reversed
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Invitation Actions */}
-                      {isInvited && notif.referenceId && !notif.isRead && (
-                        <div className="flex items-center gap-2 pt-2">
-                          <Button
-                            size="sm"
-                            className="h-7 text-xs gap-1 px-2.5 font-medium"
-                            disabled={isBusy}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleAcceptInvitation(notif.referenceId!, notif.id)
-                            }}
-                          >
-                            {isBusy ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
-                            Accept
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs gap-1 px-2.5 font-medium"
-                            disabled={isBusy}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeclineInvitation(notif.referenceId!, notif.id)
-                            }}
-                          >
-                            <X className="size-3" />
-                            Decline
-                          </Button>
-                        </div>
-                      )}
-
-                      {/* Settlement Inline Actions (Accept / Decline) */}
-                      {isSettlementActionable && (
-                        <div className="flex items-center gap-2 pt-2">
-                          <Button
-                            size="sm"
-                            className="h-7 text-xs gap-1 px-2.5 font-medium"
-                            disabled={isBusy}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleAcceptSettlement(notif)
-                            }}
-                          >
-                            {isBusy ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
-                            Accept
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs gap-1 px-2.5 font-medium"
-                            disabled={isBusy}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setDeclineTarget(notif)
-                              setDeclineReason('')
-                            }}
-                          >
-                            <X className="size-3" />
-                            Decline
-                          </Button>
-                        </div>
-                      )}
+                    <div className="divide-y divide-border/60">
+                      {todayNotifications.map(renderNotificationItem)}
                     </div>
-
-                    {!notif.isRead && (
-                      <span className="size-2 rounded-full bg-primary shrink-0 self-start mt-1.5" />
-                    )}
                   </div>
-                )
-              })
+                )}
+
+                {/* Earlier Section */}
+                {earlierNotifications.length > 0 && (
+                  <div>
+                    <div className="bg-muted/40 px-3.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-t border-border/40">
+                      Earlier
+                    </div>
+                    <div className="divide-y divide-border/60">
+                      {earlierNotifications.map(renderNotificationItem)}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </PopoverContent>
       </Popover>
+
+      {/* Accept Confirmation Dialog */}
+      <Dialog open={!!acceptTarget} onOpenChange={(val) => !val && setAcceptTarget(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold">Confirm Settlement Receipt</DialogTitle>
+            <DialogDescription className="text-xs">
+              {acceptTarget?.title}: {acceptTarget?.message}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground py-1">
+            {acceptTarget?.type === 'SettlementAwaitingOwner'
+              ? 'As the group owner, approving this settlement will confirm it and permanently adjust group balances.'
+              : 'Confirming receipt will record that you received this payment. Group balances will update accordingly once fully confirmed.'}
+          </p>
+          <DialogFooter className="flex gap-2 sm:justify-end pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isAccepting}
+              onClick={() => setAcceptTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={isAccepting}
+              onClick={handleConfirmAcceptSettlement}
+              className="gap-1.5"
+            >
+              {isAccepting ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
+              Confirm Accept
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Decline Reason Dialog */}
       <Dialog open={!!declineTarget} onOpenChange={(val) => !val && setDeclineTarget(null)}>

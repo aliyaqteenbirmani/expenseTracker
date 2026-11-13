@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { splitExpensesApi } from '../splitExpensesApi'
 import { toast } from 'sonner'
 import type { SplitGroupMemberDto, SplitSettlementDto, SuggestedSettlementDto } from '../types'
-import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Loader2, Info } from 'lucide-react'
 import { MemberSelector, getMemberDisplayName } from './MemberSelector'
 
 interface SettleUpDialogProps {
@@ -15,6 +15,8 @@ interface SettleUpDialogProps {
   groupId: string
   members: SplitGroupMemberDto[]
   currentUserId?: string
+  isOwner?: boolean
+  ownerId?: string
   initialSuggestion?: SuggestedSettlementDto | null
   token?: string
   onSettlementRecorded: (settlement: SplitSettlementDto) => void
@@ -26,6 +28,8 @@ export function SettleUpDialog({
   groupId,
   members,
   currentUserId,
+  isOwner,
+  ownerId,
   initialSuggestion,
   token,
   onSettlementRecorded,
@@ -70,6 +74,13 @@ export function SettleUpDialog({
   const fromMember = activeMembers.find((m) => m.userId === fromUserId)
   const toMember = activeMembers.find((m) => m.userId === toUserId)
 
+  // Determine if settlement will be confirmed immediately:
+  // Owner recording on behalf of others, or owner is the receiver ("X paid me")
+  const effectiveOwner = isOwner || (ownerId && currentUserId === ownerId)
+  const isImmediate = Boolean(
+    effectiveOwner && (fromUserId !== currentUserId || toUserId === ownerId)
+  )
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -106,7 +117,13 @@ export function SettleUpDialog({
         },
         token
       )
-      toast.success('Settlement payment recorded successfully')
+      
+      if (res.status === 'Confirmed') {
+        toast.success('Settlement payment recorded and confirmed successfully')
+      } else {
+        toast.success('Settlement request submitted. Awaiting confirmation.')
+      }
+
       setConfirmed(false)
       setAmountStr('')
       setNote('')
@@ -133,6 +150,23 @@ export function SettleUpDialog({
       <form onSubmit={handleSubmit} className="space-y-4">
         {!confirmed ? (
           <>
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground flex gap-2.5 items-start">
+              <Info className="size-4 text-primary shrink-0 mt-0.5" />
+              <div>
+                {isImmediate ? (
+                  <p>
+                    As the group owner, recording this payment will confirm the settlement and update group balances immediately.
+                  </p>
+                ) : (
+                  <p>
+                    Submitting this payment sends a settlement request. It will be confirmed by{' '}
+                    <strong className="text-foreground">{getMemberDisplayName(toMember) || 'the receiver'}</strong>
+                    {' '}(and approved by the group owner if required) before balances are adjusted.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="settle-from-user">Payer (Who paid?) *</Label>
@@ -220,9 +254,13 @@ export function SettleUpDialog({
                 <CheckCircle2 className="size-6" />
               </div>
               <div>
-                <h4 className="font-semibold text-base">Confirm Payment Recording</h4>
+                <h4 className="font-semibold text-base">
+                  {isImmediate ? 'Confirm Payment Recording' : 'Review Settlement Request'}
+                </h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  This transaction will update the net balance for both members immediately.
+                  {isImmediate
+                    ? 'This transaction will update the net balance for both members immediately.'
+                    : `Your request will be sent to ${getMemberDisplayName(toMember) || 'the receiver'} for confirmation before balances change.`}
                 </p>
               </div>
 
@@ -248,8 +286,17 @@ export function SettleUpDialog({
               >
                 Back
               </Button>
-              <Button type="submit" loading={loading} className="gap-1.5">
-                Confirm & Record
+              <Button type="submit" disabled={loading} className="gap-1.5">
+                {loading ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Submitting...
+                  </>
+                ) : isImmediate ? (
+                  'Confirm & Record'
+                ) : (
+                  'Submit Settlement Request'
+                )}
               </Button>
             </div>
           </div>

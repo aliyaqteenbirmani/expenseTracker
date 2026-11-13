@@ -83,6 +83,8 @@ import {
   UserPlus,
   ChevronDown,
   ChevronUp,
+  RotateCcw,
+  Clock,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -91,6 +93,7 @@ interface SplitGroupDetailsPageProps {
   currentUserId?: string
   token?: string
   initialExpenseId?: string | null
+  initialTab?: string | null
   onBack: () => void
   onGroupDeleted?: () => void
 }
@@ -100,13 +103,20 @@ export function SplitGroupDetailsPage({
   currentUserId,
   token,
   initialExpenseId,
+  initialTab,
   onBack,
   onGroupDeleted,
 }: SplitGroupDetailsPageProps) {
   const { reduce, fadeOnly } = useMotionSafe()
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(initialTab || 'overview')
   const [loading, setLoading] = useState(true)
   const [group, setGroup] = useState<SplitGroupDetailDto | null>(null)
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab)
+    }
+  }, [initialTab])
 
   // Sub-data states
   const [expenses, setExpenses] = useState<SplitExpenseListItemDto[]>([])
@@ -117,7 +127,12 @@ export function SplitGroupDetailsPage({
   const [settleOverview, setSettleOverview] = useState<SettleUpOverviewDto | null>(null)
   const [settlements, setSettlements] = useState<SplitSettlementDto[]>([])
   const [pendingActions, setPendingActions] = useState<SplitSettlementDto[]>([])
-  const [actingSettlementId, setActingSettlementId] = useState<string | null>(null)
+  const [acceptSettlementTarget, setAcceptSettlementTarget] = useState<SplitSettlementDto | null>(null)
+  const [isAcceptingSettlement, setIsAcceptingSettlement] = useState(false)
+  const [cancelSettlementTarget, setCancelSettlementTarget] = useState<SplitSettlementDto | null>(null)
+  const [isCancellingSettlement, setIsCancellingSettlement] = useState(false)
+  const [reverseSettlementTarget, setReverseSettlementTarget] = useState<SplitSettlementDto | null>(null)
+  const [isReversingSettlement, setIsReversingSettlement] = useState(false)
   const [declineSettlementTarget, setDeclineSettlementTarget] = useState<SplitSettlementDto | null>(null)
   const [declineSettlementReason, setDeclineSettlementReason] = useState('')
   const [isDecliningSettlement, setIsDecliningSettlement] = useState(false)
@@ -183,23 +198,60 @@ export function SplitGroupDetailsPage({
     }
   }, [groupId, token])
 
-  const handleAcceptPendingAction = async (item: SplitSettlementDto) => {
+  const handleConfirmAcceptPendingAction = async () => {
+    if (!acceptSettlementTarget) return
     try {
-      setActingSettlementId(item.id)
-      if (item.status === 'PendingOwner') {
-        await splitExpensesApi.approveSettlementByOwner(groupId, item.id, token)
+      setIsAcceptingSettlement(true)
+      if (acceptSettlementTarget.status === 'PendingOwner') {
+        await splitExpensesApi.approveSettlementByOwner(groupId, acceptSettlementTarget.id, token)
         toast.success('Settlement approved and confirmed!')
       } else {
-        await splitExpensesApi.confirmSettlement(groupId, item.id, token)
+        await splitExpensesApi.confirmSettlement(groupId, acceptSettlementTarget.id, token)
         toast.success('Payment receipt confirmed!')
       }
+      setAcceptSettlementTarget(null)
       await loadBalancesAndSettlements()
+      await loadGroupDetails()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to confirm settlement'
       toast.error(msg)
       await loadBalancesAndSettlements()
     } finally {
-      setActingSettlementId(null)
+      setIsAcceptingSettlement(false)
+    }
+  }
+
+  const handleConfirmCancelSettlement = async () => {
+    if (!cancelSettlementTarget) return
+    try {
+      setIsCancellingSettlement(true)
+      await splitExpensesApi.cancelSettlement(groupId, cancelSettlementTarget.id, token)
+      toast.success('Settlement request cancelled.')
+      setCancelSettlementTarget(null)
+      await loadBalancesAndSettlements()
+      await loadGroupDetails()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to cancel settlement'
+      toast.error(msg)
+    } finally {
+      setIsCancellingSettlement(false)
+    }
+  }
+
+  const handleConfirmReverseSettlement = async () => {
+    if (!reverseSettlementTarget) return
+    try {
+      setIsReversingSettlement(true)
+      await splitExpensesApi.reverseSettlement(groupId, reverseSettlementTarget.id, token)
+      toast.success('Settlement reversed. Balances restored.')
+      setReverseSettlementTarget(null)
+      await loadBalancesAndSettlements()
+      await loadGroupDetails()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to reverse settlement'
+      toast.error(msg)
+    } finally {
+      setIsReversingSettlement(false)
     }
   }
 
@@ -226,6 +278,7 @@ export function SplitGroupDetailsPage({
       setDeclineSettlementTarget(null)
       setDeclineSettlementReason('')
       await loadBalancesAndSettlements()
+      await loadGroupDetails()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to decline settlement'
       toast.error(msg)
@@ -309,7 +362,7 @@ export function SplitGroupDetailsPage({
     }
   }
 
-  // Handle clicking on an expense notification
+  // Handle clicking on an expense or settlement notification
   const handleNotificationClick = (notif: SplitNotificationDto) => {
     if (!notif.groupId) return
     if (notif.groupId === groupId) {
@@ -317,8 +370,16 @@ export function SplitGroupDetailsPage({
         toast.info('This expense has been deleted.')
         setActiveTab('expenses')
         loadExpenses()
-      } else if (notif.referenceId) {
+      } else if (notif.type.includes('Expense') && notif.referenceId) {
+        setActiveTab('expenses')
         void handleOpenExpense(notif.referenceId)
+      } else if (notif.type.includes('Settlement')) {
+        setActiveTab('settle')
+        loadBalancesAndSettlements()
+      } else if (notif.type.includes('Invitation') || notif.type.includes('Member')) {
+        setActiveTab('members')
+        loadGroupDetails()
+        loadInvitations()
       }
     }
   }
@@ -420,6 +481,100 @@ export function SplitGroupDetailsPage({
     group.members?.find((m) => m.userId === currentUserId)?.email || group.ownerEmail
   const pendingInvites = invitations.filter((i) => i.status === 'Pending')
   const pastInvites = invitations.filter((i) => i.status !== 'Pending')
+
+  const myMemberBal = balances.find((b) => b.userId === currentUserId)
+  const pendingPaidAmount = myMemberBal?.pendingPaid || 0
+  const pendingRecvAmount = myMemberBal?.pendingReceived || 0
+
+  let pendingBalFooter: React.ReactNode = null
+  if (pendingPaidAmount > 0.005 && pendingRecvAmount > 0.005) {
+    pendingBalFooter = (
+      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium font-mono">
+        Rs. {pendingPaidAmount.toFixed(2)} pending confirmation · Rs. {pendingRecvAmount.toFixed(2)} pending receipt
+      </span>
+    )
+  } else if (pendingPaidAmount > 0.005) {
+    pendingBalFooter = (
+      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium font-mono">
+        Rs. {pendingPaidAmount.toFixed(2)} pending confirmation
+      </span>
+    )
+  } else if (pendingRecvAmount > 0.005) {
+    pendingBalFooter = (
+      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium font-mono">
+        Rs. {pendingRecvAmount.toFixed(2)} pending receipt
+      </span>
+    )
+  }
+
+  const totalSettledAmount = settlements
+    .filter((s) => s.status === 'Confirmed')
+    .reduce((sum, s) => sum + s.amount, 0)
+
+  const myRequests = settlements.filter(
+    (s) => s.createdBy === currentUserId || s.fromUserId === currentUserId
+  )
+
+  const renderSettlementStatusChip = (st: SplitSettlementDto) => {
+    switch (st.status) {
+      case 'PendingReceiver':
+        return (
+          <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+            Waiting for receiver
+          </Badge>
+        )
+      case 'PendingOwner':
+        return (
+          <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
+            Waiting for admin approval
+          </Badge>
+        )
+      case 'Confirmed':
+        return (
+          <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+            Confirmed
+          </Badge>
+        )
+      case 'DeclinedByReceiver':
+        return (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
+              Declined by receiver
+            </Badge>
+            {st.declineReason && (
+              <span className="text-[10px] text-muted-foreground italic truncate max-w-[200px]" title={st.declineReason}>
+                &quot;{st.declineReason}&quot;
+              </span>
+            )}
+          </div>
+        )
+      case 'DeclinedByOwner':
+        return (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
+              Declined by admin
+            </Badge>
+            {st.declineReason && (
+              <span className="text-[10px] text-muted-foreground italic truncate max-w-[200px]" title={st.declineReason}>
+                &quot;{st.declineReason}&quot;
+              </span>
+            )}
+          </div>
+        )
+      case 'Cancelled':
+        return (
+          <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground border-border">
+            Cancelled
+          </Badge>
+        )
+      default:
+        return (
+          <Badge variant="outline" className="text-[10px]">
+            {st.status}
+          </Badge>
+        )
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -557,16 +712,17 @@ export function SplitGroupDetailsPage({
                 icon={Scale}
                 trend={isOwed ? 'up' : owes ? 'down' : 'neutral'}
                 delta={isOwed ? 'You get back' : owes ? 'You owe' : 'All clear'}
+                footer={pendingBalFooter}
               />
             </motion.div>
             <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
               <StatCard
                 label="Total Settled"
-                value={settleOverview?.totalOutstandingDebt || 0}
+                value={totalSettledAmount}
                 formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
                 icon={HandCoins}
                 trend="neutral"
-                delta="Outstanding debt"
+                delta="Confirmed payments"
               />
             </motion.div>
             <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
@@ -785,7 +941,7 @@ export function SplitGroupDetailsPage({
           <div className="rounded-xl border bg-card p-4">
             <h3 className="text-base font-semibold mb-1">Member Balances</h3>
             <p className="text-xs text-muted-foreground mb-4">
-              Net balance calculates total paid minus total share, plus net settlement payments.
+              Net balance calculates total paid minus total share, plus confirmed settlement payments.
             </p>
 
             <motion.div
@@ -799,6 +955,9 @@ export function SplitGroupDetailsPage({
                 const isZero = Math.abs(bal) < 0.005
                 const isPositive = bal > 0.005
                 const isNegative = bal < -0.005
+                const canSeePending = isOwner || m.userId === currentUserId
+                const hasPendingPaid = (m.pendingPaid ?? 0) > 0.005
+                const hasPendingRecv = (m.pendingReceived ?? 0) > 0.005
 
                 return (
                   <motion.div
@@ -811,8 +970,8 @@ export function SplitGroupDetailsPage({
                         {getMemberInitials(m.fullName || m.email)}
                       </div>
                       <div>
-                        <div className="font-semibold text-sm flex items-center gap-2">
-                          {m.fullName}
+                        <div className="font-semibold text-sm flex items-center gap-2 flex-wrap">
+                          <span>{m.fullName}</span>
                           {m.userId === currentUserId && (
                             <Badge variant="outline" className="text-[10px] h-4">
                               You
@@ -823,9 +982,27 @@ export function SplitGroupDetailsPage({
                               Inactive
                             </Badge>
                           )}
+                          {canSeePending && hasPendingPaid && (
+                            <Badge variant="outline" className="text-[10px] h-4 text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 gap-1 font-mono">
+                              <Clock className="size-2.5" />
+                              Pending pay: Rs. {m.pendingPaid!.toFixed(2)}
+                            </Badge>
+                          )}
+                          {canSeePending && hasPendingRecv && (
+                            <Badge variant="outline" className="text-[10px] h-4 text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 gap-1 font-mono">
+                              <Clock className="size-2.5" />
+                              Pending recv: Rs. {m.pendingReceived!.toFixed(2)}
+                            </Badge>
+                          )}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Paid: Rs. {m.totalPaid.toFixed(2)} · Share: Rs. {m.totalShare.toFixed(2)}
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span>Paid: Rs. {m.totalPaid.toFixed(2)}</span>
+                          <span>·</span>
+                          <span>Share: Rs. {m.totalShare.toFixed(2)}</span>
+                          <span>·</span>
+                          <span>
+                            Settled: +Rs. {(m.settlementsReceived ?? 0).toFixed(2)} / -Rs. {(m.settlementsPaid ?? 0).toFixed(2)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -836,20 +1013,20 @@ export function SplitGroupDetailsPage({
                       </span>
                       {isZero && (
                         <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                          <CheckCircle2 className="size-3.5" />
+                          <CheckCircle2 className="size-3.5 text-emerald-500" />
                           Settled up
                         </span>
                       )}
                       {isPositive && (
                         <span className="text-sm font-bold font-mono text-inflow flex items-center gap-1">
                           <ArrowUpRight className="size-4" />
-                          Gets back Rs. {Math.abs(bal).toFixed(2)}
+                          {m.userId === currentUserId ? 'You get back' : `${m.fullName} gets back`} Rs. {Math.abs(bal).toFixed(2)}
                         </span>
                       )}
                       {isNegative && (
                         <span className="text-sm font-bold font-mono text-outflow flex items-center gap-1">
                           <ArrowDownLeft className="size-4" />
-                          Owes Rs. {Math.abs(bal).toFixed(2)}
+                          {m.userId === currentUserId ? 'You owe' : `${m.fullName} owes`} Rs. {Math.abs(bal).toFixed(2)}
                         </span>
                       )}
                     </div>
@@ -874,7 +1051,6 @@ export function SplitGroupDetailsPage({
 
               <div className="grid grid-cols-1 gap-3">
                 {pendingActions.map((item) => {
-                  const isBusy = actingSettlementId === item.id
                   const isAwaitingOwner = item.status === 'PendingOwner'
 
                   return (
@@ -904,21 +1080,15 @@ export function SplitGroupDetailsPage({
                       <div className="flex items-center gap-2 self-end sm:self-center">
                         <Button
                           size="sm"
-                          disabled={isBusy}
-                          onClick={() => handleAcceptPendingAction(item)}
+                          onClick={() => setAcceptSettlementTarget(item)}
                           className="gap-1.5 h-8 text-xs font-medium"
                         >
-                          {isBusy ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            <Check className="size-3.5" />
-                          )}
+                          <Check className="size-3.5" />
                           Accept
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={isBusy}
                           onClick={() => {
                             setDeclineSettlementTarget(item)
                             setDeclineSettlementReason('')
@@ -935,6 +1105,67 @@ export function SplitGroupDetailsPage({
               </div>
             </div>
           )}
+
+          {/* My Requests */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold">My Requests</h3>
+              {myRequests.length > 0 && (
+                <Badge variant="secondary" className="text-xs font-mono">
+                  {myRequests.length}
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Settlement requests you submitted and their current approval status.
+            </p>
+
+            {myRequests.length === 0 ? (
+              <Card className="rounded-xl border bg-card/60 p-5 text-center">
+                <p className="text-xs text-muted-foreground">No settlement requests submitted by you.</p>
+              </Card>
+            ) : (
+              <div className="rounded-xl border divide-y overflow-hidden bg-card">
+                {myRequests.map((req) => {
+                  const isPending = req.status === 'PendingReceiver' || req.status === 'PendingOwner'
+                  const canCancel = (req.canCancel ?? true) && isPending
+
+                  return (
+                    <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 gap-3">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm">
+                            You paid {req.toUserName}
+                          </span>
+                          {renderSettlementStatusChip(req)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(req.settlementDate), 'MMM d, yyyy')}
+                          {req.note && ` · "${req.note}"`}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                        <span className="font-mono font-bold text-sm text-foreground">
+                          Rs. {req.amount.toFixed(2)}
+                        </span>
+                        {canCancel && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                            onClick={() => setCancelSettlementTarget(req)}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Suggested payments */}
           <div className="space-y-3">
@@ -1008,27 +1239,46 @@ export function SplitGroupDetailsPage({
               <p className="text-xs text-muted-foreground">No payments recorded yet.</p>
             ) : (
               <div className="rounded-xl border divide-y overflow-hidden bg-card">
-                {settlements.map((st) => (
-                  <div key={st.id} className="flex items-center justify-between p-3.5 text-sm">
-                    <div className="flex items-center gap-3 truncate">
-                      <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <HandCoins className="size-4" />
+                {settlements.map((st) => {
+                  const canReverse = (isOwner || st.canReverse) && st.status === 'Confirmed'
+
+                  return (
+                    <div key={st.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 text-sm gap-2">
+                      <div className="flex items-center gap-3 truncate min-w-0">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                          <HandCoins className="size-4" />
+                        </div>
+                        <div className="truncate min-w-0">
+                          <div className="font-semibold truncate flex items-center gap-2 flex-wrap">
+                            <span>{st.fromUserName} paid {st.toUserName}</span>
+                            {renderSettlementStatusChip(st)}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {format(new Date(st.settlementDate), 'MMM d, yyyy')}
+                            {st.note && ` · ${st.note}`}
+                          </div>
+                        </div>
                       </div>
-                      <div className="truncate">
-                        <div className="font-semibold truncate">
-                          {st.fromUserName} paid {st.toUserName}
+                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                        <div className="font-mono font-bold text-inflow">
+                          Rs. {st.amount.toFixed(2)}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {format(new Date(st.settlementDate), 'MMM d, yyyy')}
-                          {st.note && ` · ${st.note}`}
-                        </div>
+                        {canReverse && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-destructive hover:bg-destructive/10 gap-1 px-2"
+                            onClick={() => setReverseSettlementTarget(st)}
+                            title="Reverse confirmed payment and restore balances"
+                          >
+                            <RotateCcw className="size-3" />
+                            Reverse
+                          </Button>
+                        )}
                       </div>
                     </div>
-                    <div className="font-mono font-bold text-inflow">
-                      Rs. {st.amount.toFixed(2)}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -1358,6 +1608,8 @@ export function SplitGroupDetailsPage({
         groupId={groupId}
         members={group.members || []}
         currentUserId={currentUserId}
+        isOwner={isOwner}
+        ownerId={group.ownerId}
         initialSuggestion={activeSuggestion}
         token={token}
         onSettlementRecorded={() => {
@@ -1478,6 +1730,116 @@ export function SplitGroupDetailsPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Accept Settlement Confirmation Alert */}
+      <AlertDialog
+        open={!!acceptSettlementTarget}
+        onOpenChange={(v) => !v && setAcceptSettlementTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {acceptSettlementTarget?.status === 'PendingOwner'
+                ? 'Approve Settlement as Owner?'
+                : 'Confirm Payment Receipt?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {acceptSettlementTarget?.status === 'PendingOwner' ? (
+                <>
+                  Approve that <span className="font-semibold text-foreground">{acceptSettlementTarget.fromUserName}</span> paid{' '}
+                  <span className="font-semibold text-foreground">Rs. {acceptSettlementTarget.amount.toFixed(2)}</span> to{' '}
+                  <span className="font-semibold text-foreground">{acceptSettlementTarget.toUserName}</span>?
+                  This will finalize the settlement and update group balances.
+                </>
+              ) : (
+                <>
+                  Confirm that you received{' '}
+                  <span className="font-semibold text-foreground">Rs. {acceptSettlementTarget?.amount.toFixed(2)}</span> from{' '}
+                  <span className="font-semibold text-foreground">{acceptSettlementTarget?.fromUserName}</span>?
+                  {group.ownerId !== currentUserId
+                    ? ' The group owner will provide final approval before balances change.'
+                    : ' This will finalize the settlement and update balances.'}
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isAcceptingSettlement}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmAcceptPendingAction}
+              disabled={isAcceptingSettlement}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {isAcceptingSettlement ? (
+                <Loader2 className="size-3.5 animate-spin mr-1.5" />
+              ) : (
+                <Check className="size-3.5 mr-1.5" />
+              )}
+              {acceptSettlementTarget?.status === 'PendingOwner' ? 'Approve Settlement' : 'Confirm Receipt'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Settlement Confirmation Alert */}
+      <AlertDialog
+        open={!!cancelSettlementTarget}
+        onOpenChange={(v) => !v && setCancelSettlementTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Settlement Request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel your settlement request of{' '}
+              <span className="font-semibold text-foreground">
+                Rs. {cancelSettlementTarget?.amount.toFixed(2)}
+              </span>{' '}
+              to <span className="font-semibold text-foreground">{cancelSettlementTarget?.toUserName}</span>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancellingSettlement}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmCancelSettlement}
+              disabled={isCancellingSettlement}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isCancellingSettlement ? 'Cancelling...' : 'Cancel Request'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reverse Settlement Confirmation Alert */}
+      <AlertDialog
+        open={!!reverseSettlementTarget}
+        onOpenChange={(v) => !v && setReverseSettlementTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reverse Confirmed Settlement?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reverse the confirmed settlement of{' '}
+              <span className="font-semibold text-foreground">
+                Rs. {reverseSettlementTarget?.amount.toFixed(2)}
+              </span>{' '}
+              from <span className="font-semibold text-foreground">{reverseSettlementTarget?.fromUserName}</span> to{' '}
+              <span className="font-semibold text-foreground">{reverseSettlementTarget?.toUserName}</span>?
+              This will restore both members' balances to their state before the settlement.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isReversingSettlement}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmReverseSettlement}
+              disabled={isReversingSettlement}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isReversingSettlement ? 'Reversing...' : 'Reverse Settlement'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

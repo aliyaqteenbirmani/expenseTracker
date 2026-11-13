@@ -45,6 +45,7 @@ export function SplitExpensesPage({
   const { reduce, fadeOnly } = useMotionSafe()
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [initialExpenseId, setInitialExpenseId] = useState<string | null>(null)
+  const [initialTab, setInitialTab] = useState<string | null>(null)
   const [groups, setGroups] = useState<SplitGroupSummaryDto[]>([])
   const [myInvitations, setMyInvitations] = useState<SplitGroupInvitationDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,8 +58,19 @@ export function SplitExpensesPage({
       if (notif.type === 'ExpenseDeleted') {
         toast.info('This expense has been deleted.')
         setInitialExpenseId(null)
-      } else if (notif.referenceId) {
+        setInitialTab('expenses')
+      } else if (notif.type.includes('Expense') && notif.referenceId) {
         setInitialExpenseId(notif.referenceId)
+        setInitialTab('expenses')
+      } else if (notif.type.includes('Settlement')) {
+        setInitialExpenseId(null)
+        setInitialTab('settle')
+      } else if (notif.type.includes('Invitation') || notif.type.includes('Member')) {
+        setInitialExpenseId(null)
+        setInitialTab('members')
+      } else {
+        setInitialExpenseId(null)
+        setInitialTab('overview')
       }
     }
   }
@@ -139,14 +151,17 @@ export function SplitExpensesPage({
             currentUserId={currentUserId}
             token={token}
             initialExpenseId={initialExpenseId}
+            initialTab={initialTab}
             onBack={() => {
               setSelectedGroupId(null)
               setInitialExpenseId(null)
+              setInitialTab(null)
               loadData()
             }}
             onGroupDeleted={() => {
               setSelectedGroupId(null)
               setInitialExpenseId(null)
+              setInitialTab(null)
               loadData()
             }}
           />

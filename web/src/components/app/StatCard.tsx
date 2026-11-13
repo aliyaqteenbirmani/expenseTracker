@@ -46,8 +46,8 @@ export function StatCard({
         )}
       </CardHeader>
       <CardContent className="p-0 pt-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <div className={cn('text-3xl font-semibold tabular-nums tracking-tight font-mono', valueColor)}>
+        <div className="flex items-baseline justify-between gap-2 min-w-0">
+          <div className={cn('text-2xl sm:text-2xl xl:text-3xl font-semibold tabular-nums tracking-tight font-mono whitespace-nowrap truncate', valueColor)}>
             <AnimatedNumber value={value} formatFn={formatFn} />
           </div>
           {delta && (

@@ -114,11 +114,21 @@ export function AppSidebar({
     const interval = setInterval(fetchCount, 45000)
     const unsub = realtimeService.subscribeSplitNotification(fetchCount)
     const onFocus = () => void fetchCount()
+    const onNotificationUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ unreadCount?: number }>
+      if (typeof customEvent.detail?.unreadCount === 'number') {
+        setSplitUnreadCount(customEvent.detail.unreadCount)
+      } else {
+        void fetchCount()
+      }
+    }
     window.addEventListener('focus', onFocus)
+    window.addEventListener('split-notifications-updated', onNotificationUpdate)
     return () => {
       clearInterval(interval)
       unsub()
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener('split-notifications-updated', onNotificationUpdate)
     }
   }, [token])
   const fullName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'User'
