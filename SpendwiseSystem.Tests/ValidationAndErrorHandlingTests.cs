@@ -199,18 +199,20 @@ namespace SpendwiseSystem.Tests
             public Task<decimal> GetPendingPayerToReceiverAmountAsync(Guid groupId, Guid fromUserId, Guid toUserId, Guid? excludeSettlementId = null) =>
                 Task.FromResult(0m);
 
-            public Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement)
+            public Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement, List<SplitNotification>? notifications = null)
             {
                 Settlements.Add(settlement);
                 return Task.FromResult(new SplitSettlementDto { Id = settlement.Id, Amount = settlement.Amount, Status = settlement.Status });
             }
 
-            public Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId) => Task.FromResult(1);
-            public Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId) => Task.FromResult(1);
-            public Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId) => Task.FromResult(1);
-            public Task<int> DeclineByOwnerAsync(Guid settlementId, string? reason, Guid ownerUserId) => Task.FromResult(1);
-            public Task<int> CancelByPayerAsync(Guid settlementId, Guid payerUserId) => Task.FromResult(1);
-            public Task<bool> ReverseConfirmedSettlementAsync(Guid settlementId, Guid groupId, Guid ownerUserId) => Task.FromResult(true);
+            public Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId, List<SplitNotification>? notifications = null) => Task.FromResult(1);
+            public Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId, List<SplitNotification>? notifications = null) => Task.FromResult(1);
+            public Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId, List<SplitNotification>? notifications = null) => Task.FromResult(1);
+            public Task<int> DeclineByOwnerAsync(Guid settlementId, string? reason, Guid ownerUserId, List<SplitNotification>? notifications = null) => Task.FromResult(1);
+            public Task<int> CancelByPayerAsync(Guid settlementId, Guid payerUserId, List<SplitNotification>? notifications = null) => Task.FromResult(1);
+            public Task<bool> ReverseConfirmedSettlementAsync(Guid settlementId, Guid groupId, Guid ownerUserId, List<SplitNotification>? notifications = null) => Task.FromResult(true);
+            public Task<List<SplitSettlementDto>> GetSettlementsNeedingReminderAsync(DateTime olderThan) => Task.FromResult(new List<SplitSettlementDto>());
+            public Task<bool> AddReminderNotificationAsync(SplitNotification reminderNotification) => Task.FromResult(true);
 
             public Task<SplitSettlementDto> CreateSettlementWithActivityAsync(
                 SplitSettlement settlement, string creatorName, string groupName)

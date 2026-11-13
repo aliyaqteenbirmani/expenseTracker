@@ -166,6 +166,7 @@ export function SplitExpensesPage({
                     <SplitNotificationBell
                       token={token}
                       onInvitationProcessed={loadData}
+                      onSettlementProcessed={loadData}
                       onNotificationClick={handleNotificationClick}
                     />
                     <Button onClick={() => setCreateGroupOpen(true)} className="gap-2 shadow-xs">

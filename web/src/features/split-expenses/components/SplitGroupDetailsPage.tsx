@@ -29,7 +29,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { splitExpensesApi } from '../splitExpensesApi'
+import { realtimeService } from '@/realtimeService'
 import { AddExpenseDialog } from './AddExpenseDialog'
 import { EditExpenseDialog } from './EditExpenseDialog'
 import { ExpenseDetailDialog } from './ExpenseDetailDialog'
@@ -62,6 +72,8 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   CheckCircle2,
+  Check,
+  X,
   Trash2,
   Mail,
   UserX,
@@ -104,6 +116,11 @@ export function SplitGroupDetailsPage({
   const [balances, setBalances] = useState<MemberBalanceDto[]>([])
   const [settleOverview, setSettleOverview] = useState<SettleUpOverviewDto | null>(null)
   const [settlements, setSettlements] = useState<SplitSettlementDto[]>([])
+  const [pendingActions, setPendingActions] = useState<SplitSettlementDto[]>([])
+  const [actingSettlementId, setActingSettlementId] = useState<string | null>(null)
+  const [declineSettlementTarget, setDeclineSettlementTarget] = useState<SplitSettlementDto | null>(null)
+  const [declineSettlementReason, setDeclineSettlementReason] = useState('')
+  const [isDecliningSettlement, setIsDecliningSettlement] = useState(false)
   const [activities, setActivities] = useState<SplitGroupActivityDto[]>([])
   const [invitations, setInvitations] = useState<SplitGroupInvitationDto[]>([])
 
@@ -151,18 +168,72 @@ export function SplitGroupDetailsPage({
 
   const loadBalancesAndSettlements = useCallback(async () => {
     try {
-      const [balList, settleData, historyList] = await Promise.all([
+      const [balList, settleData, historyList, pendingList] = await Promise.all([
         splitExpensesApi.getGroupBalances(groupId, token),
         splitExpensesApi.getSettleUpSuggestions(groupId, token),
         splitExpensesApi.getGroupSettlements(groupId, token),
+        splitExpensesApi.getPendingActions(groupId, token),
       ])
       setBalances(balList || [])
       setSettleOverview(settleData || null)
       setSettlements(historyList || [])
+      setPendingActions(pendingList || [])
     } catch {
       // Handled silently
     }
   }, [groupId, token])
+
+  const handleAcceptPendingAction = async (item: SplitSettlementDto) => {
+    try {
+      setActingSettlementId(item.id)
+      if (item.status === 'PendingOwner') {
+        await splitExpensesApi.approveSettlementByOwner(groupId, item.id, token)
+        toast.success('Settlement approved and confirmed!')
+      } else {
+        await splitExpensesApi.confirmSettlement(groupId, item.id, token)
+        toast.success('Payment receipt confirmed!')
+      }
+      await loadBalancesAndSettlements()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to confirm settlement'
+      toast.error(msg)
+      await loadBalancesAndSettlements()
+    } finally {
+      setActingSettlementId(null)
+    }
+  }
+
+  const handleConfirmDeclinePendingAction = async () => {
+    if (!declineSettlementTarget) return
+    try {
+      setIsDecliningSettlement(true)
+      if (declineSettlementTarget.status === 'PendingOwner') {
+        await splitExpensesApi.declineSettlementByOwner(
+          groupId,
+          declineSettlementTarget.id,
+          declineSettlementReason || undefined,
+          token
+        )
+      } else {
+        await splitExpensesApi.declineSettlement(
+          groupId,
+          declineSettlementTarget.id,
+          declineSettlementReason || undefined,
+          token
+        )
+      }
+      toast.info('Settlement request declined.')
+      setDeclineSettlementTarget(null)
+      setDeclineSettlementReason('')
+      await loadBalancesAndSettlements()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to decline settlement'
+      toast.error(msg)
+      await loadBalancesAndSettlements()
+    } finally {
+      setIsDecliningSettlement(false)
+    }
+  }
 
   const loadActivities = useCallback(async () => {
     try {
@@ -190,6 +261,25 @@ export function SplitGroupDetailsPage({
     loadActivities()
     loadInvitations()
   }, [loadGroupDetails, loadExpenses, loadBalancesAndSettlements, loadActivities, loadInvitations])
+
+  // Realtime live updates & window focus refetch
+  useEffect(() => {
+    const onFocus = () => {
+      loadBalancesAndSettlements()
+    }
+    window.addEventListener('focus', onFocus)
+
+    const unsubscribe = realtimeService.subscribeSplitNotification(() => {
+      loadBalancesAndSettlements()
+      loadExpenses()
+      loadActivities()
+    })
+
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      unsubscribe()
+    }
+  }, [loadBalancesAndSettlements, loadExpenses, loadActivities])
 
   // Refetch when switching tabs
   const handleTabChange = (tab: string) => {
@@ -372,6 +462,10 @@ export function SplitGroupDetailsPage({
           <SplitNotificationBell
             token={token}
             onInvitationProcessed={loadGroupDetails}
+            onSettlementProcessed={() => {
+              loadGroupDetails()
+              loadBalancesAndSettlements()
+            }}
             onNotificationClick={handleNotificationClick}
           />
           <Button
@@ -768,6 +862,80 @@ export function SplitGroupDetailsPage({
 
         {/* 4. SETTLE UP TAB */}
         <MotionTabsContent value="settle" className="space-y-6 pt-4">
+          {/* Awaiting Your Action */}
+          {pendingActions.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold">Awaiting Your Action</h3>
+                <Badge variant="secondary" className="text-xs font-mono">
+                  {pendingActions.length} pending
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {pendingActions.map((item) => {
+                  const isBusy = actingSettlementId === item.id
+                  const isAwaitingOwner = item.status === 'PendingOwner'
+
+                  return (
+                    <Card
+                      key={item.id}
+                      className="rounded-xl border-amber-500/30 bg-amber-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-amber-600 dark:text-amber-400">
+                            {isAwaitingOwner ? 'Group Owner Final Approval' : 'Confirm Payment Receipt'}
+                          </span>
+                        </div>
+                        <div className="text-sm font-semibold">
+                          {item.fromUserName} recorded paying {item.toUserName}
+                        </div>
+                        <div className="text-base font-mono font-bold text-foreground">
+                          Rs. {item.amount.toFixed(2)}
+                        </div>
+                        {item.note && (
+                          <p className="text-xs text-muted-foreground italic">
+                            &quot;{item.note}&quot;
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center">
+                        <Button
+                          size="sm"
+                          disabled={isBusy}
+                          onClick={() => handleAcceptPendingAction(item)}
+                          className="gap-1.5 h-8 text-xs font-medium"
+                        >
+                          {isBusy ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Check className="size-3.5" />
+                          )}
+                          Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isBusy}
+                          onClick={() => {
+                            setDeclineSettlementTarget(item)
+                            setDeclineSettlementReason('')
+                          }}
+                          className="gap-1.5 h-8 text-xs font-medium"
+                        >
+                          <X className="size-3.5" />
+                          Decline
+                        </Button>
+                      </div>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Suggested payments */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -1260,6 +1428,56 @@ export function SplitGroupDetailsPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Decline Settlement Dialog */}
+      <Dialog
+        open={!!declineSettlementTarget}
+        onOpenChange={(val) => !val && setDeclineSettlementTarget(null)}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold">Decline Settlement Request</DialogTitle>
+            <DialogDescription className="text-xs">
+              Decline payment of Rs. {declineSettlementTarget?.amount.toFixed(2)} from {declineSettlementTarget?.fromUserName} to {declineSettlementTarget?.toUserName}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-xs font-medium text-foreground">
+              Reason for declining (optional)
+            </label>
+            <Textarea
+              placeholder="e.g. Payment not received in bank, incorrect amount..."
+              value={declineSettlementReason}
+              onChange={(e) => setDeclineSettlementReason(e.target.value)}
+              className="resize-none text-xs"
+              rows={3}
+            />
+          </div>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isDecliningSettlement}
+              onClick={() => setDeclineSettlementTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isDecliningSettlement}
+              onClick={handleConfirmDeclinePendingAction}
+              className="gap-1.5"
+            >
+              {isDecliningSettlement ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <X className="size-3" />
+              )}
+              Confirm Decline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

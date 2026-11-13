@@ -133,6 +133,7 @@ export interface SplitSettlementDto {
   id: string
   groupId: string
   groupName: string
+  groupOwnerId?: string
   fromUserId: string
   fromUserName: string
   fromUserEmail: string
@@ -309,7 +310,23 @@ export interface InviteSplitGroupMemberDto {
 export interface SplitNotificationDto {
   id: string
   userId: string
-  type: 'GroupInvitationReceived' | 'InvitationAccepted' | 'InvitationRejected' | string
+  type:
+    | 'GroupInvitationReceived'
+    | 'InvitationAccepted'
+    | 'InvitationRejected'
+    | 'ExpenseAdded'
+    | 'ExpenseUpdated'
+    | 'ExpenseDeleted'
+    | 'SettlementRequested'
+    | 'SettlementReceiverConfirmed'
+    | 'SettlementAwaitingOwner'
+    | 'SettlementConfirmed'
+    | 'SettlementDeclined'
+    | 'SettlementCancelled'
+    | 'SettlementRecordedForYou'
+    | 'SettlementReversed'
+    | 'SettlementReminder'
+    | string
   groupId?: string
   groupName?: string
   referenceId?: string

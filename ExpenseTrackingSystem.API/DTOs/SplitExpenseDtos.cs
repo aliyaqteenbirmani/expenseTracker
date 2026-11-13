@@ -444,6 +444,7 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public Guid Id { get; set; }
         public Guid GroupId { get; set; }
         public string GroupName { get; set; } = string.Empty;
+        public Guid? GroupOwnerId { get; set; }
         public Guid FromUserId { get; set; }
         public string FromUserName { get; set; } = string.Empty;
         public string FromUserEmail { get; set; } = string.Empty;

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SpendwiseSystem.Application.Interfaces;
 using SpendwiseSystem.Domain.DTOs.SplitExpenseDtos;
 using SpendwiseSystem.Domain.Entities;
@@ -14,17 +15,51 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
         private readonly ISplitGroupRepository _groupRepository;
         private readonly ISplitBalanceRepository _balanceRepository;
         private readonly IDebtSimplificationService _debtSimplificationService;
+        private readonly ISplitNotificationRepository? _notificationRepository;
+        private readonly ISplitRealtimeService? _realtimeService;
+        private readonly ILogger<SplitSettlementService>? _logger;
 
         public SplitSettlementService(
             ISplitSettlementRepository settlementRepository,
             ISplitGroupRepository groupRepository,
             ISplitBalanceRepository balanceRepository,
             IDebtSimplificationService debtSimplificationService)
+            : this(settlementRepository, groupRepository, balanceRepository, debtSimplificationService, null, null, null)
+        {
+        }
+
+        public SplitSettlementService(
+            ISplitSettlementRepository settlementRepository,
+            ISplitGroupRepository groupRepository,
+            ISplitBalanceRepository balanceRepository,
+            IDebtSimplificationService debtSimplificationService,
+            ISplitNotificationRepository? notificationRepository,
+            ISplitRealtimeService? realtimeService = null,
+            ILogger<SplitSettlementService>? logger = null)
         {
             _settlementRepository = settlementRepository;
             _groupRepository = groupRepository;
             _balanceRepository = balanceRepository;
             _debtSimplificationService = debtSimplificationService;
+            _notificationRepository = notificationRepository;
+            _realtimeService = realtimeService;
+            _logger = logger;
+        }
+
+        private async Task BroadcastNotificationsAsync(IEnumerable<SplitNotification> notifications)
+        {
+            if (_realtimeService == null) return;
+            foreach (var notif in notifications)
+            {
+                try
+                {
+                    await _realtimeService.NotifyUserAsync(notif.UserId, "ReceiveSplitNotification", notif);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to broadcast realtime notification {NotificationId} to user {UserId}", notif.Id, notif.UserId);
+                }
+            }
         }
 
         public async Task<ApiResponse<SplitSettlementDto>> RecordSettlementAsync(
@@ -155,7 +190,124 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 IsDeleted = false
             };
 
-            var result = await _settlementRepository.CreateSettlementAsync(settlement);
+            var notifications = new List<SplitNotification>();
+
+            if (isReceiver)
+            {
+                // Receiver-recorded payment ("X paid me")
+                if (initialStatus == SplitSettlementStatus.PendingOwner)
+                {
+                    // Payer notification (informational: "Y recorded your payment of Rs. X, waiting for approval")
+                    if (dto.FromUserId != currentUserId)
+                    {
+                        notifications.Add(new SplitNotification
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = dto.FromUserId,
+                            Type = "SettlementRecordedForYou",
+                            GroupId = groupId,
+                            ReferenceId = settlement.Id,
+                            Title = "Payment Recorded For You",
+                            Message = $"{receiver.FullName} recorded your payment of Rs. {amount:N2}, waiting for group owner approval.",
+                            IsRead = false,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+
+                    // Owner notification: Accept / Decline
+                    if (group.OwnerId != currentUserId)
+                    {
+                        notifications.Add(new SplitNotification
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = group.OwnerId,
+                            Type = "SettlementAwaitingOwner",
+                            GroupId = groupId,
+                            ReferenceId = settlement.Id,
+                            Title = "Settlement Awaiting Approval",
+                            Message = $"{receiver.FullName} recorded a payment of Rs. {amount:N2} from {sender.FullName}. Group owner approval required.",
+                            IsRead = false,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+                else // initialStatus == Confirmed (receiver is owner)
+                {
+                    // Payer gets informational
+                    if (dto.FromUserId != currentUserId)
+                    {
+                        notifications.Add(new SplitNotification
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = dto.FromUserId,
+                            Type = "SettlementRecordedForYou",
+                            GroupId = groupId,
+                            ReferenceId = settlement.Id,
+                            Title = "Payment Recorded For You",
+                            Message = $"{receiver.FullName} recorded and confirmed your payment of Rs. {amount:N2}.",
+                            IsRead = false,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+            else if (isPayer)
+            {
+                // Payer submits request: Receiver gets Accept / Decline
+                if (dto.ToUserId != currentUserId)
+                {
+                    notifications.Add(new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = dto.ToUserId,
+                        Type = "SettlementRequested",
+                        GroupId = groupId,
+                        ReferenceId = settlement.Id,
+                        Title = "Payment Settlement Requested",
+                        Message = $"{sender.FullName} recorded a payment of Rs. {amount:N2} to you. Please confirm receipt.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+            else if (isOwner)
+            {
+                // Owner records on behalf of members: informational for payer and receiver
+                if (dto.FromUserId != currentUserId)
+                {
+                    notifications.Add(new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = dto.FromUserId,
+                        Type = "SettlementRecordedForYou",
+                        GroupId = groupId,
+                        ReferenceId = settlement.Id,
+                        Title = "Payment Recorded For You",
+                        Message = $"{currentUserName} recorded a payment of Rs. {amount:N2} from you to {receiver.FullName}.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+                if (dto.ToUserId != currentUserId)
+                {
+                    notifications.Add(new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = dto.ToUserId,
+                        Type = "SettlementRecordedForYou",
+                        GroupId = groupId,
+                        ReferenceId = settlement.Id,
+                        Title = "Payment Recorded For You",
+                        Message = $"{currentUserName} recorded a payment of Rs. {amount:N2} to you from {sender.FullName}.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            var result = await _settlementRepository.CreateSettlementAsync(settlement, notifications);
+            await BroadcastNotificationsAsync(notifications);
             EnrichSettlementFlags(result, currentUserId, isOwner);
 
             string successMessage = initialStatus switch
@@ -219,12 +371,73 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 ? SplitSettlementStatus.Confirmed
                 : SplitSettlementStatus.PendingOwner;
 
-            int rows = await _settlementRepository.ConfirmByReceiverAsync(settlement.Id, nextStatus, currentUserId);
+            var notifications = new List<SplitNotification>();
+
+            if (nextStatus == SplitSettlementStatus.PendingOwner)
+            {
+                // Receiver confirms and receiver != owner (and payer != owner)
+                // Owner: Accept / Decline
+                if (group.OwnerId != currentUserId)
+                {
+                    notifications.Add(new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = group.OwnerId,
+                        Type = "SettlementAwaitingOwner",
+                        GroupId = groupId,
+                        ReferenceId = settlement.Id,
+                        Title = "Settlement Awaiting Approval",
+                        Message = $"{sender?.FullName ?? "Member"} paid Rs. {settlement.Amount:N2} to {receiver?.FullName ?? "Member"} (confirmed by {receiver?.FullName ?? "Member"}). Group owner approval required.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+                // Payer: "Receiver confirmed, waiting for admin approval"
+                if (settlement.FromUserId != currentUserId)
+                {
+                    notifications.Add(new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = settlement.FromUserId,
+                        Type = "SettlementReceiverConfirmed",
+                        GroupId = groupId,
+                        ReferenceId = settlement.Id,
+                        Title = $"Payment Received by {receiver?.FullName ?? "Recipient"}",
+                        Message = $"{receiver?.FullName ?? "Recipient"} confirmed receiving your payment of Rs. {settlement.Amount:N2}. Waiting for group owner final approval.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+            else // Confirmed (receiver = owner OR payer = owner)
+            {
+                // Payer gets Confirmed notification
+                if (settlement.FromUserId != currentUserId)
+                {
+                    notifications.Add(new SplitNotification
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = settlement.FromUserId,
+                        Type = "SettlementConfirmed",
+                        GroupId = groupId,
+                        ReferenceId = settlement.Id,
+                        Title = "Payment Settlement Confirmed",
+                        Message = $"Your payment of Rs. {settlement.Amount:N2} to {receiver?.FullName ?? "Recipient"} was confirmed.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            int rows = await _settlementRepository.ConfirmByReceiverAsync(settlement.Id, nextStatus, currentUserId, notifications);
             if (rows == 0)
             {
                 var current = await _settlementRepository.GetSettlementByIdAsync(settlementId);
                 return ApiResponse<SplitSettlementDto>.FailureResponse($"Settlement has already been processed (current status: {current?.Status ?? "Unknown"}).");
             }
+
+            await BroadcastNotificationsAsync(notifications);
 
             var detail = await _settlementRepository.GetSettlementDetailsAsync(settlement.Id, groupId);
             if (detail == null)
@@ -260,12 +473,32 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (settlement.ToUserId != currentUserId)
                 return ApiResponse<SplitSettlementDto>.ForbiddenResponse("Only the recipient of this settlement can decline receipt.");
 
-            int rows = await _settlementRepository.DeclineByReceiverAsync(settlement.Id, reason, currentUserId);
+            var notifications = new List<SplitNotification>();
+            if (settlement.FromUserId != currentUserId)
+            {
+                var reasonSuffix = !string.IsNullOrWhiteSpace(reason) ? $": \"{reason.Trim()}\"" : ".";
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = settlement.FromUserId,
+                    Type = "SettlementDeclined",
+                    GroupId = groupId,
+                    ReferenceId = settlement.Id,
+                    Title = "Payment Settlement Declined",
+                    Message = $"{currentUserName} declined your payment of Rs. {settlement.Amount:N2}{reasonSuffix}",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            int rows = await _settlementRepository.DeclineByReceiverAsync(settlement.Id, reason, currentUserId, notifications);
             if (rows == 0)
             {
                 var current = await _settlementRepository.GetSettlementByIdAsync(settlementId);
                 return ApiResponse<SplitSettlementDto>.FailureResponse($"Settlement has already been processed (current status: {current?.Status ?? "Unknown"}).");
             }
+
+            await BroadcastNotificationsAsync(notifications);
 
             var detail = await _settlementRepository.GetSettlementDetailsAsync(settlement.Id, groupId);
             if (detail != null)
@@ -313,12 +546,50 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                     $"Cannot approve settlement: Amount (Rs. {settlement.Amount:N2}) exceeds remaining debt (Rs. {senderDebt:N2}) or credit (Rs. {receiverCredit:N2}). You may decline this request.");
             }
 
-            int rows = await _settlementRepository.ApproveByOwnerAsync(settlement.Id, currentUserId);
+            var notifications = new List<SplitNotification>();
+
+            // Payer gets Confirmed
+            if (settlement.FromUserId != currentUserId)
+            {
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = settlement.FromUserId,
+                    Type = "SettlementConfirmed",
+                    GroupId = groupId,
+                    ReferenceId = settlement.Id,
+                    Title = "Payment Settlement Confirmed",
+                    Message = $"Your payment of Rs. {settlement.Amount:N2} to {receiver?.FullName ?? "Recipient"} was approved by {currentUserName}.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // Receiver gets Confirmed
+            if (settlement.ToUserId != currentUserId)
+            {
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = settlement.ToUserId,
+                    Type = "SettlementConfirmed",
+                    GroupId = groupId,
+                    ReferenceId = settlement.Id,
+                    Title = "Payment Settlement Confirmed",
+                    Message = $"Payment of Rs. {settlement.Amount:N2} from {sender?.FullName ?? "Member"} was approved by {currentUserName}.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            int rows = await _settlementRepository.ApproveByOwnerAsync(settlement.Id, currentUserId, notifications);
             if (rows == 0)
             {
                 var current = await _settlementRepository.GetSettlementByIdAsync(settlementId);
                 return ApiResponse<SplitSettlementDto>.FailureResponse($"Settlement has already been processed (current status: {current?.Status ?? "Unknown"}).");
             }
+
+            await BroadcastNotificationsAsync(notifications);
 
             var detail = await _settlementRepository.GetSettlementDetailsAsync(settlement.Id, groupId);
             if (detail != null)
@@ -344,12 +615,55 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (settlement.Status != SplitSettlementStatus.PendingOwner)
                 return ApiResponse<SplitSettlementDto>.FailureResponse($"Settlement is not waiting for owner approval (current status: {settlement.Status}).");
 
-            int rows = await _settlementRepository.DeclineByOwnerAsync(settlement.Id, reason, currentUserId);
+            var balances = await _balanceRepository.GetGroupBalancesAsync(groupId);
+            var sender = balances.FirstOrDefault(b => b.UserId == settlement.FromUserId);
+            var receiver = balances.FirstOrDefault(b => b.UserId == settlement.ToUserId);
+
+            var notifications = new List<SplitNotification>();
+            var reasonSuffix = !string.IsNullOrWhiteSpace(reason) ? $": \"{reason.Trim()}\"" : ".";
+
+            // Payer gets Declined
+            if (settlement.FromUserId != currentUserId)
+            {
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = settlement.FromUserId,
+                    Type = "SettlementDeclined",
+                    GroupId = groupId,
+                    ReferenceId = settlement.Id,
+                    Title = "Payment Settlement Declined",
+                    Message = $"{currentUserName} declined the settlement of Rs. {settlement.Amount:N2} to {receiver?.FullName ?? "Recipient"}{reasonSuffix}",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // Receiver gets Declined
+            if (settlement.ToUserId != currentUserId)
+            {
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = settlement.ToUserId,
+                    Type = "SettlementDeclined",
+                    GroupId = groupId,
+                    ReferenceId = settlement.Id,
+                    Title = "Payment Settlement Declined",
+                    Message = $"{currentUserName} declined the settlement of Rs. {settlement.Amount:N2} from {sender?.FullName ?? "Member"}{reasonSuffix}",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            int rows = await _settlementRepository.DeclineByOwnerAsync(settlement.Id, reason, currentUserId, notifications);
             if (rows == 0)
             {
                 var current = await _settlementRepository.GetSettlementByIdAsync(settlementId);
                 return ApiResponse<SplitSettlementDto>.FailureResponse($"Settlement has already been processed (current status: {current?.Status ?? "Unknown"}).");
             }
+
+            await BroadcastNotificationsAsync(notifications);
 
             var detail = await _settlementRepository.GetSettlementDetailsAsync(settlement.Id, groupId);
             if (detail != null)
@@ -375,11 +689,36 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (settlement.Status != SplitSettlementStatus.PendingReceiver && settlement.Status != SplitSettlementStatus.PendingOwner)
                 return ApiResponse<SplitSettlementDto>.FailureResponse($"Only pending settlements can be cancelled (current status: {settlement.Status}).");
 
+            Guid pendingApproverId = settlement.Status == SplitSettlementStatus.PendingOwner
+                ? group.OwnerId
+                : settlement.ToUserId;
+
             int rows = await _settlementRepository.CancelByPayerAsync(settlement.Id, currentUserId);
             if (rows == 0)
             {
                 var current = await _settlementRepository.GetSettlementByIdAsync(settlementId);
                 return ApiResponse<SplitSettlementDto>.FailureResponse($"Settlement has already been processed (current status: {current?.Status ?? "Unknown"}).");
+            }
+
+            if (pendingApproverId != currentUserId && _realtimeService != null)
+            {
+                try
+                {
+                    await _realtimeService.NotifyUserAsync(pendingApproverId, "ReceiveSplitNotification", new
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = pendingApproverId,
+                        Type = "SettlementCancelled",
+                        GroupId = groupId,
+                        ReferenceId = settlement.Id,
+                        Title = "Settlement Cancelled",
+                        Message = $"Settlement request of Rs. {settlement.Amount:N2} was cancelled by payer."
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to broadcast cancellation notification to approver {UserId}", pendingApproverId);
+                }
             }
 
             var detail = await _settlementRepository.GetSettlementDetailsAsync(settlement.Id, groupId);
@@ -406,8 +745,53 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (settlement.Status != SplitSettlementStatus.Confirmed)
                 return ApiResponse<bool>.FailureResponse($"Only confirmed settlements can be reversed (current status: {settlement.Status}).");
 
+            var balances = await _balanceRepository.GetGroupBalancesAsync(groupId);
+            var sender = balances.FirstOrDefault(b => b.UserId == settlement.FromUserId);
+            var receiver = balances.FirstOrDefault(b => b.UserId == settlement.ToUserId);
+
+            var notifications = new List<SplitNotification>();
+
+            // Payer gets Reversed
+            if (settlement.FromUserId != currentUserId)
+            {
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = settlement.FromUserId,
+                    Type = "SettlementReversed",
+                    GroupId = groupId,
+                    ReferenceId = settlement.Id,
+                    Title = "Payment Settlement Reversed",
+                    Message = $"The settlement of Rs. {settlement.Amount:N2} to {receiver?.FullName ?? "Recipient"} was reversed by {currentUserName}. Balances have been restored.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // Receiver gets Reversed
+            if (settlement.ToUserId != currentUserId)
+            {
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = settlement.ToUserId,
+                    Type = "SettlementReversed",
+                    GroupId = groupId,
+                    ReferenceId = settlement.Id,
+                    Title = "Payment Settlement Reversed",
+                    Message = $"The settlement of Rs. {settlement.Amount:N2} from {sender?.FullName ?? "Member"} was reversed by {currentUserName}. Balances have been restored.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
             var success = await _settlementRepository.ReverseConfirmedSettlementAsync(
-                settlementId, groupId, currentUserId);
+                settlementId, groupId, currentUserId, notifications);
+
+            if (success)
+            {
+                await BroadcastNotificationsAsync(notifications);
+            }
 
             return success
                 ? ApiResponse<bool>.SuccessResponse("Settlement reversed successfully. Balances have been restored.", true)

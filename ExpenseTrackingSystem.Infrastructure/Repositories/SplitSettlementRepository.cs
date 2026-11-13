@@ -44,6 +44,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     s.Id,
                     s.GroupId,
                     g.Name AS GroupName,
+                    g.OwnerId AS GroupOwnerId,
                     s.FromUserId,
                     ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uf.FirstName, ' ', uf.LastName))), ''), uf.Email) AS FromUserName,
                     uf.Email AS FromUserEmail,
@@ -99,6 +100,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     s.Id,
                     s.GroupId,
                     g.Name AS GroupName,
+                    g.OwnerId AS GroupOwnerId,
                     s.FromUserId,
                     ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uf.FirstName, ' ', uf.LastName))), ''), uf.Email) AS FromUserName,
                     uf.Email AS FromUserEmail,
@@ -152,6 +154,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     s.Id,
                     s.GroupId,
                     g.Name AS GroupName,
+                    g.OwnerId AS GroupOwnerId,
                     s.FromUserId,
                     ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uf.FirstName, ' ', uf.LastName))), ''), uf.Email) AS FromUserName,
                     uf.Email AS FromUserEmail,
@@ -235,7 +238,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             });
         }
 
-        public async Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement)
+        public async Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement, List<SplitNotification>? notifications = null)
         {
             const string insertSql = @"
                 INSERT INTO dbo.SplitSettlements
@@ -248,12 +251,34 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                      @CreatedAt, @UpdatedAt, @IsDeleted);";
 
             using var connection = CreateConnection();
-            await connection.ExecuteAsync(insertSql, settlement);
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+            try
+            {
+                await connection.ExecuteAsync(insertSql, settlement, transaction);
+
+                if (notifications != null && notifications.Count > 0)
+                {
+                    const string notifSql = @"
+                        INSERT INTO dbo.SplitNotifications
+                            (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                        VALUES
+                            (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+                    await connection.ExecuteAsync(notifSql, notifications, transaction);
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
 
             return (await GetSettlementDetailsAsync(settlement.Id, settlement.GroupId))!;
         }
 
-        public async Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId)
+        public async Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId, List<SplitNotification>? notifications = null)
         {
             const string sql = @"
                 UPDATE dbo.SplitSettlements
@@ -264,15 +289,48 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 WHERE Id = @SettlementId AND Status = 'PendingReceiver' AND IsDeleted = 0;";
 
             using var connection = CreateConnection();
-            return await connection.ExecuteAsync(sql, new
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+            try
             {
-                SettlementId = settlementId,
-                NewStatus = newStatus,
-                ReceiverUserId = receiverUserId
-            });
+                var rows = await connection.ExecuteAsync(sql, new
+                {
+                    SettlementId = settlementId,
+                    NewStatus = newStatus,
+                    ReceiverUserId = receiverUserId
+                }, transaction);
+
+                if (rows > 0)
+                {
+                    const string markReadSql = @"
+                        UPDATE dbo.SplitNotifications
+                        SET IsRead = 1,
+                            ReadAt = SYSUTCDATETIME()
+                        WHERE ReferenceId = @SettlementId AND UserId = @ReceiverUserId AND IsRead = 0;";
+                    await connection.ExecuteAsync(markReadSql, new { SettlementId = settlementId, ReceiverUserId = receiverUserId }, transaction);
+
+                    if (notifications != null && notifications.Count > 0)
+                    {
+                        const string notifSql = @"
+                            INSERT INTO dbo.SplitNotifications
+                                (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                            VALUES
+                                (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+                        await connection.ExecuteAsync(notifSql, notifications, transaction);
+                    }
+                }
+
+                transaction.Commit();
+                return rows;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
-        public async Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId)
+        public async Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId, List<SplitNotification>? notifications = null)
         {
             const string sql = @"
                 UPDATE dbo.SplitSettlements
@@ -284,15 +342,48 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 WHERE Id = @SettlementId AND Status = 'PendingReceiver' AND IsDeleted = 0;";
 
             using var connection = CreateConnection();
-            return await connection.ExecuteAsync(sql, new
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+            try
             {
-                SettlementId = settlementId,
-                Reason = reason?.Trim(),
-                ReceiverUserId = receiverUserId
-            });
+                var rows = await connection.ExecuteAsync(sql, new
+                {
+                    SettlementId = settlementId,
+                    Reason = reason?.Trim(),
+                    ReceiverUserId = receiverUserId
+                }, transaction);
+
+                if (rows > 0)
+                {
+                    const string markReadSql = @"
+                        UPDATE dbo.SplitNotifications
+                        SET IsRead = 1,
+                            ReadAt = SYSUTCDATETIME()
+                        WHERE ReferenceId = @SettlementId AND UserId = @ReceiverUserId AND IsRead = 0;";
+                    await connection.ExecuteAsync(markReadSql, new { SettlementId = settlementId, ReceiverUserId = receiverUserId }, transaction);
+
+                    if (notifications != null && notifications.Count > 0)
+                    {
+                        const string notifSql = @"
+                            INSERT INTO dbo.SplitNotifications
+                                (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                            VALUES
+                                (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+                        await connection.ExecuteAsync(notifSql, notifications, transaction);
+                    }
+                }
+
+                transaction.Commit();
+                return rows;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
-        public async Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId)
+        public async Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId, List<SplitNotification>? notifications = null)
         {
             const string sql = @"
                 UPDATE dbo.SplitSettlements
@@ -303,14 +394,47 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 WHERE Id = @SettlementId AND Status = 'PendingOwner' AND IsDeleted = 0;";
 
             using var connection = CreateConnection();
-            return await connection.ExecuteAsync(sql, new
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+            try
             {
-                SettlementId = settlementId,
-                OwnerUserId = ownerUserId
-            });
+                var rows = await connection.ExecuteAsync(sql, new
+                {
+                    SettlementId = settlementId,
+                    OwnerUserId = ownerUserId
+                }, transaction);
+
+                if (rows > 0)
+                {
+                    const string markReadSql = @"
+                        UPDATE dbo.SplitNotifications
+                        SET IsRead = 1,
+                            ReadAt = SYSUTCDATETIME()
+                        WHERE ReferenceId = @SettlementId AND UserId = @OwnerUserId AND IsRead = 0;";
+                    await connection.ExecuteAsync(markReadSql, new { SettlementId = settlementId, OwnerUserId = ownerUserId }, transaction);
+
+                    if (notifications != null && notifications.Count > 0)
+                    {
+                        const string notifSql = @"
+                            INSERT INTO dbo.SplitNotifications
+                                (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                            VALUES
+                                (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+                        await connection.ExecuteAsync(notifSql, notifications, transaction);
+                    }
+                }
+
+                transaction.Commit();
+                return rows;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
-        public async Task<int> DeclineByOwnerAsync(Guid settlementId, string? reason, Guid ownerUserId)
+        public async Task<int> DeclineByOwnerAsync(Guid settlementId, string? reason, Guid ownerUserId, List<SplitNotification>? notifications = null)
         {
             const string sql = @"
                 UPDATE dbo.SplitSettlements
@@ -322,15 +446,48 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 WHERE Id = @SettlementId AND Status = 'PendingOwner' AND IsDeleted = 0;";
 
             using var connection = CreateConnection();
-            return await connection.ExecuteAsync(sql, new
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+            try
             {
-                SettlementId = settlementId,
-                Reason = reason?.Trim(),
-                OwnerUserId = ownerUserId
-            });
+                var rows = await connection.ExecuteAsync(sql, new
+                {
+                    SettlementId = settlementId,
+                    Reason = reason?.Trim(),
+                    OwnerUserId = ownerUserId
+                }, transaction);
+
+                if (rows > 0)
+                {
+                    const string markReadSql = @"
+                        UPDATE dbo.SplitNotifications
+                        SET IsRead = 1,
+                            ReadAt = SYSUTCDATETIME()
+                        WHERE ReferenceId = @SettlementId AND UserId = @OwnerUserId AND IsRead = 0;";
+                    await connection.ExecuteAsync(markReadSql, new { SettlementId = settlementId, OwnerUserId = ownerUserId }, transaction);
+
+                    if (notifications != null && notifications.Count > 0)
+                    {
+                        const string notifSql = @"
+                            INSERT INTO dbo.SplitNotifications
+                                (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                            VALUES
+                                (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+                        await connection.ExecuteAsync(notifSql, notifications, transaction);
+                    }
+                }
+
+                transaction.Commit();
+                return rows;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
-        public async Task<int> CancelByPayerAsync(Guid settlementId, Guid payerUserId)
+        public async Task<int> CancelByPayerAsync(Guid settlementId, Guid payerUserId, List<SplitNotification>? notifications = null)
         {
             const string sql = @"
                 UPDATE dbo.SplitSettlements
@@ -341,14 +498,53 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 WHERE Id = @SettlementId AND Status IN ('PendingReceiver', 'PendingOwner') AND IsDeleted = 0;";
 
             using var connection = CreateConnection();
-            return await connection.ExecuteAsync(sql, new
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+            try
             {
-                SettlementId = settlementId,
-                PayerUserId = payerUserId
-            });
+                var rows = await connection.ExecuteAsync(sql, new
+                {
+                    SettlementId = settlementId,
+                    PayerUserId = payerUserId
+                }, transaction);
+
+                if (rows > 0)
+                {
+                    const string updatePendingNotifSql = @"
+                        UPDATE dbo.SplitNotifications
+                        SET Type = 'SettlementCancelled',
+                            Message = CASE 
+                                WHEN Message LIKE '%(Cancelled by payer)%' THEN Message 
+                                ELSE RTRIM(Message) + ' (Cancelled by payer)' 
+                            END,
+                            IsRead = 1,
+                            ReadAt = SYSUTCDATETIME()
+                        WHERE ReferenceId = @SettlementId 
+                          AND Type IN ('SettlementRequested', 'SettlementAwaitingOwner', 'SettlementReminder');";
+                    await connection.ExecuteAsync(updatePendingNotifSql, new { SettlementId = settlementId }, transaction);
+
+                    if (notifications != null && notifications.Count > 0)
+                    {
+                        const string notifSql = @"
+                            INSERT INTO dbo.SplitNotifications
+                                (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                            VALUES
+                                (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+                        await connection.ExecuteAsync(notifSql, notifications, transaction);
+                    }
+                }
+
+                transaction.Commit();
+                return rows;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
-        public async Task<bool> ReverseConfirmedSettlementAsync(Guid settlementId, Guid groupId, Guid ownerUserId)
+        public async Task<bool> ReverseConfirmedSettlementAsync(Guid settlementId, Guid groupId, Guid ownerUserId, List<SplitNotification>? notifications = null)
         {
             const string sql = @"
                 UPDATE dbo.SplitSettlements
@@ -357,13 +553,129 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 WHERE Id = @SettlementId AND GroupId = @GroupId AND Status = 'Confirmed' AND IsDeleted = 0;";
 
             using var connection = CreateConnection();
-            var rows = await connection.ExecuteAsync(sql, new
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+            try
             {
-                SettlementId = settlementId,
-                GroupId = groupId,
-                OwnerUserId = ownerUserId
-            });
-            return rows > 0;
+                var rows = await connection.ExecuteAsync(sql, new
+                {
+                    SettlementId = settlementId,
+                    GroupId = groupId,
+                    OwnerUserId = ownerUserId
+                }, transaction);
+
+                if (rows > 0 && notifications != null && notifications.Count > 0)
+                {
+                    const string notifSql = @"
+                        INSERT INTO dbo.SplitNotifications
+                            (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                        VALUES
+                            (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+                    await connection.ExecuteAsync(notifSql, notifications, transaction);
+                }
+
+                transaction.Commit();
+                return rows > 0;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+
+        public async Task<List<SplitSettlementDto>> GetSettlementsNeedingReminderAsync(DateTime olderThan)
+        {
+            const string sql = @"
+                SELECT 
+                    s.Id,
+                    s.GroupId,
+                    g.Name AS GroupName,
+                    g.OwnerId AS GroupOwnerId,
+                    s.FromUserId,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uf.FirstName, ' ', uf.LastName))), ''), uf.Email) AS FromUserName,
+                    uf.Email AS FromUserEmail,
+                    s.ToUserId,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ut.FirstName, ' ', ut.LastName))), ''), ut.Email) AS ToUserName,
+                    ut.Email AS ToUserEmail,
+                    s.Amount,
+                    s.SettlementDate,
+                    s.Note,
+                    s.Status,
+                    s.CreatedBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uc.FirstName, ' ', uc.LastName))), ''), uc.Email) AS CreatedByName,
+                    s.ReceiverActionBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ur.FirstName, ' ', ur.LastName))), ''), ur.Email) AS ReceiverActionByName,
+                    s.ReceiverActionAt,
+                    s.OwnerActionBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uo.FirstName, ' ', uo.LastName))), ''), uo.Email) AS OwnerActionByName,
+                    s.OwnerActionAt,
+                    s.DeclineReason,
+                    s.CancelledAt,
+                    s.CancelledBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ux.FirstName, ' ', ux.LastName))), ''), ux.Email) AS CancelledByName,
+                    s.CreatedAt,
+                    s.UpdatedAt
+                FROM dbo.SplitSettlements s
+                INNER JOIN dbo.SplitGroups g ON g.Id = s.GroupId
+                LEFT JOIN dbo.Users uf ON uf.Id = s.FromUserId
+                LEFT JOIN dbo.Users ut ON ut.Id = s.ToUserId
+                LEFT JOIN dbo.Users uc ON uc.Id = s.CreatedBy
+                LEFT JOIN dbo.Users ur ON ur.Id = s.ReceiverActionBy
+                LEFT JOIN dbo.Users uo ON uo.Id = s.OwnerActionBy
+                LEFT JOIN dbo.Users ux ON ux.Id = s.CancelledBy
+                WHERE s.Status IN ('PendingReceiver', 'PendingOwner')
+                  AND s.CreatedAt <= @OlderThan
+                  AND s.IsDeleted = 0
+                  AND NOT EXISTS (
+                      SELECT 1 FROM dbo.SplitNotifications sn
+                      WHERE sn.ReferenceId = s.Id AND sn.Type = 'SettlementReminder'
+                  );";
+
+            using var connection = CreateConnection();
+            var results = await connection.QueryAsync<SplitSettlementDto>(sql, new { OlderThan = olderThan });
+            return results.ToList();
+        }
+
+        public async Task<bool> AddReminderNotificationAsync(SplitNotification reminderNotification)
+        {
+            const string checkSql = @"
+                SELECT COUNT(*) 
+                FROM dbo.SplitNotifications 
+                WHERE ReferenceId = @ReferenceId AND Type = 'SettlementReminder' AND UserId = @UserId;";
+
+            const string insertSql = @"
+                INSERT INTO dbo.SplitNotifications
+                    (Id, UserId, Type, GroupId, ReferenceId, Title, Message, IsRead, CreatedAt)
+                VALUES
+                    (@Id, @UserId, @Type, @GroupId, @ReferenceId, @Title, @Message, @IsRead, @CreatedAt);";
+
+            using var connection = CreateConnection();
+            await connection.OpenAsync();
+            using var transaction = connection.BeginTransaction();
+            try
+            {
+                var exists = await connection.ExecuteScalarAsync<int>(checkSql, new
+                {
+                    reminderNotification.ReferenceId,
+                    reminderNotification.UserId
+                }, transaction);
+
+                if (exists > 0)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+
+                await connection.ExecuteAsync(insertSql, reminderNotification, transaction);
+                transaction.Commit();
+                return true;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
         public async Task<SplitSettlementDto> CreateSettlementWithActivityAsync(

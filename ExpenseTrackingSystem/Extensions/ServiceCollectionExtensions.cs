@@ -96,6 +96,7 @@ namespace SpendwiseSystem.API.Extensions
             services.AddTransient<ISplitNotificationRepository, SplitNotificationRepository>();
             services.AddTransient<ISplitNotificationService, SplitNotificationService>();
             services.AddScoped<ISplitRealtimeService, SpendwiseSystem.API.Services.Realtime.SplitRealtimeService>();
+            services.AddHostedService<SpendwiseSystem.API.Services.SettlementReminderBackgroundService>();
 
             services.AddSingleton<AutoMapper.IConfigurationProvider>(_ =>
             {

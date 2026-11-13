@@ -476,6 +476,7 @@ namespace SpendwiseSystem.Tests
         private class InMemorySettlementRepository : ISplitSettlementRepository
         {
             public List<SplitSettlement> Settlements { get; } = new();
+            public List<SplitNotification> Notifications { get; } = new();
 
             public Task<SplitSettlement?> GetSettlementByIdAsync(Guid settlementId) =>
                 Task.FromResult(Settlements.FirstOrDefault(s => s.Id == settlementId && !s.IsDeleted));
@@ -510,23 +511,35 @@ namespace SpendwiseSystem.Tests
                 return Task.FromResult(sum);
             }
 
-            public Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement)
+            public Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement, List<SplitNotification>? notifications = null)
             {
                 Settlements.Add(settlement);
+                if (notifications != null && notifications.Count > 0)
+                    Notifications.AddRange(notifications);
                 return Task.FromResult(MapDto(settlement));
             }
 
-            public Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId)
+            public Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId, List<SplitNotification>? notifications = null)
             {
                 var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.Status == SplitSettlementStatus.PendingReceiver && !x.IsDeleted);
                 if (s == null) return Task.FromResult(0);
                 s.Status = newStatus;
                 s.ReceiverActionBy = receiverUserId;
                 s.ReceiverActionAt = DateTime.UtcNow;
+
+                foreach (var n in Notifications.Where(x => x.ReferenceId == settlementId && x.UserId == receiverUserId && !x.IsRead))
+                {
+                    n.IsRead = true;
+                    n.ReadAt = DateTime.UtcNow;
+                }
+
+                if (notifications != null && notifications.Count > 0)
+                    Notifications.AddRange(notifications);
+
                 return Task.FromResult(1);
             }
 
-            public Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId)
+            public Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId, List<SplitNotification>? notifications = null)
             {
                 var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.Status == SplitSettlementStatus.PendingReceiver && !x.IsDeleted);
                 if (s == null) return Task.FromResult(0);
@@ -534,20 +547,40 @@ namespace SpendwiseSystem.Tests
                 s.ReceiverActionBy = receiverUserId;
                 s.ReceiverActionAt = DateTime.UtcNow;
                 s.DeclineReason = reason;
+
+                foreach (var n in Notifications.Where(x => x.ReferenceId == settlementId && x.UserId == receiverUserId && !x.IsRead))
+                {
+                    n.IsRead = true;
+                    n.ReadAt = DateTime.UtcNow;
+                }
+
+                if (notifications != null && notifications.Count > 0)
+                    Notifications.AddRange(notifications);
+
                 return Task.FromResult(1);
             }
 
-            public Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId)
+            public Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId, List<SplitNotification>? notifications = null)
             {
                 var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.Status == SplitSettlementStatus.PendingOwner && !x.IsDeleted);
                 if (s == null) return Task.FromResult(0);
                 s.Status = SplitSettlementStatus.Confirmed;
                 s.OwnerActionBy = ownerUserId;
                 s.OwnerActionAt = DateTime.UtcNow;
+
+                foreach (var n in Notifications.Where(x => x.ReferenceId == settlementId && x.UserId == ownerUserId && !x.IsRead))
+                {
+                    n.IsRead = true;
+                    n.ReadAt = DateTime.UtcNow;
+                }
+
+                if (notifications != null && notifications.Count > 0)
+                    Notifications.AddRange(notifications);
+
                 return Task.FromResult(1);
             }
 
-            public Task<int> DeclineByOwnerAsync(Guid settlementId, string? reason, Guid ownerUserId)
+            public Task<int> DeclineByOwnerAsync(Guid settlementId, string? reason, Guid ownerUserId, List<SplitNotification>? notifications = null)
             {
                 var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.Status == SplitSettlementStatus.PendingOwner && !x.IsDeleted);
                 if (s == null) return Task.FromResult(0);
@@ -555,24 +588,70 @@ namespace SpendwiseSystem.Tests
                 s.OwnerActionBy = ownerUserId;
                 s.OwnerActionAt = DateTime.UtcNow;
                 s.DeclineReason = reason;
+
+                foreach (var n in Notifications.Where(x => x.ReferenceId == settlementId && x.UserId == ownerUserId && !x.IsRead))
+                {
+                    n.IsRead = true;
+                    n.ReadAt = DateTime.UtcNow;
+                }
+
+                if (notifications != null && notifications.Count > 0)
+                    Notifications.AddRange(notifications);
+
                 return Task.FromResult(1);
             }
 
-            public Task<int> CancelByPayerAsync(Guid settlementId, Guid payerUserId)
+            public Task<int> CancelByPayerAsync(Guid settlementId, Guid payerUserId, List<SplitNotification>? notifications = null)
             {
                 var s = Settlements.FirstOrDefault(x => x.Id == settlementId && (x.Status == SplitSettlementStatus.PendingReceiver || x.Status == SplitSettlementStatus.PendingOwner) && !x.IsDeleted);
                 if (s == null) return Task.FromResult(0);
                 s.Status = SplitSettlementStatus.Cancelled;
                 s.CancelledBy = payerUserId;
                 s.CancelledAt = DateTime.UtcNow;
+
+                foreach (var n in Notifications.Where(x => x.ReferenceId == settlementId && (x.Type == "SettlementRequested" || x.Type == "SettlementAwaitingOwner" || x.Type == "SettlementReminder")))
+                {
+                    n.Type = "SettlementCancelled";
+                    if (!n.Message.Contains("(Cancelled by payer)"))
+                        n.Message += " (Cancelled by payer)";
+                    n.IsRead = true;
+                    n.ReadAt = DateTime.UtcNow;
+                }
+
+                if (notifications != null && notifications.Count > 0)
+                    Notifications.AddRange(notifications);
+
                 return Task.FromResult(1);
             }
 
-            public Task<bool> ReverseConfirmedSettlementAsync(Guid settlementId, Guid groupId, Guid ownerUserId)
+            public Task<bool> ReverseConfirmedSettlementAsync(Guid settlementId, Guid groupId, Guid ownerUserId, List<SplitNotification>? notifications = null)
             {
                 var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.GroupId == groupId && x.Status == SplitSettlementStatus.Confirmed && !x.IsDeleted);
                 if (s == null) return Task.FromResult(false);
                 s.IsDeleted = true;
+
+                if (notifications != null && notifications.Count > 0)
+                    Notifications.AddRange(notifications);
+
+                return Task.FromResult(true);
+            }
+
+            public Task<List<SplitSettlementDto>> GetSettlementsNeedingReminderAsync(DateTime olderThan)
+            {
+                var list = Settlements.Where(s => !s.IsDeleted
+                    && (s.Status == SplitSettlementStatus.PendingReceiver || s.Status == SplitSettlementStatus.PendingOwner)
+                    && s.CreatedAt <= olderThan
+                    && !Notifications.Any(n => n.ReferenceId == s.Id && n.Type == "SettlementReminder"))
+                    .Select(MapDto).ToList();
+                return Task.FromResult(list);
+            }
+
+            public Task<bool> AddReminderNotificationAsync(SplitNotification reminderNotification)
+            {
+                if (Notifications.Any(n => n.ReferenceId == reminderNotification.ReferenceId && n.Type == "SettlementReminder" && n.UserId == reminderNotification.UserId))
+                    return Task.FromResult(false);
+
+                Notifications.Add(reminderNotification);
                 return Task.FromResult(true);
             }
 
@@ -2781,6 +2860,670 @@ namespace SpendwiseSystem.Tests
             var postBalances = await balanceRepo.GetGroupBalancesAsync(groupId);
             Assert.Equal(-250m, postBalances.First(b => b.UserId == payerId).NetBalance);
         }
+
+        #region Phase 2 Step 4: Settlement Notification Matrix Tests
+
+        [Fact]
+        public async Task SettlementNotification_01_PayerSubmits_OnlyReceiverNotified()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var bystanderId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = bystanderId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+            groupRepo.Users.Add(new User { Id = bystanderId, FirstName = "Bystander", LastName = "C", Email = "bystander@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 100m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 100m });
+
+            // Payer submits settlement request
+            var res = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 100m
+            }, payerId, "Payer A");
+
+            Assert.True(res.Success);
+
+            // Verify notifications: Only receiver is notified with SettlementRequested
+            Assert.Single(settlementRepo.Notifications);
+            var notif = settlementRepo.Notifications[0];
+            Assert.Equal(receiverId, notif.UserId);
+            Assert.Equal("SettlementRequested", notif.Type);
+            Assert.Contains("Payer A", notif.Message);
+            Assert.Contains("100.00", notif.Message);
+
+            // Payer, Owner, Bystander get zero notifications
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == payerId);
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == ownerId);
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == bystanderId);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_02_ReceiverConfirmsNonOwner_OwnerAndPayerNotified_OthersNotNotified()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var bystanderId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = bystanderId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+            groupRepo.Users.Add(new User { Id = bystanderId, FirstName = "Bystander", LastName = "C", Email = "bystander@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 150m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 150m });
+
+            var settlementId = Guid.NewGuid();
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = settlementId,
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 150m,
+                Status = SplitSettlementStatus.PendingReceiver,
+                CreatedBy = payerId
+            });
+
+            // Seed initial notification to receiver
+            settlementRepo.Notifications.Add(new SplitNotification
+            {
+                Id = Guid.NewGuid(),
+                UserId = receiverId,
+                Type = "SettlementRequested",
+                ReferenceId = settlementId,
+                GroupId = groupId,
+                Title = "Payment Settlement Requested",
+                Message = "Payer A recorded payment",
+                IsRead = false
+            });
+
+            // Receiver confirms receipt
+            var res = await service.ConfirmSettlementAsync(groupId, settlementId, receiverId, "Receiver B");
+            Assert.True(res.Success);
+
+            // Previous receiver notification marked as read
+            var receiverInitialNotif = settlementRepo.Notifications.First(n => n.Type == "SettlementRequested");
+            Assert.True(receiverInitialNotif.IsRead);
+
+            // Newly added notifications:
+            // 1. Owner gets SettlementAwaitingOwner
+            var ownerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == ownerId && n.Type == "SettlementAwaitingOwner");
+            Assert.NotNull(ownerNotif);
+            Assert.Contains("Group owner approval required", ownerNotif.Message);
+
+            // 2. Payer gets SettlementReceiverConfirmed
+            var payerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == payerId && n.Type == "SettlementReceiverConfirmed");
+            Assert.NotNull(payerNotif);
+            Assert.Contains("confirmed receiving your payment", payerNotif.Message);
+
+            // Bystander and Receiver (actor) get no new notifications
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == bystanderId);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_03_ReceiverConfirmsOwner_PayerNotifiedConfirmed()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            // Receiver is the group Owner
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = ownerId, Amount = 80m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 80m });
+
+            var settlementId = Guid.NewGuid();
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = settlementId,
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = ownerId,
+                Amount = 80m,
+                Status = SplitSettlementStatus.PendingReceiver,
+                CreatedBy = payerId
+            });
+
+            // Owner confirms receipt as receiver -> becomes Confirmed immediately
+            var res = await service.ConfirmSettlementAsync(groupId, settlementId, ownerId, "Owner O");
+            Assert.True(res.Success);
+            Assert.Equal(SplitSettlementStatus.Confirmed, res.Data.Status);
+
+            // Payer gets SettlementConfirmed
+            var payerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == payerId && n.Type == "SettlementConfirmed");
+            Assert.NotNull(payerNotif);
+            Assert.Contains("was confirmed", payerNotif.Message);
+
+            // Actor (owner) is not notified
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == ownerId);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_04_OwnerApproves_PayerAndReceiverNotified()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var bystanderId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = bystanderId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+            groupRepo.Users.Add(new User { Id = bystanderId, FirstName = "Bystander", LastName = "C", Email = "bystander@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 300m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 300m });
+
+            var settlementId = Guid.NewGuid();
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = settlementId,
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 300m,
+                Status = SplitSettlementStatus.PendingOwner,
+                CreatedBy = payerId,
+                ReceiverActionBy = receiverId,
+                ReceiverActionAt = DateTime.UtcNow
+            });
+
+            // Owner approves
+            var res = await service.ApproveSettlementByOwnerAsync(groupId, settlementId, ownerId, "Owner O");
+            Assert.True(res.Success);
+
+            // Payer gets SettlementConfirmed
+            var payerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == payerId && n.Type == "SettlementConfirmed");
+            Assert.NotNull(payerNotif);
+            Assert.Contains("was approved by Owner O", payerNotif.Message);
+
+            // Receiver gets SettlementConfirmed
+            var receiverNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == receiverId && n.Type == "SettlementConfirmed");
+            Assert.NotNull(receiverNotif);
+            Assert.Contains("was approved by Owner O", receiverNotif.Message);
+
+            // Bystander gets nothing
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == bystanderId);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_05_ReceiverDeclines_PayerNotifiedWithReason()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 120m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 120m });
+
+            var settlementId = Guid.NewGuid();
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = settlementId,
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 120m,
+                Status = SplitSettlementStatus.PendingReceiver,
+                CreatedBy = payerId
+            });
+
+            // Receiver declines with reason
+            var res = await service.DeclineSettlementByReceiverAsync(groupId, settlementId, "Did not receive cash", receiverId, "Receiver B");
+            Assert.True(res.Success);
+
+            // Payer gets SettlementDeclined with reason
+            var payerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == payerId && n.Type == "SettlementDeclined");
+            Assert.NotNull(payerNotif);
+            Assert.Contains("Did not receive cash", payerNotif.Message);
+
+            // Owner is not notified
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == ownerId);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_06_OwnerDeclines_PayerAndReceiverNotifiedWithReason()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var bystanderId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = bystanderId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+            groupRepo.Users.Add(new User { Id = bystanderId, FirstName = "Bystander", LastName = "C", Email = "bystander@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 175m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 175m });
+
+            var settlementId = Guid.NewGuid();
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = settlementId,
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 175m,
+                Status = SplitSettlementStatus.PendingOwner,
+                CreatedBy = payerId,
+                ReceiverActionBy = receiverId,
+                ReceiverActionAt = DateTime.UtcNow
+            });
+
+            // Owner declines with reason
+            var res = await service.DeclineSettlementByOwnerAsync(groupId, settlementId, "Disputed expense share", ownerId, "Owner O");
+            Assert.True(res.Success);
+
+            // Both payer and receiver get SettlementDeclined with reason
+            var payerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == payerId && n.Type == "SettlementDeclined");
+            Assert.NotNull(payerNotif);
+            Assert.Contains("Disputed expense share", payerNotif.Message);
+
+            var receiverNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == receiverId && n.Type == "SettlementDeclined");
+            Assert.NotNull(receiverNotif);
+            Assert.Contains("Disputed expense share", receiverNotif.Message);
+
+            // Bystander gets nothing
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == bystanderId);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_07_PayerCancels_ApproverNotificationUpdatedToCancelled()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 100m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 100m });
+
+            var settlementId = Guid.NewGuid();
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = settlementId,
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 100m,
+                Status = SplitSettlementStatus.PendingReceiver,
+                CreatedBy = payerId
+            });
+
+            // Seed receiver's pending notification
+            settlementRepo.Notifications.Add(new SplitNotification
+            {
+                Id = Guid.NewGuid(),
+                UserId = receiverId,
+                Type = "SettlementRequested",
+                ReferenceId = settlementId,
+                GroupId = groupId,
+                Title = "Payment Settlement Requested",
+                Message = "Payer A recorded payment of Rs. 100.00",
+                IsRead = false
+            });
+
+            // Payer cancels
+            var res = await service.CancelSettlementAsync(groupId, settlementId, payerId, "Payer A");
+            Assert.True(res.Success);
+
+            // Approver's notification updated to SettlementCancelled and appended with '(Cancelled by payer)', marked read
+            var updatedNotif = settlementRepo.Notifications.First(n => n.ReferenceId == settlementId);
+            Assert.Equal("SettlementCancelled", updatedNotif.Type);
+            Assert.Contains("(Cancelled by payer)", updatedNotif.Message);
+            Assert.True(updatedNotif.IsRead);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_08_ReceiverRecorded_PayerAndOwnerNotified()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 90m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 90m });
+
+            // Receiver records payment ("A paid me")
+            var res = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 90m
+            }, receiverId, "Receiver B");
+
+            Assert.True(res.Success);
+
+            // Payer gets SettlementRecordedForYou
+            var payerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == payerId && n.Type == "SettlementRecordedForYou");
+            Assert.NotNull(payerNotif);
+            Assert.Contains("waiting for group owner approval", payerNotif.Message);
+
+            // Owner gets SettlementAwaitingOwner
+            var ownerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == ownerId && n.Type == "SettlementAwaitingOwner");
+            Assert.NotNull(ownerNotif);
+            Assert.Contains("Group owner approval required", ownerNotif.Message);
+
+            // Receiver (actor) gets nothing
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == receiverId);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_09_OwnerRecords_PayerAndReceiverNotified()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 110m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 110m });
+
+            // Owner records payment on behalf of members
+            var res = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 110m
+            }, ownerId, "Owner O");
+
+            Assert.True(res.Success);
+
+            // Payer gets SettlementRecordedForYou
+            var payerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == payerId && n.Type == "SettlementRecordedForYou");
+            Assert.NotNull(payerNotif);
+            Assert.Contains("Owner O recorded a payment", payerNotif.Message);
+
+            // Receiver gets SettlementRecordedForYou
+            var receiverNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == receiverId && n.Type == "SettlementRecordedForYou");
+            Assert.NotNull(receiverNotif);
+            Assert.Contains("Owner O recorded a payment", receiverNotif.Message);
+
+            // Owner (actor) gets nothing
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == ownerId);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_10_OwnerReverses_PayerAndReceiverNotified()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            var settlementId = Guid.NewGuid();
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = settlementId,
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 140m,
+                Status = SplitSettlementStatus.Confirmed,
+                IsDeleted = false
+            });
+
+            // Owner reverses settlement
+            var res = await service.ReverseSettlementAsync(groupId, settlementId, ownerId, "Owner O");
+            Assert.True(res.Success);
+
+            // Payer gets SettlementReversed
+            var payerNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == payerId && n.Type == "SettlementReversed");
+            Assert.NotNull(payerNotif);
+            Assert.Contains("was reversed by Owner O", payerNotif.Message);
+
+            // Receiver gets SettlementReversed
+            var receiverNotif = settlementRepo.Notifications.FirstOrDefault(n => n.UserId == receiverId && n.Type == "SettlementReversed");
+            Assert.NotNull(receiverNotif);
+            Assert.Contains("was reversed by Owner O", receiverNotif.Message);
+
+            // Owner (actor) gets nothing
+            Assert.DoesNotContain(settlementRepo.Notifications, n => n.UserId == ownerId);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_11_ReminderSentOnceAfter3Days()
+        {
+            var settlementRepo = new InMemorySettlementRepository();
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            var oldSettlementId = Guid.NewGuid();
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = oldSettlementId,
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 200m,
+                Status = SplitSettlementStatus.PendingReceiver,
+                CreatedAt = DateTime.UtcNow.AddDays(-4),
+                IsDeleted = false
+            });
+
+            // Query settlements needing reminder older than 3 days
+            var needing = await settlementRepo.GetSettlementsNeedingReminderAsync(DateTime.UtcNow.AddDays(-3));
+            Assert.Single(needing);
+
+            // First reminder addition succeeds
+            var reminder = new SplitNotification
+            {
+                Id = Guid.NewGuid(),
+                UserId = receiverId,
+                Type = "SettlementReminder",
+                GroupId = groupId,
+                ReferenceId = oldSettlementId,
+                Title = "Settlement Reminder",
+                Message = "Reminder: Settlement awaiting action",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var added1 = await settlementRepo.AddReminderNotificationAsync(reminder);
+            Assert.True(added1);
+
+            // Second reminder addition is rejected (idempotent / no repeat)
+            var added2 = await settlementRepo.AddReminderNotificationAsync(reminder);
+            Assert.False(added2);
+
+            // Querying needing reminders again returns empty because reminder already exists
+            var needingAfter = await settlementRepo.GetSettlementsNeedingReminderAsync(DateTime.UtcNow.AddDays(-3));
+            Assert.Empty(needingAfter);
+        }
+
+        [Fact]
+        public async Task SettlementNotification_12_ZeroGroupActivityLeakage()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 50m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 50m });
+
+            // Record settlement
+            var res = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 50m
+            }, payerId, "Payer A");
+            Assert.True(res.Success);
+
+            // Confirm settlement
+            await service.ConfirmSettlementAsync(groupId, res.Data.Id, receiverId, "Receiver B");
+
+            // Zero activities logged to SplitGroupActivity table!
+            Assert.Empty(groupRepo.Activities);
+        }
+
+        #endregion
 
         #endregion
     }
