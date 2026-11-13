@@ -65,6 +65,23 @@ namespace SpendwiseSystem.API.Controllers
             return Ok(response);
         }
 
+        [HttpGet("pending-actions")]
+        public async Task<ActionResult<ApiResponse<List<SplitSettlementDto>>>> GetPendingActions(Guid groupId)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _settlementService.GetPendingActionsAsync(groupId, CurrentUserId);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
         [HttpGet("suggestions")]
         public async Task<ActionResult<ApiResponse<SettleUpOverviewDto>>> GetSettleUpSuggestions(Guid groupId)
         {
@@ -95,6 +112,119 @@ namespace SpendwiseSystem.API.Controllers
                 if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
                     return StatusCode(403, response);
                 return NotFound(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost("{settlementId:guid}/confirm")]
+        public async Task<ActionResult<ApiResponse<SplitSettlementDto>>> ConfirmSettlement(
+            Guid groupId, Guid settlementId)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _settlementService.ConfirmSettlementAsync(groupId, settlementId, CurrentUserId, CurrentUserName);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost("{settlementId:guid}/decline")]
+        public async Task<ActionResult<ApiResponse<SplitSettlementDto>>> DeclineSettlement(
+            Guid groupId, Guid settlementId, [FromBody] DeclineSettlementDto? dto)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _settlementService.DeclineSettlementByReceiverAsync(
+                groupId, settlementId, dto?.Reason, CurrentUserId, CurrentUserName);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost("{settlementId:guid}/approve")]
+        public async Task<ActionResult<ApiResponse<SplitSettlementDto>>> ApproveSettlementByOwner(
+            Guid groupId, Guid settlementId)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _settlementService.ApproveSettlementByOwnerAsync(
+                groupId, settlementId, CurrentUserId, CurrentUserName);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost("{settlementId:guid}/owner-decline")]
+        public async Task<ActionResult<ApiResponse<SplitSettlementDto>>> DeclineSettlementByOwner(
+            Guid groupId, Guid settlementId, [FromBody] DeclineSettlementDto? dto)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _settlementService.DeclineSettlementByOwnerAsync(
+                groupId, settlementId, dto?.Reason, CurrentUserId, CurrentUserName);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost("{settlementId:guid}/cancel")]
+        public async Task<ActionResult<ApiResponse<SplitSettlementDto>>> CancelSettlement(
+            Guid groupId, Guid settlementId)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _settlementService.CancelSettlementAsync(
+                groupId, settlementId, CurrentUserId, CurrentUserName);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return BadRequest(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost("{settlementId:guid}/reverse")]
+        public async Task<ActionResult<ApiResponse<bool>>> ReverseSettlement(
+            Guid groupId, Guid settlementId)
+        {
+            if (CurrentUserId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
+
+            var response = await _settlementService.ReverseSettlementAsync(
+                groupId, settlementId, CurrentUserId, CurrentUserName);
+            if (!response.Success)
+            {
+                if (response.StatusCode == 403 || response.ErrorCode == "FORBIDDEN")
+                    return StatusCode(403, response);
+                return BadRequest(response);
             }
 
             return Ok(response);

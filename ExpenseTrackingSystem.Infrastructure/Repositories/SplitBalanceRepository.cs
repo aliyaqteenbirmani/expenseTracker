@@ -64,13 +64,25 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 SettlementsPaid AS (
                     SELECT FromUserId AS UserId, SUM(Amount) AS TotalSettlementsPaid
                     FROM dbo.SplitSettlements
-                    WHERE GroupId = @GroupId AND IsDeleted = 0
+                    WHERE GroupId = @GroupId AND IsDeleted = 0 AND Status = 'Confirmed'
                     GROUP BY FromUserId
                 ),
                 SettlementsReceived AS (
                     SELECT ToUserId AS UserId, SUM(Amount) AS TotalSettlementsReceived
                     FROM dbo.SplitSettlements
-                    WHERE GroupId = @GroupId AND IsDeleted = 0
+                    WHERE GroupId = @GroupId AND IsDeleted = 0 AND Status = 'Confirmed'
+                    GROUP BY ToUserId
+                ),
+                PendingSettlementsPaid AS (
+                    SELECT FromUserId AS UserId, SUM(Amount) AS TotalPendingPaid
+                    FROM dbo.SplitSettlements
+                    WHERE GroupId = @GroupId AND IsDeleted = 0 AND Status IN ('PendingReceiver', 'PendingOwner')
+                    GROUP BY FromUserId
+                ),
+                PendingSettlementsReceived AS (
+                    SELECT ToUserId AS UserId, SUM(Amount) AS TotalPendingReceived
+                    FROM dbo.SplitSettlements
+                    WHERE GroupId = @GroupId AND IsDeleted = 0 AND Status IN ('PendingReceiver', 'PendingOwner')
                     GROUP BY ToUserId
                 )
                 SELECT 
@@ -83,6 +95,8 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     ISNULL(es.TotalShare, CAST(0 AS DECIMAL(18,2))) AS TotalShare,
                     ISNULL(sp.TotalSettlementsPaid, CAST(0 AS DECIMAL(18,2))) AS SettlementsPaid,
                     ISNULL(sr.TotalSettlementsReceived, CAST(0 AS DECIMAL(18,2))) AS SettlementsReceived,
+                    ISNULL(psp.TotalPendingPaid, CAST(0 AS DECIMAL(18,2))) AS PendingPaid,
+                    ISNULL(psr.TotalPendingReceived, CAST(0 AS DECIMAL(18,2))) AS PendingReceived,
                     (ISNULL(ep.TotalPaid, 0) - ISNULL(es.TotalShare, 0) + ISNULL(sp.TotalSettlementsPaid, 0) - ISNULL(sr.TotalSettlementsReceived, 0)) AS NetBalance
                 FROM GroupUsers gu
                 INNER JOIN dbo.Users u ON u.Id = gu.UserId
@@ -90,6 +104,8 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 LEFT JOIN ExpenseShares es ON es.UserId = gu.UserId
                 LEFT JOIN SettlementsPaid sp ON sp.UserId = gu.UserId
                 LEFT JOIN SettlementsReceived sr ON sr.UserId = gu.UserId
+                LEFT JOIN PendingSettlementsPaid psp ON psp.UserId = gu.UserId
+                LEFT JOIN PendingSettlementsReceived psr ON psr.UserId = gu.UserId
                 ORDER BY gu.IsActive DESC, NetBalance DESC, FullName ASC;";
 
             using var connection = CreateConnection();
@@ -123,7 +139,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             const string totalsSql = @"
                 SELECT 
                     ISNULL((SELECT SUM(Amount) FROM dbo.SplitExpenses WHERE GroupId = @GroupId AND IsDeleted = 0), CAST(0 AS DECIMAL(18,2))) AS TotalExpenses,
-                    ISNULL((SELECT SUM(Amount) FROM dbo.SplitSettlements WHERE GroupId = @GroupId AND IsDeleted = 0), CAST(0 AS DECIMAL(18,2))) AS TotalSettlements;";
+                    ISNULL((SELECT SUM(Amount) FROM dbo.SplitSettlements WHERE GroupId = @GroupId AND IsDeleted = 0 AND Status = 'Confirmed'), CAST(0 AS DECIMAL(18,2))) AS TotalSettlements;";
 
             var totals = await connection.QueryFirstOrDefaultAsync<dynamic>(totalsSql, new { GroupId = groupId });
             decimal totalExpenses = totals?.TotalExpenses ?? 0m;
@@ -144,6 +160,8 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 CurrentUserBalance = netBalance,
                 CurrentUserTotalPaid = currentUserBalance?.TotalPaid ?? 0m,
                 CurrentUserTotalShare = currentUserBalance?.TotalShare ?? 0m,
+                CurrentUserPendingPaid = currentUserBalance?.PendingPaid ?? 0m,
+                CurrentUserPendingReceived = currentUserBalance?.PendingReceived ?? 0m,
                 CurrentUserStatusText = userStatusText,
                 MemberCount = allBalances.Count,
                 SettledMembersCount = allBalances.Count(b => b.NetBalance == 0m),

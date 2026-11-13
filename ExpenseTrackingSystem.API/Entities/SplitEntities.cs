@@ -73,6 +73,16 @@ namespace SpendwiseSystem.Domain.Entities
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 
+    public static class SplitSettlementStatus
+    {
+        public const string PendingReceiver = "PendingReceiver";
+        public const string PendingOwner = "PendingOwner";
+        public const string Confirmed = "Confirmed";
+        public const string DeclinedByReceiver = "DeclinedByReceiver";
+        public const string DeclinedByOwner = "DeclinedByOwner";
+        public const string Cancelled = "Cancelled";
+    }
+
     public class SplitSettlement
     {
         public Guid Id { get; set; } = Guid.NewGuid();
@@ -82,7 +92,15 @@ namespace SpendwiseSystem.Domain.Entities
         public decimal Amount { get; set; }
         public DateTime SettlementDate { get; set; }
         public string? Note { get; set; }
+        public string Status { get; set; } = SplitSettlementStatus.PendingReceiver;
         public Guid CreatedBy { get; set; }
+        public Guid? ReceiverActionBy { get; set; }
+        public DateTime? ReceiverActionAt { get; set; }
+        public Guid? OwnerActionBy { get; set; }
+        public DateTime? OwnerActionAt { get; set; }
+        public string? DeclineReason { get; set; }
+        public DateTime? CancelledAt { get; set; }
+        public Guid? CancelledBy { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public bool IsDeleted { get; set; } = false;

@@ -183,6 +183,9 @@ export const splitExpensesApi = {
   getGroupSettlements: (groupId: string, token?: string) =>
     api<SplitSettlementDto[]>(`/api/splitgroup/${groupId}/settlements`, token),
 
+  getPendingActions: (groupId: string, token?: string) =>
+    api<SplitSettlementDto[]>(`/api/splitgroup/${groupId}/settlements/pending-actions`, token),
+
   getSettleUpSuggestions: (groupId: string, token?: string) =>
     api<SettleUpOverviewDto>(`/api/splitgroup/${groupId}/settlements/suggestions`, token),
 
@@ -190,6 +193,38 @@ export const splitExpensesApi = {
     api<SplitSettlementDto>(`/api/splitgroup/${groupId}/settlements`, token, {
       method: 'POST',
       body: JSON.stringify(dto),
+    }),
+
+  confirmSettlement: (groupId: string, settlementId: string, token?: string) =>
+    api<SplitSettlementDto>(`/api/splitgroup/${groupId}/settlements/${settlementId}/confirm`, token, {
+      method: 'POST',
+    }),
+
+  declineSettlement: (groupId: string, settlementId: string, reason?: string, token?: string) =>
+    api<SplitSettlementDto>(`/api/splitgroup/${groupId}/settlements/${settlementId}/decline`, token, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  approveSettlementByOwner: (groupId: string, settlementId: string, token?: string) =>
+    api<SplitSettlementDto>(`/api/splitgroup/${groupId}/settlements/${settlementId}/approve`, token, {
+      method: 'POST',
+    }),
+
+  declineSettlementByOwner: (groupId: string, settlementId: string, reason?: string, token?: string) =>
+    api<SplitSettlementDto>(`/api/splitgroup/${groupId}/settlements/${settlementId}/owner-decline`, token, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  cancelSettlement: (groupId: string, settlementId: string, token?: string) =>
+    api<SplitSettlementDto>(`/api/splitgroup/${groupId}/settlements/${settlementId}/cancel`, token, {
+      method: 'POST',
+    }),
+
+  reverseSettlement: (groupId: string, settlementId: string, token?: string) =>
+    api<boolean>(`/api/splitgroup/${groupId}/settlements/${settlementId}/reverse`, token, {
+      method: 'POST',
     }),
 
   deleteSettlement: (groupId: string, settlementId: string, token?: string) =>

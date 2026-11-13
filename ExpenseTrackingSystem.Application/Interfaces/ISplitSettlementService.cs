@@ -11,6 +11,27 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<ApiResponse<SplitSettlementDto>> RecordSettlementAsync(
             Guid groupId, RecordSettlementDto dto, Guid currentUserId, string currentUserName);
 
+        Task<ApiResponse<SplitSettlementDto>> ConfirmSettlementAsync(
+            Guid groupId, Guid settlementId, Guid currentUserId, string currentUserName);
+
+        Task<ApiResponse<SplitSettlementDto>> DeclineSettlementByReceiverAsync(
+            Guid groupId, Guid settlementId, string? reason, Guid currentUserId, string currentUserName);
+
+        Task<ApiResponse<SplitSettlementDto>> ApproveSettlementByOwnerAsync(
+            Guid groupId, Guid settlementId, Guid currentUserId, string currentUserName);
+
+        Task<ApiResponse<SplitSettlementDto>> DeclineSettlementByOwnerAsync(
+            Guid groupId, Guid settlementId, string? reason, Guid currentUserId, string currentUserName);
+
+        Task<ApiResponse<SplitSettlementDto>> CancelSettlementAsync(
+            Guid groupId, Guid settlementId, Guid currentUserId, string currentUserName);
+
+        Task<ApiResponse<bool>> ReverseSettlementAsync(
+            Guid groupId, Guid settlementId, Guid currentUserId, string currentUserName);
+
+        Task<ApiResponse<List<SplitSettlementDto>>> GetPendingActionsAsync(
+            Guid groupId, Guid currentUserId);
+
         Task<ApiResponse<List<SplitSettlementDto>>> GetGroupSettlementsAsync(
             Guid groupId, Guid currentUserId);
 

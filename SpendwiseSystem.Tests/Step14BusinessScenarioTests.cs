@@ -484,44 +484,123 @@ namespace SpendwiseSystem.Tests
             {
                 var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.GroupId == groupId && !x.IsDeleted);
                 if (s == null) return Task.FromResult<SplitSettlementDto?>(null);
-                return Task.FromResult<SplitSettlementDto?>(new SplitSettlementDto
-                {
-                    Id = s.Id,
-                    GroupId = s.GroupId,
-                    FromUserId = s.FromUserId,
-                    ToUserId = s.ToUserId,
-                    Amount = s.Amount,
-                    Note = s.Note,
-                    SettlementDate = s.SettlementDate
-                });
+                return Task.FromResult<SplitSettlementDto?>(MapDto(s));
             }
 
             public Task<List<SplitSettlementDto>> GetGroupSettlementsAsync(Guid groupId) =>
-                Task.FromResult(Settlements.Where(s => s.GroupId == groupId && !s.IsDeleted).Select(s => new SplitSettlementDto
-                {
-                    Id = s.Id,
-                    GroupId = s.GroupId,
-                    FromUserId = s.FromUserId,
-                    ToUserId = s.ToUserId,
-                    Amount = s.Amount,
-                    Note = s.Note,
-                    SettlementDate = s.SettlementDate
-                }).ToList());
+                Task.FromResult(Settlements.Where(s => s.GroupId == groupId && !s.IsDeleted).Select(MapDto).ToList());
+
+            public Task<List<SplitSettlementDto>> GetGroupSettlementsAsync(Guid groupId, Guid currentUserId, bool isOwner) =>
+                Task.FromResult(Settlements.Where(s => s.GroupId == groupId && !s.IsDeleted && (isOwner || s.FromUserId == currentUserId || s.ToUserId == currentUserId))
+                    .Select(MapDto).ToList());
+
+            public Task<List<SplitSettlementDto>> GetPendingActionsAsync(Guid groupId, Guid currentUserId, bool isOwner) =>
+                Task.FromResult(Settlements.Where(s => s.GroupId == groupId && !s.IsDeleted && ((s.Status == SplitSettlementStatus.PendingReceiver && s.ToUserId == currentUserId) || (s.Status == SplitSettlementStatus.PendingOwner && isOwner)))
+                    .Select(MapDto).ToList());
+
+            public Task<List<SplitSettlement>> GetPendingSettlementsAsync(Guid groupId) =>
+                Task.FromResult(Settlements.Where(s => s.GroupId == groupId && !s.IsDeleted && (s.Status == SplitSettlementStatus.PendingReceiver || s.Status == SplitSettlementStatus.PendingOwner)).ToList());
+
+            public Task<decimal> GetPendingPayerToReceiverAmountAsync(Guid groupId, Guid fromUserId, Guid toUserId, Guid? excludeSettlementId = null)
+            {
+                var sum = Settlements.Where(s => s.GroupId == groupId && s.FromUserId == fromUserId && s.ToUserId == toUserId
+                    && !s.IsDeleted && (s.Status == SplitSettlementStatus.PendingReceiver || s.Status == SplitSettlementStatus.PendingOwner)
+                    && (excludeSettlementId == null || s.Id != excludeSettlementId))
+                    .Sum(s => s.Amount);
+                return Task.FromResult(sum);
+            }
+
+            public Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement)
+            {
+                Settlements.Add(settlement);
+                return Task.FromResult(MapDto(settlement));
+            }
+
+            public Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId)
+            {
+                var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.Status == SplitSettlementStatus.PendingReceiver && !x.IsDeleted);
+                if (s == null) return Task.FromResult(0);
+                s.Status = newStatus;
+                s.ReceiverActionBy = receiverUserId;
+                s.ReceiverActionAt = DateTime.UtcNow;
+                return Task.FromResult(1);
+            }
+
+            public Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId)
+            {
+                var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.Status == SplitSettlementStatus.PendingReceiver && !x.IsDeleted);
+                if (s == null) return Task.FromResult(0);
+                s.Status = SplitSettlementStatus.DeclinedByReceiver;
+                s.ReceiverActionBy = receiverUserId;
+                s.ReceiverActionAt = DateTime.UtcNow;
+                s.DeclineReason = reason;
+                return Task.FromResult(1);
+            }
+
+            public Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId)
+            {
+                var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.Status == SplitSettlementStatus.PendingOwner && !x.IsDeleted);
+                if (s == null) return Task.FromResult(0);
+                s.Status = SplitSettlementStatus.Confirmed;
+                s.OwnerActionBy = ownerUserId;
+                s.OwnerActionAt = DateTime.UtcNow;
+                return Task.FromResult(1);
+            }
+
+            public Task<int> DeclineByOwnerAsync(Guid settlementId, string? reason, Guid ownerUserId)
+            {
+                var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.Status == SplitSettlementStatus.PendingOwner && !x.IsDeleted);
+                if (s == null) return Task.FromResult(0);
+                s.Status = SplitSettlementStatus.DeclinedByOwner;
+                s.OwnerActionBy = ownerUserId;
+                s.OwnerActionAt = DateTime.UtcNow;
+                s.DeclineReason = reason;
+                return Task.FromResult(1);
+            }
+
+            public Task<int> CancelByPayerAsync(Guid settlementId, Guid payerUserId)
+            {
+                var s = Settlements.FirstOrDefault(x => x.Id == settlementId && (x.Status == SplitSettlementStatus.PendingReceiver || x.Status == SplitSettlementStatus.PendingOwner) && !x.IsDeleted);
+                if (s == null) return Task.FromResult(0);
+                s.Status = SplitSettlementStatus.Cancelled;
+                s.CancelledBy = payerUserId;
+                s.CancelledAt = DateTime.UtcNow;
+                return Task.FromResult(1);
+            }
+
+            public Task<bool> ReverseConfirmedSettlementAsync(Guid settlementId, Guid groupId, Guid ownerUserId)
+            {
+                var s = Settlements.FirstOrDefault(x => x.Id == settlementId && x.GroupId == groupId && x.Status == SplitSettlementStatus.Confirmed && !x.IsDeleted);
+                if (s == null) return Task.FromResult(false);
+                s.IsDeleted = true;
+                return Task.FromResult(true);
+            }
+
+            private static SplitSettlementDto MapDto(SplitSettlement s) => new SplitSettlementDto
+            {
+                Id = s.Id,
+                GroupId = s.GroupId,
+                FromUserId = s.FromUserId,
+                ToUserId = s.ToUserId,
+                Amount = s.Amount,
+                Status = s.Status,
+                Note = s.Note,
+                SettlementDate = s.SettlementDate,
+                CreatedBy = s.CreatedBy,
+                ReceiverActionBy = s.ReceiverActionBy,
+                ReceiverActionAt = s.ReceiverActionAt,
+                OwnerActionBy = s.OwnerActionBy,
+                OwnerActionAt = s.OwnerActionAt,
+                DeclineReason = s.DeclineReason,
+                CancelledAt = s.CancelledAt,
+                CancelledBy = s.CancelledBy
+            };
 
             public Task<SplitSettlementDto> CreateSettlementWithActivityAsync(
                 SplitSettlement settlement, string creatorName, string groupName)
             {
                 Settlements.Add(settlement);
-                return Task.FromResult(new SplitSettlementDto
-                {
-                    Id = settlement.Id,
-                    GroupId = settlement.GroupId,
-                    FromUserId = settlement.FromUserId,
-                    ToUserId = settlement.ToUserId,
-                    Amount = settlement.Amount,
-                    Note = settlement.Note,
-                    SettlementDate = settlement.SettlementDate
-                });
+                return Task.FromResult(MapDto(settlement));
             }
 
             public Task<SplitSettlementDto?> UpdateSettlementWithActivityAsync(
@@ -576,7 +655,7 @@ namespace SpendwiseSystem.Tests
                 }).ToList();
 
                 var settlements = _settlementRepo.Settlements.Where(s => s.GroupId == groupId).Select(s =>
-                    new SettlementRecord(s.Id, s.FromUserId, s.ToUserId, s.Amount, s.IsDeleted)).ToList();
+                    new SettlementRecord(s.Id, s.FromUserId, s.ToUserId, s.Amount, s.IsDeleted, s.Status)).ToList();
 
                 var balances = GroupBalanceCalculator.CalculateBalances(members, expenses, settlements);
                 return Task.FromResult(balances);
@@ -2136,6 +2215,571 @@ namespace SpendwiseSystem.Tests
             // Verify net group balances sum to 0
             var finalBalances = await balanceRepo.GetGroupBalancesAsync(groupId);
             Assert.Equal(0m, finalBalances.Sum(b => b.NetBalance));
+        }
+
+        #endregion
+
+        #region 7. Phase 2 Step 3: Settlement Approval Workflow & Balance Tests
+
+        [Fact]
+        public async Task SettlementApproval_01_MemberPayerSubmits_EntersPendingReceiver_ReceiverConfirms_EntersPendingOwner_OwnerApproves_Confirmed()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            // Payer owes 500, Receiver is owed 500
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 500m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 500m });
+
+            // 1. Payer submits
+            var submitRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 300m,
+                Note = "Partial payment"
+            }, payerId, "Payer A");
+
+            Assert.True(submitRes.Success);
+            Assert.Equal(SplitSettlementStatus.PendingReceiver, submitRes.Data.Status);
+            Assert.Equal(payerId, submitRes.Data.CreatedBy);
+
+            var settlementId = submitRes.Data.Id;
+
+            // Pending settlement does NOT affect balances
+            var midBalances1 = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(-500m, midBalances1.First(b => b.UserId == payerId).NetBalance);
+            Assert.Equal(500m, midBalances1.First(b => b.UserId == receiverId).NetBalance);
+
+            // 2. Non-receiver member tries to confirm -> Forbidden
+            var nonReceiverRes = await service.ConfirmSettlementAsync(groupId, settlementId, ownerId, "Owner O");
+            Assert.False(nonReceiverRes.Success);
+            Assert.Equal(403, nonReceiverRes.StatusCode);
+
+            // 3. Receiver confirms -> advances to PendingOwner
+            var confirmRes = await service.ConfirmSettlementAsync(groupId, settlementId, receiverId, "Receiver B");
+            Assert.True(confirmRes.Success);
+            Assert.Equal(SplitSettlementStatus.PendingOwner, confirmRes.Data.Status);
+            Assert.Equal(receiverId, confirmRes.Data.ReceiverActionBy);
+
+            // Still PendingOwner -> does NOT affect balances
+            var midBalances2 = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(-500m, midBalances2.First(b => b.UserId == payerId).NetBalance);
+
+            // 4. Non-owner tries to give final approval -> Forbidden
+            var nonOwnerApproveRes = await service.ApproveSettlementByOwnerAsync(groupId, settlementId, payerId, "Payer A");
+            Assert.False(nonOwnerApproveRes.Success);
+            Assert.Equal(403, nonOwnerApproveRes.StatusCode);
+
+            // 5. Owner gives final approval -> Confirmed
+            var ownerApproveRes = await service.ApproveSettlementByOwnerAsync(groupId, settlementId, ownerId, "Owner O");
+            Assert.True(ownerApproveRes.Success);
+            Assert.Equal(SplitSettlementStatus.Confirmed, ownerApproveRes.Data.Status);
+            Assert.Equal(ownerId, ownerApproveRes.Data.OwnerActionBy);
+
+            // Now Confirmed -> affects balances!
+            var finalBalances = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(-200m, finalBalances.First(b => b.UserId == payerId).NetBalance);
+            Assert.Equal(200m, finalBalances.First(b => b.UserId == receiverId).NetBalance);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_02_ReceiverIsOwner_ReceiverConfirmationDirectlyConfirms()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = ownerId, Amount = 400m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 400m });
+
+            // Payer submits
+            var submitRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = ownerId,
+                Amount = 400m
+            }, payerId, "Payer A");
+
+            Assert.True(submitRes.Success);
+            Assert.Equal(SplitSettlementStatus.PendingReceiver, submitRes.Data.Status);
+
+            // Receiver (who is owner) confirms -> direct Confirmed!
+            var confirmRes = await service.ConfirmSettlementAsync(groupId, submitRes.Data.Id, ownerId, "Owner O");
+            Assert.True(confirmRes.Success);
+            Assert.Equal(SplitSettlementStatus.Confirmed, confirmRes.Data.Status);
+
+            var balances = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(0m, balances.First(b => b.UserId == payerId).NetBalance);
+            Assert.Equal(0m, balances.First(b => b.UserId == ownerId).NetBalance);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_03_PayerIsOwner_ReceiverConfirmationDirectlyConfirms()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 600m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = ownerId, ShareAmount = 600m });
+
+            // Owner submits
+            var submitRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = ownerId,
+                ToUserId = receiverId,
+                Amount = 600m
+            }, ownerId, "Owner O");
+
+            Assert.True(submitRes.Success);
+            Assert.Equal(SplitSettlementStatus.PendingReceiver, submitRes.Data.Status);
+
+            // Member confirms receipt -> direct Confirmed (owner cannot approve own payment)
+            var confirmRes = await service.ConfirmSettlementAsync(groupId, submitRes.Data.Id, receiverId, "Receiver B");
+            Assert.True(confirmRes.Success);
+            Assert.Equal(SplitSettlementStatus.Confirmed, confirmRes.Data.Status);
+
+            var balances = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(0m, balances.First(b => b.UserId == ownerId).NetBalance);
+            Assert.Equal(0m, balances.First(b => b.UserId == receiverId).NetBalance);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_04_ReceiverRecordedPayment_TreatsReceiverConfirmationGiven()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 350m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 350m });
+
+            // Receiver B records that Payer A paid them
+            var submitRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 350m
+            }, receiverId, "Receiver B");
+
+            Assert.True(submitRes.Success);
+            Assert.Equal(SplitSettlementStatus.PendingOwner, submitRes.Data.Status);
+            Assert.Equal(receiverId, submitRes.Data.ReceiverActionBy);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_05_OwnerRecordsOnBehalfOfMembers_ImmediatelyConfirmed()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 200m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 200m });
+
+            // Owner records settlement between Member A and Member B
+            var submitRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 200m
+            }, ownerId, "Owner O");
+
+            Assert.True(submitRes.Success);
+            Assert.Equal(SplitSettlementStatus.Confirmed, submitRes.Data.Status);
+            Assert.Equal(ownerId, submitRes.Data.CreatedBy);
+            Assert.Equal(ownerId, submitRes.Data.OwnerActionBy);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_06_ReceiverDeclines_SetsDeclinedByReceiver_NoBalanceEffect()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 500m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 500m });
+
+            var submitRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 500m
+            }, payerId, "Payer A");
+
+            var declineRes = await service.DeclineSettlementByReceiverAsync(
+                groupId, submitRes.Data.Id, "Did not receive funds", receiverId, "Receiver B");
+
+            Assert.True(declineRes.Success);
+            Assert.Equal(SplitSettlementStatus.DeclinedByReceiver, declineRes.Data.Status);
+            Assert.Equal("Did not receive funds", declineRes.Data.DeclineReason);
+
+            // Balances remain unaffected
+            var balances = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(-500m, balances.First(b => b.UserId == payerId).NetBalance);
+            Assert.Equal(500m, balances.First(b => b.UserId == receiverId).NetBalance);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_07_PayerCancels_SetsCancelled_NoBalanceEffect()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 400m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 400m });
+
+            var submitRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 400m
+            }, payerId, "Payer A");
+
+            var cancelRes = await service.CancelSettlementAsync(groupId, submitRes.Data.Id, payerId, "Payer A");
+            Assert.True(cancelRes.Success);
+            Assert.Equal(SplitSettlementStatus.Cancelled, cancelRes.Data.Status);
+
+            var balances = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(-400m, balances.First(b => b.UserId == payerId).NetBalance);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_08_AmountCannotBeEdited()
+        {
+            var service = new SplitSettlementService(
+                new InMemorySettlementRepository(), new InMemoryGroupRepository(), new InMemoryBalanceRepository(new InMemoryGroupRepository(), new InMemoryExpenseRepository(), new InMemorySettlementRepository()), new DebtSimplificationService());
+
+            var updateRes = await service.UpdateSettlementAsync(Guid.NewGuid(), Guid.NewGuid(), new UpdateSettlementDto
+            {
+                FromUserId = Guid.NewGuid(),
+                ToUserId = Guid.NewGuid(),
+                Amount = 100m
+            }, Guid.NewGuid(), "User");
+
+            Assert.False(updateRes.Success);
+            Assert.Contains("cannot be edited", updateRes.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_09_ReservedAmounts_SubmittingMoreThanDebtOrCreditIsRejected()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 400m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 400m });
+
+            // 1. Submit 250m -> Succeeds (250 <= 400)
+            var firstRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 250m
+            }, payerId, "Payer A");
+            Assert.True(firstRes.Success);
+
+            // 2. Submit another 200m -> Rejected because 250 (pending) + 200 = 450 > 400!
+            var secondRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 200m
+            }, payerId, "Payer A");
+            Assert.False(secondRes.Success);
+            Assert.Contains("exceeds", secondRes.Message, StringComparison.OrdinalIgnoreCase);
+
+            // 3. Submit 150m -> Succeeds because 250 + 150 == 400
+            var thirdRes = await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 150m
+            }, payerId, "Payer A");
+            Assert.True(thirdRes.Success);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_10_DebtSimplification_SubtractsPendingAmountsSoNotPromptedTwice()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 500m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 500m });
+
+            // Before any settlement, suggestions say Payer owes Receiver 500
+            var initialOverview = await service.GetSettleUpOverviewAsync(groupId, payerId);
+            Assert.Single(initialOverview.Data.SuggestedTransactions);
+            Assert.Equal(500m, initialOverview.Data.SuggestedTransactions[0].Amount);
+
+            // Payer submits 500m settlement (PendingReceiver)
+            await service.RecordSettlementAsync(groupId, new RecordSettlementDto
+            {
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 500m
+            }, payerId, "Payer A");
+
+            // Overview after pending settlement: effective remaining debt is 0, so suggested transactions is EMPTY!
+            var updatedOverview = await service.GetSettleUpOverviewAsync(groupId, payerId);
+            Assert.Empty(updatedOverview.Data.SuggestedTransactions);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_11_Visibility_UnrelatedMemberCannotSeeOtherSettlements()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var bystanderId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = bystanderId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+            groupRepo.Users.Add(new User { Id = bystanderId, FirstName = "Bystander", LastName = "C", Email = "bystander@test.com" });
+
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = Guid.NewGuid(),
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 200m,
+                Status = SplitSettlementStatus.Confirmed
+            });
+
+            // 1. Bystander lists settlements -> Empty list (filtered server-side)
+            var bystanderListRes = await service.GetGroupSettlementsAsync(groupId, bystanderId);
+            Assert.Empty(bystanderListRes.Data);
+
+            // 2. Bystander tries to view details of the settlement -> 403 Forbidden
+            var settlementId = settlementRepo.Settlements[0].Id;
+            var bystanderDetailRes = await service.GetSettlementDetailsAsync(groupId, settlementId, bystanderId);
+            Assert.False(bystanderDetailRes.Success);
+            Assert.Equal(403, bystanderDetailRes.StatusCode);
+
+            // 3. Payer lists -> Sees 1 settlement
+            var payerListRes = await service.GetGroupSettlementsAsync(groupId, payerId);
+            Assert.Single(payerListRes.Data);
+
+            // 4. Owner lists -> Sees 1 settlement
+            var ownerListRes = await service.GetGroupSettlementsAsync(groupId, ownerId);
+            Assert.Single(ownerListRes.Data);
+        }
+
+        [Fact]
+        public async Task SettlementApproval_12_Reversal_OnlyOwnerCanReverseConfirmedSettlement()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var settlementRepo = new InMemorySettlementRepository();
+            var balanceRepo = new InMemoryBalanceRepository(groupRepo, expenseRepo, settlementRepo);
+            var service = new SplitSettlementService(settlementRepo, groupRepo, balanceRepo, new DebtSimplificationService());
+
+            var ownerId = Guid.NewGuid();
+            var payerId = Guid.NewGuid();
+            var receiverId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = payerId, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = receiverId, Role = "Member", IsActive = true });
+
+            groupRepo.Users.Add(new User { Id = ownerId, FirstName = "Owner", LastName = "O", Email = "owner@test.com" });
+            groupRepo.Users.Add(new User { Id = payerId, FirstName = "Payer", LastName = "A", Email = "payer@test.com" });
+            groupRepo.Users.Add(new User { Id = receiverId, FirstName = "Receiver", LastName = "B", Email = "receiver@test.com" });
+
+            expenseRepo.Expenses.Add(new SplitExpense { Id = Guid.NewGuid(), GroupId = groupId, PayerId = receiverId, Amount = 250m, ExpenseDate = DateTime.UtcNow });
+            expenseRepo.Shares.Add(new SplitExpenseShare { ExpenseId = expenseRepo.Expenses[0].Id, UserId = payerId, ShareAmount = 250m });
+
+            var settlementId = Guid.NewGuid();
+            settlementRepo.Settlements.Add(new SplitSettlement
+            {
+                Id = settlementId,
+                GroupId = groupId,
+                FromUserId = payerId,
+                ToUserId = receiverId,
+                Amount = 250m,
+                Status = SplitSettlementStatus.Confirmed,
+                IsDeleted = false
+            });
+
+            // Before reversal: payer settled up (NetBalance = 0)
+            var preBalances = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(0m, preBalances.First(b => b.UserId == payerId).NetBalance);
+
+            // Payer tries to reverse -> Forbidden
+            var payerReverseRes = await service.ReverseSettlementAsync(groupId, settlementId, payerId, "Payer A");
+            Assert.False(payerReverseRes.Success);
+            Assert.Equal(403, payerReverseRes.StatusCode);
+
+            // Owner reverses -> Success
+            var ownerReverseRes = await service.ReverseSettlementAsync(groupId, settlementId, ownerId, "Owner O");
+            Assert.True(ownerReverseRes.Success);
+            Assert.True(settlementRepo.Settlements[0].IsDeleted);
+
+            // After reversal: payer owes 250 again!
+            var postBalances = await balanceRepo.GetGroupBalancesAsync(groupId);
+            Assert.Equal(-250m, postBalances.First(b => b.UserId == payerId).NetBalance);
         }
 
         #endregion

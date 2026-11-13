@@ -7,7 +7,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
 {
     public record ExpenseRecord(Guid Id, Guid PayerId, decimal Amount, bool IsDeleted, IReadOnlyList<ShareRecord> Shares);
     public record ShareRecord(Guid UserId, decimal ShareAmount);
-    public record SettlementRecord(Guid Id, Guid FromUserId, Guid ToUserId, decimal Amount, bool IsDeleted);
+    public record SettlementRecord(Guid Id, Guid FromUserId, Guid ToUserId, decimal Amount, bool IsDeleted, string Status = "Confirmed");
     public record MemberRecord(Guid UserId, string FullName, string Email, string Role, bool IsActive);
 
     public static class GroupBalanceCalculator
@@ -23,7 +23,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             IEnumerable<SettlementRecord> settlements)
         {
             var activeExpenses = expenses.Where(e => !e.IsDeleted).ToList();
-            var activeSettlements = settlements.Where(s => !s.IsDeleted).ToList();
+            var activeSettlements = settlements.Where(s => !s.IsDeleted && s.Status == "Confirmed").ToList();
 
             // Collect all user IDs from active members + historical participants
             var allUserIds = new HashSet<Guid>(members.Select(m => m.UserId));

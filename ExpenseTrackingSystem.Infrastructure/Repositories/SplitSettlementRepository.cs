@@ -27,7 +27,9 @@ namespace SpendwiseSystem.Infrastructure.Repositories
         public async Task<SplitSettlement?> GetSettlementByIdAsync(Guid settlementId)
         {
             const string sql = @"
-                SELECT Id, GroupId, FromUserId, ToUserId, Amount, SettlementDate, Note, CreatedBy, CreatedAt, UpdatedAt, IsDeleted
+                SELECT Id, GroupId, FromUserId, ToUserId, Amount, SettlementDate, Note, Status, CreatedBy, 
+                       ReceiverActionBy, ReceiverActionAt, OwnerActionBy, OwnerActionAt, DeclineReason, CancelledAt, CancelledBy,
+                       CreatedAt, UpdatedAt, IsDeleted
                 FROM dbo.SplitSettlements
                 WHERE Id = @SettlementId AND IsDeleted = 0;";
 
@@ -51,8 +53,19 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     s.Amount,
                     s.SettlementDate,
                     s.Note,
+                    s.Status,
                     s.CreatedBy,
                     ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uc.FirstName, ' ', uc.LastName))), ''), uc.Email) AS CreatedByName,
+                    s.ReceiverActionBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ur.FirstName, ' ', ur.LastName))), ''), ur.Email) AS ReceiverActionByName,
+                    s.ReceiverActionAt,
+                    s.OwnerActionBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uo.FirstName, ' ', uo.LastName))), ''), uo.Email) AS OwnerActionByName,
+                    s.OwnerActionAt,
+                    s.DeclineReason,
+                    s.CancelledAt,
+                    s.CancelledBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ux.FirstName, ' ', ux.LastName))), ''), ux.Email) AS CancelledByName,
                     s.CreatedAt,
                     s.UpdatedAt
                 FROM dbo.SplitSettlements s
@@ -60,6 +73,9 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 LEFT JOIN dbo.Users uf ON uf.Id = s.FromUserId
                 LEFT JOIN dbo.Users ut ON ut.Id = s.ToUserId
                 LEFT JOIN dbo.Users uc ON uc.Id = s.CreatedBy
+                LEFT JOIN dbo.Users ur ON ur.Id = s.ReceiverActionBy
+                LEFT JOIN dbo.Users uo ON uo.Id = s.OwnerActionBy
+                LEFT JOIN dbo.Users ux ON ux.Id = s.CancelledBy
                 WHERE s.Id = @SettlementId AND s.GroupId = @GroupId AND s.IsDeleted = 0;";
 
             using var connection = CreateConnection();
@@ -71,6 +87,12 @@ namespace SpendwiseSystem.Infrastructure.Repositories
         }
 
         public async Task<List<SplitSettlementDto>> GetGroupSettlementsAsync(Guid groupId)
+        {
+            // Backward compatibility: default to group owner view if caller doesn't specify user
+            return await GetGroupSettlementsAsync(groupId, Guid.Empty, true);
+        }
+
+        public async Task<List<SplitSettlementDto>> GetGroupSettlementsAsync(Guid groupId, Guid currentUserId, bool isOwner)
         {
             const string sql = @"
                 SELECT 
@@ -86,8 +108,19 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     s.Amount,
                     s.SettlementDate,
                     s.Note,
+                    s.Status,
                     s.CreatedBy,
                     ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uc.FirstName, ' ', uc.LastName))), ''), uc.Email) AS CreatedByName,
+                    s.ReceiverActionBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ur.FirstName, ' ', ur.LastName))), ''), ur.Email) AS ReceiverActionByName,
+                    s.ReceiverActionAt,
+                    s.OwnerActionBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uo.FirstName, ' ', uo.LastName))), ''), uo.Email) AS OwnerActionByName,
+                    s.OwnerActionAt,
+                    s.DeclineReason,
+                    s.CancelledAt,
+                    s.CancelledBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ux.FirstName, ' ', ux.LastName))), ''), ux.Email) AS CancelledByName,
                     s.CreatedAt,
                     s.UpdatedAt
                 FROM dbo.SplitSettlements s
@@ -95,12 +128,242 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 LEFT JOIN dbo.Users uf ON uf.Id = s.FromUserId
                 LEFT JOIN dbo.Users ut ON ut.Id = s.ToUserId
                 LEFT JOIN dbo.Users uc ON uc.Id = s.CreatedBy
+                LEFT JOIN dbo.Users ur ON ur.Id = s.ReceiverActionBy
+                LEFT JOIN dbo.Users uo ON uo.Id = s.OwnerActionBy
+                LEFT JOIN dbo.Users ux ON ux.Id = s.CancelledBy
                 WHERE s.GroupId = @GroupId AND s.IsDeleted = 0
+                  AND (@IsOwner = 1 OR s.FromUserId = @CurrentUserId OR s.ToUserId = @CurrentUserId)
                 ORDER BY s.SettlementDate DESC, s.CreatedAt DESC;";
 
             using var connection = CreateConnection();
-            var results = await connection.QueryAsync<SplitSettlementDto>(sql, new { GroupId = groupId });
+            var results = await connection.QueryAsync<SplitSettlementDto>(sql, new
+            {
+                GroupId = groupId,
+                CurrentUserId = currentUserId,
+                IsOwner = isOwner ? 1 : 0
+            });
             return results.ToList();
+        }
+
+        public async Task<List<SplitSettlementDto>> GetPendingActionsAsync(Guid groupId, Guid currentUserId, bool isOwner)
+        {
+            const string sql = @"
+                SELECT 
+                    s.Id,
+                    s.GroupId,
+                    g.Name AS GroupName,
+                    s.FromUserId,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uf.FirstName, ' ', uf.LastName))), ''), uf.Email) AS FromUserName,
+                    uf.Email AS FromUserEmail,
+                    s.ToUserId,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ut.FirstName, ' ', ut.LastName))), ''), ut.Email) AS ToUserName,
+                    ut.Email AS ToUserEmail,
+                    s.Amount,
+                    s.SettlementDate,
+                    s.Note,
+                    s.Status,
+                    s.CreatedBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uc.FirstName, ' ', uc.LastName))), ''), uc.Email) AS CreatedByName,
+                    s.ReceiverActionBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ur.FirstName, ' ', ur.LastName))), ''), ur.Email) AS ReceiverActionByName,
+                    s.ReceiverActionAt,
+                    s.OwnerActionBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(uo.FirstName, ' ', uo.LastName))), ''), uo.Email) AS OwnerActionByName,
+                    s.OwnerActionAt,
+                    s.DeclineReason,
+                    s.CancelledAt,
+                    s.CancelledBy,
+                    ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(ux.FirstName, ' ', ux.LastName))), ''), ux.Email) AS CancelledByName,
+                    s.CreatedAt,
+                    s.UpdatedAt
+                FROM dbo.SplitSettlements s
+                INNER JOIN dbo.SplitGroups g ON g.Id = s.GroupId
+                LEFT JOIN dbo.Users uf ON uf.Id = s.FromUserId
+                LEFT JOIN dbo.Users ut ON ut.Id = s.ToUserId
+                LEFT JOIN dbo.Users uc ON uc.Id = s.CreatedBy
+                LEFT JOIN dbo.Users ur ON ur.Id = s.ReceiverActionBy
+                LEFT JOIN dbo.Users uo ON uo.Id = s.OwnerActionBy
+                LEFT JOIN dbo.Users ux ON ux.Id = s.CancelledBy
+                WHERE s.GroupId = @GroupId AND s.IsDeleted = 0
+                  AND ((s.Status = 'PendingReceiver' AND s.ToUserId = @CurrentUserId)
+                       OR (s.Status = 'PendingOwner' AND @IsOwner = 1))
+                ORDER BY s.CreatedAt ASC;";
+
+            using var connection = CreateConnection();
+            var results = await connection.QueryAsync<SplitSettlementDto>(sql, new
+            {
+                GroupId = groupId,
+                CurrentUserId = currentUserId,
+                IsOwner = isOwner ? 1 : 0
+            });
+            return results.ToList();
+        }
+
+        public async Task<List<SplitSettlement>> GetPendingSettlementsAsync(Guid groupId)
+        {
+            const string sql = @"
+                SELECT Id, GroupId, FromUserId, ToUserId, Amount, SettlementDate, Note, Status, CreatedBy, 
+                       ReceiverActionBy, ReceiverActionAt, OwnerActionBy, OwnerActionAt, DeclineReason, CancelledAt, CancelledBy,
+                       CreatedAt, UpdatedAt, IsDeleted
+                FROM dbo.SplitSettlements
+                WHERE GroupId = @GroupId AND Status IN ('PendingReceiver', 'PendingOwner') AND IsDeleted = 0;";
+
+            using var connection = CreateConnection();
+            var results = await connection.QueryAsync<SplitSettlement>(sql, new { GroupId = groupId });
+            return results.ToList();
+        }
+
+        public async Task<decimal> GetPendingPayerToReceiverAmountAsync(Guid groupId, Guid fromUserId, Guid toUserId, Guid? excludeSettlementId = null)
+        {
+            const string sql = @"
+                SELECT ISNULL(SUM(Amount), CAST(0 AS DECIMAL(18,2)))
+                FROM dbo.SplitSettlements
+                WHERE GroupId = @GroupId 
+                  AND FromUserId = @FromUserId 
+                  AND ToUserId = @ToUserId 
+                  AND Status IN ('PendingReceiver', 'PendingOwner') 
+                  AND IsDeleted = 0
+                  AND (@ExcludeSettlementId IS NULL OR Id <> @ExcludeSettlementId);";
+
+            using var connection = CreateConnection();
+            return await connection.ExecuteScalarAsync<decimal>(sql, new
+            {
+                GroupId = groupId,
+                FromUserId = fromUserId,
+                ToUserId = toUserId,
+                ExcludeSettlementId = excludeSettlementId
+            });
+        }
+
+        public async Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement)
+        {
+            const string insertSql = @"
+                INSERT INTO dbo.SplitSettlements
+                    (Id, GroupId, FromUserId, ToUserId, Amount, SettlementDate, Note, Status, CreatedBy, 
+                     ReceiverActionBy, ReceiverActionAt, OwnerActionBy, OwnerActionAt, DeclineReason, CancelledAt, CancelledBy,
+                     CreatedAt, UpdatedAt, IsDeleted)
+                VALUES
+                    (@Id, @GroupId, @FromUserId, @ToUserId, @Amount, @SettlementDate, @Note, @Status, @CreatedBy, 
+                     @ReceiverActionBy, @ReceiverActionAt, @OwnerActionBy, @OwnerActionAt, @DeclineReason, @CancelledAt, @CancelledBy,
+                     @CreatedAt, @UpdatedAt, @IsDeleted);";
+
+            using var connection = CreateConnection();
+            await connection.ExecuteAsync(insertSql, settlement);
+
+            return (await GetSettlementDetailsAsync(settlement.Id, settlement.GroupId))!;
+        }
+
+        public async Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId)
+        {
+            const string sql = @"
+                UPDATE dbo.SplitSettlements
+                SET Status = @NewStatus,
+                    ReceiverActionBy = @ReceiverUserId,
+                    ReceiverActionAt = SYSUTCDATETIME(),
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = @SettlementId AND Status = 'PendingReceiver' AND IsDeleted = 0;";
+
+            using var connection = CreateConnection();
+            return await connection.ExecuteAsync(sql, new
+            {
+                SettlementId = settlementId,
+                NewStatus = newStatus,
+                ReceiverUserId = receiverUserId
+            });
+        }
+
+        public async Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId)
+        {
+            const string sql = @"
+                UPDATE dbo.SplitSettlements
+                SET Status = 'DeclinedByReceiver',
+                    ReceiverActionBy = @ReceiverUserId,
+                    ReceiverActionAt = SYSUTCDATETIME(),
+                    DeclineReason = @Reason,
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = @SettlementId AND Status = 'PendingReceiver' AND IsDeleted = 0;";
+
+            using var connection = CreateConnection();
+            return await connection.ExecuteAsync(sql, new
+            {
+                SettlementId = settlementId,
+                Reason = reason?.Trim(),
+                ReceiverUserId = receiverUserId
+            });
+        }
+
+        public async Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId)
+        {
+            const string sql = @"
+                UPDATE dbo.SplitSettlements
+                SET Status = 'Confirmed',
+                    OwnerActionBy = @OwnerUserId,
+                    OwnerActionAt = SYSUTCDATETIME(),
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = @SettlementId AND Status = 'PendingOwner' AND IsDeleted = 0;";
+
+            using var connection = CreateConnection();
+            return await connection.ExecuteAsync(sql, new
+            {
+                SettlementId = settlementId,
+                OwnerUserId = ownerUserId
+            });
+        }
+
+        public async Task<int> DeclineByOwnerAsync(Guid settlementId, string? reason, Guid ownerUserId)
+        {
+            const string sql = @"
+                UPDATE dbo.SplitSettlements
+                SET Status = 'DeclinedByOwner',
+                    OwnerActionBy = @OwnerUserId,
+                    OwnerActionAt = SYSUTCDATETIME(),
+                    DeclineReason = @Reason,
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = @SettlementId AND Status = 'PendingOwner' AND IsDeleted = 0;";
+
+            using var connection = CreateConnection();
+            return await connection.ExecuteAsync(sql, new
+            {
+                SettlementId = settlementId,
+                Reason = reason?.Trim(),
+                OwnerUserId = ownerUserId
+            });
+        }
+
+        public async Task<int> CancelByPayerAsync(Guid settlementId, Guid payerUserId)
+        {
+            const string sql = @"
+                UPDATE dbo.SplitSettlements
+                SET Status = 'Cancelled',
+                    CancelledBy = @PayerUserId,
+                    CancelledAt = SYSUTCDATETIME(),
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = @SettlementId AND Status IN ('PendingReceiver', 'PendingOwner') AND IsDeleted = 0;";
+
+            using var connection = CreateConnection();
+            return await connection.ExecuteAsync(sql, new
+            {
+                SettlementId = settlementId,
+                PayerUserId = payerUserId
+            });
+        }
+
+        public async Task<bool> ReverseConfirmedSettlementAsync(Guid settlementId, Guid groupId, Guid ownerUserId)
+        {
+            const string sql = @"
+                UPDATE dbo.SplitSettlements
+                SET IsDeleted = 1,
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = @SettlementId AND GroupId = @GroupId AND Status = 'Confirmed' AND IsDeleted = 0;";
+
+            using var connection = CreateConnection();
+            var rows = await connection.ExecuteAsync(sql, new
+            {
+                SettlementId = settlementId,
+                GroupId = groupId,
+                OwnerUserId = ownerUserId
+            });
+            return rows > 0;
         }
 
         public async Task<SplitSettlementDto> CreateSettlementWithActivityAsync(

@@ -156,6 +156,28 @@ namespace SpendwiseSystem.Tests
             public Task<List<SplitSettlementDto>> GetGroupSettlementsAsync(Guid groupId) =>
                 Task.FromResult(new List<SplitSettlementDto>());
 
+            public Task<List<SplitSettlementDto>> GetGroupSettlementsAsync(Guid groupId, Guid currentUserId, bool isOwner) =>
+                Task.FromResult(new List<SplitSettlementDto>());
+
+            public Task<List<SplitSettlementDto>> GetPendingActionsAsync(Guid groupId, Guid currentUserId, bool isOwner) =>
+                Task.FromResult(new List<SplitSettlementDto>());
+
+            public Task<List<SplitSettlement>> GetPendingSettlementsAsync(Guid groupId) =>
+                Task.FromResult(new List<SplitSettlement>());
+
+            public Task<decimal> GetPendingPayerToReceiverAmountAsync(Guid groupId, Guid fromUserId, Guid toUserId, Guid? excludeSettlementId = null) =>
+                Task.FromResult(0m);
+
+            public Task<SplitSettlementDto> CreateSettlementAsync(SplitSettlement settlement) =>
+                Task.FromResult(new SplitSettlementDto());
+
+            public Task<int> ConfirmByReceiverAsync(Guid settlementId, string newStatus, Guid receiverUserId) => Task.FromResult(1);
+            public Task<int> DeclineByReceiverAsync(Guid settlementId, string? reason, Guid receiverUserId) => Task.FromResult(1);
+            public Task<int> ApproveByOwnerAsync(Guid settlementId, Guid ownerUserId) => Task.FromResult(1);
+            public Task<int> DeclineByOwnerAsync(Guid settlementId, string? reason, Guid ownerUserId) => Task.FromResult(1);
+            public Task<int> CancelByPayerAsync(Guid settlementId, Guid payerUserId) => Task.FromResult(1);
+            public Task<bool> ReverseConfirmedSettlementAsync(Guid settlementId, Guid groupId, Guid ownerUserId) => Task.FromResult(true);
+
             public Task<SplitSettlementDto> CreateSettlementWithActivityAsync(
                 SplitSettlement settlement, string creatorName, string groupName) =>
                 Task.FromResult(new SplitSettlementDto());

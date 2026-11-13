@@ -143,7 +143,15 @@ BEGIN
         Amount DECIMAL(18, 2) NOT NULL,
         SettlementDate DATETIME2 NOT NULL,
         Note NVARCHAR(500) NULL,
+        Status NVARCHAR(50) NOT NULL CONSTRAINT DF_SplitSettlements_Status DEFAULT ('PendingReceiver'),
         CreatedBy UNIQUEIDENTIFIER NOT NULL,
+        ReceiverActionBy UNIQUEIDENTIFIER NULL,
+        ReceiverActionAt DATETIME2 NULL,
+        OwnerActionBy UNIQUEIDENTIFIER NULL,
+        OwnerActionAt DATETIME2 NULL,
+        DeclineReason NVARCHAR(500) NULL,
+        CancelledAt DATETIME2 NULL,
+        CancelledBy UNIQUEIDENTIFIER NULL,
         CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_SplitSettlements_CreatedAt DEFAULT (SYSUTCDATETIME()),
         UpdatedAt DATETIME2 NOT NULL CONSTRAINT DF_SplitSettlements_UpdatedAt DEFAULT (SYSUTCDATETIME()),
         IsDeleted BIT NOT NULL CONSTRAINT DF_SplitSettlements_IsDeleted DEFAULT (0),
@@ -152,6 +160,9 @@ BEGIN
         CONSTRAINT FK_SplitSettlements_Users_FromUserId FOREIGN KEY (FromUserId) REFERENCES dbo.Users (Id),
         CONSTRAINT FK_SplitSettlements_Users_ToUserId FOREIGN KEY (ToUserId) REFERENCES dbo.Users (Id),
         CONSTRAINT FK_SplitSettlements_Users_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES dbo.Users (Id),
+        CONSTRAINT FK_SplitSettlements_Users_ReceiverActionBy FOREIGN KEY (ReceiverActionBy) REFERENCES dbo.Users (Id),
+        CONSTRAINT FK_SplitSettlements_Users_OwnerActionBy FOREIGN KEY (OwnerActionBy) REFERENCES dbo.Users (Id),
+        CONSTRAINT FK_SplitSettlements_Users_CancelledBy FOREIGN KEY (CancelledBy) REFERENCES dbo.Users (Id),
         CONSTRAINT CK_SplitSettlements_Amount CHECK (Amount > 0),
         CONSTRAINT CK_SplitSettlements_DifferentUsers CHECK (FromUserId <> ToUserId)
     );
@@ -232,14 +243,17 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.Split
     CREATE NONCLUSTERED INDEX IX_SplitExpenseShares_UserId ON dbo.SplitExpenseShares (UserId) INCLUDE (ExpenseId, ShareAmount);
 
 -- SplitSettlements Indexes
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.SplitSettlements') AND name = N'IX_SplitSettlements_GroupId_Status_IsDeleted')
+    CREATE NONCLUSTERED INDEX IX_SplitSettlements_GroupId_Status_IsDeleted ON dbo.SplitSettlements (GroupId, Status, IsDeleted) INCLUDE (FromUserId, ToUserId, Amount, SettlementDate);
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.SplitSettlements') AND name = N'IX_SplitSettlements_GroupId_SettlementDate')
     CREATE NONCLUSTERED INDEX IX_SplitSettlements_GroupId_SettlementDate ON dbo.SplitSettlements (GroupId, SettlementDate DESC) INCLUDE (FromUserId, ToUserId, Amount, IsDeleted);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.SplitSettlements') AND name = N'IX_SplitSettlements_FromUserId')
-    CREATE NONCLUSTERED INDEX IX_SplitSettlements_FromUserId ON dbo.SplitSettlements (FromUserId);
+    CREATE NONCLUSTERED INDEX IX_SplitSettlements_FromUserId ON dbo.SplitSettlements (FromUserId, Status, IsDeleted);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.SplitSettlements') AND name = N'IX_SplitSettlements_ToUserId')
-    CREATE NONCLUSTERED INDEX IX_SplitSettlements_ToUserId ON dbo.SplitSettlements (ToUserId);
+    CREATE NONCLUSTERED INDEX IX_SplitSettlements_ToUserId ON dbo.SplitSettlements (ToUserId, Status, IsDeleted);
 
 -- SplitGroupActivities Indexes
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.SplitGroupActivities') AND name = N'IX_SplitGroupActivities_GroupId_CreatedAt')

@@ -372,6 +372,10 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public decimal TotalShare { get; set; }
         public decimal SettlementsPaid { get; set; }
         public decimal SettlementsReceived { get; set; }
+        public decimal PendingPaid { get; set; }
+        public decimal PendingReceived { get; set; }
+        public decimal PendingSettlementsPaid { get => PendingPaid; set => PendingPaid = value; }
+        public decimal PendingSettlementsReceived { get => PendingReceived; set => PendingReceived = value; }
         public decimal NetBalance { get; set; }
         public string StatusDescription { get; set; } = string.Empty;
     }
@@ -385,6 +389,8 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public decimal CurrentUserBalance { get; set; }
         public decimal CurrentUserTotalPaid { get; set; }
         public decimal CurrentUserTotalShare { get; set; }
+        public decimal CurrentUserPendingPaid { get; set; }
+        public decimal CurrentUserPendingReceived { get; set; }
         public string CurrentUserStatusText { get; set; } = string.Empty;
         public int MemberCount { get; set; }
         public int SettledMembersCount { get; set; }
@@ -408,6 +414,12 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
 
         [StringLength(500, ErrorMessage = "Note cannot exceed 500 characters.")]
         public string? Note { get; set; }
+    }
+
+    public class DeclineSettlementDto
+    {
+        [StringLength(500, ErrorMessage = "Reason cannot exceed 500 characters.")]
+        public string? Reason { get; set; }
     }
 
     public class UpdateSettlementDto
@@ -441,10 +453,25 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         public decimal Amount { get; set; }
         public DateTime SettlementDate { get; set; }
         public string? Note { get; set; }
+        public string Status { get; set; } = "PendingReceiver";
         public Guid CreatedBy { get; set; }
         public string CreatedByName { get; set; } = string.Empty;
+        public Guid? ReceiverActionBy { get; set; }
+        public string? ReceiverActionByName { get; set; }
+        public DateTime? ReceiverActionAt { get; set; }
+        public Guid? OwnerActionBy { get; set; }
+        public string? OwnerActionByName { get; set; }
+        public DateTime? OwnerActionAt { get; set; }
+        public string? DeclineReason { get; set; }
+        public DateTime? CancelledAt { get; set; }
+        public Guid? CancelledBy { get; set; }
+        public string? CancelledByName { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        public bool CanConfirm { get; set; }
+        public bool CanDecline { get; set; }
+        public bool CanCancel { get; set; }
+        public bool CanReverse { get; set; }
     }
 
     public class SuggestedSettlementDto

@@ -101,6 +101,8 @@ export interface MemberBalanceDto {
   totalShare: number
   settlementsPaid: number
   settlementsReceived: number
+  pendingPaid?: number
+  pendingReceived?: number
   netBalance: number
   role: string
   isActive: boolean
@@ -114,8 +116,18 @@ export interface GroupFinancialSummaryDto {
   totalActiveDebt: number
   membersCount: number
   currentUserNetBalance: number
+  currentUserPendingPaid?: number
+  currentUserPendingReceived?: number
   memberBalances: MemberBalanceDto[]
 }
+
+export type SplitSettlementStatus =
+  | 'PendingReceiver'
+  | 'PendingOwner'
+  | 'Confirmed'
+  | 'DeclinedByReceiver'
+  | 'DeclinedByOwner'
+  | 'Cancelled'
 
 export interface SplitSettlementDto {
   id: string
@@ -130,10 +142,25 @@ export interface SplitSettlementDto {
   amount: number
   settlementDate: string
   note?: string
+  status: SplitSettlementStatus
   createdBy: string
   createdByName: string
+  receiverActionBy?: string
+  receiverActionByName?: string
+  receiverActionAt?: string
+  ownerActionBy?: string
+  ownerActionByName?: string
+  ownerActionAt?: string
+  declineReason?: string
+  cancelledAt?: string
+  cancelledBy?: string
+  cancelledByName?: string
   createdAt: string
   updatedAt: string
+  canConfirm?: boolean
+  canDecline?: boolean
+  canCancel?: boolean
+  canReverse?: boolean
 }
 
 export interface SuggestedSettlementDto {

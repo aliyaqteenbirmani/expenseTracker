@@ -62,8 +62,8 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     (
                         ISNULL((SELECT SUM(e.Amount) FROM dbo.SplitExpenses e WHERE e.GroupId = g.Id AND e.PayerId = @UserId AND e.IsDeleted = 0), 0)
                         - ISNULL((SELECT SUM(s.ShareAmount) FROM dbo.SplitExpenseShares s INNER JOIN dbo.SplitExpenses e ON e.Id = s.ExpenseId WHERE e.GroupId = g.Id AND s.UserId = @UserId AND e.IsDeleted = 0), 0)
-                        + ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = g.Id AND st.FromUserId = @UserId AND st.IsDeleted = 0), 0)
-                        - ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = g.Id AND st.ToUserId = @UserId AND st.IsDeleted = 0), 0)
+                        + ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = g.Id AND st.FromUserId = @UserId AND st.IsDeleted = 0 AND st.Status = 'Confirmed'), 0)
+                        - ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = g.Id AND st.ToUserId = @UserId AND st.IsDeleted = 0 AND st.Status = 'Confirmed'), 0)
                     ) AS CurrentUserBalance,
                     gm.Role AS CurrentUserRole,
                     g.CreatedAt
@@ -94,8 +94,8 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     (
                         ISNULL((SELECT SUM(e.Amount) FROM dbo.SplitExpenses e WHERE e.GroupId = g.Id AND e.PayerId = @UserId AND e.IsDeleted = 0), 0)
                         - ISNULL((SELECT SUM(s.ShareAmount) FROM dbo.SplitExpenseShares s INNER JOIN dbo.SplitExpenses e ON e.Id = s.ExpenseId WHERE e.GroupId = g.Id AND s.UserId = @UserId AND e.IsDeleted = 0), 0)
-                        + ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = g.Id AND st.FromUserId = @UserId AND st.IsDeleted = 0), 0)
-                        - ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = g.Id AND st.ToUserId = @UserId AND st.IsDeleted = 0), 0)
+                        + ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = g.Id AND st.FromUserId = @UserId AND st.IsDeleted = 0 AND st.Status = 'Confirmed'), 0)
+                        - ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = g.Id AND st.ToUserId = @UserId AND st.IsDeleted = 0 AND st.Status = 'Confirmed'), 0)
                     ) AS CurrentUserBalance,
                     gm.Role AS CurrentUserRole,
                     g.IsActive,
@@ -128,8 +128,8 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     (
                         ISNULL((SELECT SUM(e.Amount) FROM dbo.SplitExpenses e WHERE e.GroupId = @GroupId AND e.PayerId = gm.UserId AND e.IsDeleted = 0), 0)
                         - ISNULL((SELECT SUM(s.ShareAmount) FROM dbo.SplitExpenseShares s INNER JOIN dbo.SplitExpenses e ON e.Id = s.ExpenseId WHERE e.GroupId = @GroupId AND s.UserId = gm.UserId AND e.IsDeleted = 0), 0)
-                        + ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = @GroupId AND st.FromUserId = gm.UserId AND st.IsDeleted = 0), 0)
-                        - ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = @GroupId AND st.ToUserId = gm.UserId AND st.IsDeleted = 0), 0)
+                        + ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = @GroupId AND st.FromUserId = gm.UserId AND st.IsDeleted = 0 AND st.Status = 'Confirmed'), 0)
+                        - ISNULL((SELECT SUM(st.Amount) FROM dbo.SplitSettlements st WHERE st.GroupId = @GroupId AND st.ToUserId = gm.UserId AND st.IsDeleted = 0 AND st.Status = 'Confirmed'), 0)
                     ) AS Balance
                 FROM dbo.SplitGroupMembers gm
                 LEFT JOIN dbo.Users u ON u.Id = gm.UserId
