@@ -24,6 +24,7 @@ namespace SpendwiseSystem.Application.Interfaces
         Task<bool> UpdateGroupAsync(SplitGroup group, Guid userId, string userName);
         Task<bool> SoftDeleteGroupAsync(Guid groupId, Guid userId, string userName);
         Task<bool> HasFinancialRecordsAsync(Guid groupId);
+        Task<int> GetPendingSettlementsCountAsync(Guid groupId) => Task.FromResult(0);
 
         Task<User?> GetUserByEmailOrIdAsync(string? email, Guid? userId);
         Task<SplitGroupInvitation?> GetInvitationByIdAsync(Guid invitationId);

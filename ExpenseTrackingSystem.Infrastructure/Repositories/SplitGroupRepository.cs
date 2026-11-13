@@ -412,6 +412,19 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             return await connection.ExecuteScalarAsync<bool>(sql, new { GroupId = groupId });
         }
 
+        public async Task<int> GetPendingSettlementsCountAsync(Guid groupId)
+        {
+            const string sql = @"
+                SELECT COUNT(*)
+                FROM dbo.SplitSettlements
+                WHERE GroupId = @GroupId
+                  AND IsDeleted = 0
+                  AND Status IN ('PendingReceiver', 'PendingOwner');";
+
+            using var connection = CreateConnection();
+            return await connection.ExecuteScalarAsync<int>(sql, new { GroupId = groupId });
+        }
+
         public async Task<User?> GetUserByEmailOrIdAsync(string? email, Guid? userId)
         {
             const string sql = @"

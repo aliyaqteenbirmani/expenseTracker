@@ -321,6 +321,13 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (group.OwnerId != userId)
                 return ApiResponse<bool>.ForbiddenResponse("Only the group owner can delete this group.");
 
+            var pendingSettlementsCount = await _groupRepository.GetPendingSettlementsCountAsync(groupId);
+            if (pendingSettlementsCount > 0)
+            {
+                return ApiResponse<bool>.FailureResponse(
+                    $"Cannot delete or archive group while {pendingSettlementsCount} settlement request(s) are pending approval. Please accept, decline, or cancel all pending requests first.");
+            }
+
             var hasFinances = await _groupRepository.HasFinancialRecordsAsync(groupId);
             if (hasFinances)
                 return ApiResponse<bool>.FailureResponse("Cannot delete group because financial records (expenses or settlements) exist. You may deactivate it instead.");
