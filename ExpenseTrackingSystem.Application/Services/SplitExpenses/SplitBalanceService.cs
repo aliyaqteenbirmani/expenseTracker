@@ -27,10 +27,18 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<List<MemberBalanceDto>>.ForbiddenResponse("You must be an active member of this group to view balances.");
 
             var balances = await _balanceRepository.GetGroupBalancesAsync(groupId);
+            bool isOwner = membership.Role.Equals("Owner", StringComparison.OrdinalIgnoreCase);
 
-            // Personalize status description for current user
+            // Personalize status description and enforce privacy on pending settlement amounts
             foreach (var b in balances)
             {
+                // Privacy: non-owners only see their own pending amounts; strip for other members
+                if (!isOwner && b.UserId != currentUserId)
+                {
+                    b.PendingPaid = 0m;
+                    b.PendingReceived = 0m;
+                }
+
                 if (b.UserId == currentUserId)
                 {
                     if (b.NetBalance > 0)
@@ -54,6 +62,13 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             var balance = await _balanceRepository.GetMemberBalanceAsync(groupId, targetUserId);
             if (balance == null)
                 return ApiResponse<MemberBalanceDto>.FailureResponse("Member balance not found for this group.");
+
+            bool isOwner = membership.Role.Equals("Owner", StringComparison.OrdinalIgnoreCase);
+            if (!isOwner && targetUserId != currentUserId)
+            {
+                balance.PendingPaid = 0m;
+                balance.PendingReceived = 0m;
+            }
 
             if (targetUserId == currentUserId)
             {

@@ -709,21 +709,8 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                 string fromName = names?.FromName ?? "Member";
                 string toName = names?.ToName ?? "Member";
 
-                const string insertActivitySql = @"
-                    INSERT INTO dbo.SplitGroupActivities 
-                        (Id, GroupId, UserId, ActivityType, ReferenceId, Description, CreatedAt)
-                    VALUES 
-                        (@ActivityId, @GroupId, @UserId, 'SettlementRecorded', @ReferenceId, @Description, SYSUTCDATETIME());";
-
-                await connection.ExecuteAsync(insertActivitySql, new
-                {
-                    ActivityId = Guid.NewGuid(),
-                    GroupId = settlement.GroupId,
-                    UserId = settlement.CreatedBy,
-                    ReferenceId = settlement.Id,
-                    Description = $"{fromName} paid {toName} Rs. {settlement.Amount:N2}."
-                }, transaction);
-
+                // Privacy decision: settlements are private to payer, receiver, and owner,
+                // and are NOT written to the shared group-wide activity feed.
                 transaction.Commit();
             }
             catch
@@ -771,21 +758,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     return null;
                 }
 
-                const string insertActivitySql = @"
-                    INSERT INTO dbo.SplitGroupActivities 
-                        (Id, GroupId, UserId, ActivityType, ReferenceId, Description, CreatedAt)
-                    VALUES 
-                        (@ActivityId, @GroupId, @UserId, 'SettlementUpdated', @ReferenceId, @Description, SYSUTCDATETIME());";
-
-                await connection.ExecuteAsync(insertActivitySql, new
-                {
-                    ActivityId = Guid.NewGuid(),
-                    GroupId = settlement.GroupId,
-                    UserId = settlement.CreatedBy,
-                    ReferenceId = settlement.Id,
-                    Description = $"{editorName} updated settlement of Rs. {settlement.Amount:N2}."
-                }, transaction);
-
+                // Privacy decision: settlements are private and not written to group activity feed.
                 transaction.Commit();
             }
             catch
@@ -840,21 +813,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     return false;
                 }
 
-                const string insertActivitySql = @"
-                    INSERT INTO dbo.SplitGroupActivities 
-                        (Id, GroupId, UserId, ActivityType, ReferenceId, Description, CreatedAt)
-                    VALUES 
-                        (@ActivityId, @GroupId, @UserId, 'SettlementDeleted', @ReferenceId, @Description, SYSUTCDATETIME());";
-
-                await connection.ExecuteAsync(insertActivitySql, new
-                {
-                    ActivityId = Guid.NewGuid(),
-                    GroupId = groupId,
-                    UserId = deletedByUserId,
-                    ReferenceId = settlementId,
-                    Description = $"{deletedByName} deleted settlement of Rs. {amount.Value:N2}."
-                }, transaction);
-
+                // Privacy decision: settlements are private and not written to group activity feed.
                 transaction.Commit();
                 return true;
             }

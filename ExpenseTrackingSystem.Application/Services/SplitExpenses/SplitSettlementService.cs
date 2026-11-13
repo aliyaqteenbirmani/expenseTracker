@@ -889,12 +889,23 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (membership == null || !membership.IsActive)
                 return ApiResponse<SettleUpOverviewDto>.ForbiddenResponse("You must be an active member to view settle up details.");
 
+            bool isOwner = group.OwnerId == currentUserId || membership.Role.Equals("Owner", StringComparison.OrdinalIgnoreCase);
+
             var balances = await _balanceRepository.GetGroupBalancesAsync(groupId);
 
-            // Fetch pending settlements in this group to subtract pending amounts from debt suggestions
+            // Fetch pending settlements in this group
             var pendingSettlements = await _settlementRepository.GetPendingSettlementsAsync(groupId);
-            var pendingPaidByUser = pendingSettlements.GroupBy(p => p.FromUserId).ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
-            var pendingReceivedByUser = pendingSettlements.GroupBy(p => p.ToUserId).ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+
+            // Privacy rule:
+            // Group owner considers all pending settlements.
+            // Non-owner member ONLY considers pending settlements where they are a party (FromUserId == currentUserId || ToUserId == currentUserId),
+            // so other members' pending amounts never influence this member's debt suggestions.
+            var relevantPending = isOwner
+                ? pendingSettlements
+                : pendingSettlements.Where(p => p.FromUserId == currentUserId || p.ToUserId == currentUserId).ToList();
+
+            var pendingPaidByUser = relevantPending.GroupBy(p => p.FromUserId).ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+            var pendingReceivedByUser = relevantPending.GroupBy(p => p.ToUserId).ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
 
             // Create adjusted balance items for debt simplification so pending amounts are not prompted to be paid twice
             var adjustedBalances = balances.Select(b =>
@@ -923,8 +934,30 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
 
             var suggestions = _debtSimplificationService.SimplifyDebts(adjustedBalances);
 
-            var debtors = balances.Where(b => b.NetBalance < -0.005m).ToList();
-            var creditors = balances.Where(b => b.NetBalance > 0.005m).ToList();
+            // Strip pending fields from Debtors and Creditors for non-owners (non-parties)
+            var sanitizedBalances = balances.Select(b =>
+            {
+                bool isSelf = b.UserId == currentUserId;
+                return new MemberBalanceDto
+                {
+                    UserId = b.UserId,
+                    FullName = b.FullName,
+                    Email = b.Email,
+                    Role = b.Role,
+                    IsActive = b.IsActive,
+                    TotalPaid = b.TotalPaid,
+                    TotalShare = b.TotalShare,
+                    SettlementsPaid = b.SettlementsPaid,
+                    SettlementsReceived = b.SettlementsReceived,
+                    PendingPaid = (isOwner || isSelf) ? b.PendingPaid : 0m,
+                    PendingReceived = (isOwner || isSelf) ? b.PendingReceived : 0m,
+                    NetBalance = b.NetBalance,
+                    StatusDescription = b.StatusDescription
+                };
+            }).ToList();
+
+            var debtors = sanitizedBalances.Where(b => b.NetBalance < -0.005m).ToList();
+            var creditors = sanitizedBalances.Where(b => b.NetBalance > 0.005m).ToList();
             var totalDebt = debtors.Sum(d => Math.Abs(d.NetBalance));
 
             var overview = new SettleUpOverviewDto

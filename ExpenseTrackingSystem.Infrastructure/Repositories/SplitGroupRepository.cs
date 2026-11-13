@@ -876,7 +876,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     a.CreatedAt
                 FROM dbo.SplitGroupActivities a
                 LEFT JOIN dbo.Users u ON u.Id = a.UserId
-                WHERE a.GroupId = @GroupId
+                WHERE a.GroupId = @GroupId AND a.ActivityType NOT LIKE 'Settlement%'
                 ORDER BY a.CreatedAt DESC;";
 
             using var connection = CreateConnection();
@@ -893,7 +893,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
 
             dynamicParams.Add("@GroupId", groupId);
 
-            countSqlBuilder.Append("SELECT COUNT(1) FROM dbo.SplitGroupActivities a WHERE a.GroupId = @GroupId");
+            countSqlBuilder.Append("SELECT COUNT(1) FROM dbo.SplitGroupActivities a WHERE a.GroupId = @GroupId AND a.ActivityType NOT LIKE 'Settlement%'");
             sqlBuilder.Append(@"
                 SELECT 
                     a.Id,
@@ -907,7 +907,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     a.CreatedAt
                 FROM dbo.SplitGroupActivities a
                 LEFT JOIN dbo.Users u ON u.Id = a.UserId
-                WHERE a.GroupId = @GroupId");
+                WHERE a.GroupId = @GroupId AND a.ActivityType NOT LIKE 'Settlement%'");
 
             if (!string.IsNullOrWhiteSpace(parameters.ActivityType))
             {
@@ -972,7 +972,7 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                     a.CreatedAt
                 FROM dbo.SplitGroupActivities a
                 LEFT JOIN dbo.Users u ON u.Id = a.UserId
-                WHERE a.GroupId = @GroupId AND a.Id = @ActivityId;";
+                WHERE a.GroupId = @GroupId AND a.Id = @ActivityId AND a.ActivityType NOT LIKE 'Settlement%';";
 
             using var connection = CreateConnection();
             return await connection.QueryFirstOrDefaultAsync<SplitGroupActivityDto>(sql, new

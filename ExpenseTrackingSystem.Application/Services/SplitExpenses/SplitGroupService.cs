@@ -958,6 +958,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<List<SplitGroupActivityDto>>.ForbiddenResponse("You are not an active member of this group.");
 
             var activities = await _groupRepository.GetGroupActivitiesAsync(groupId, 50);
+            activities = activities.Where(a => !a.ActivityType.StartsWith("Settlement", StringComparison.OrdinalIgnoreCase)).ToList();
             return ApiResponse<List<SplitGroupActivityDto>>.SuccessResponse("Activities retrieved successfully.", activities);
         }
 
@@ -969,6 +970,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<PagedGroupActivityResultDto>.ForbiddenResponse("You are not an active member of this group.");
 
             var result = await _groupRepository.GetPagedGroupActivitiesAsync(groupId, parameters);
+            result.Items = result.Items.Where(a => !a.ActivityType.StartsWith("Settlement", StringComparison.OrdinalIgnoreCase)).ToList();
             return ApiResponse<PagedGroupActivityResultDto>.SuccessResponse("Paged activities retrieved successfully.", result);
         }
 
@@ -979,7 +981,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<SplitGroupActivityDto>.ForbiddenResponse("You are not an active member of this group.");
 
             var activity = await _groupRepository.GetActivityByIdAsync(groupId, activityId);
-            if (activity == null)
+            if (activity == null || activity.ActivityType.StartsWith("Settlement", StringComparison.OrdinalIgnoreCase))
                 return ApiResponse<SplitGroupActivityDto>.FailureResponse("Activity log entry not found.");
 
             return ApiResponse<SplitGroupActivityDto>.SuccessResponse("Activity retrieved successfully.", activity);
