@@ -15,6 +15,7 @@ interface StatCardProps {
   footer?: React.ReactNode
   className?: string
   valueColor?: string
+  valueTitle?: string
 }
 
 export function StatCard({
@@ -27,11 +28,14 @@ export function StatCard({
   footer,
   className,
   valueColor,
+  valueTitle,
 }: StatCardProps) {
+  const displayValue = formatFn ? formatFn(value) : value.toLocaleString()
+
   return (
     <Card
       className={cn(
-        'relative overflow-hidden border border-border/80 bg-gradient-to-t from-primary/5 to-card p-6 shadow-xs transition-shadow hover:shadow-sm',
+        '@container relative overflow-hidden border border-border/80 bg-gradient-to-t from-primary/5 to-card p-6 shadow-xs transition-shadow hover:shadow-sm',
         className
       )}
     >
@@ -46,8 +50,14 @@ export function StatCard({
         )}
       </CardHeader>
       <CardContent className="p-0 pt-2">
-        <div className="flex items-baseline justify-between gap-2 min-w-0">
-          <div className={cn('text-2xl sm:text-2xl xl:text-3xl font-semibold tabular-nums tracking-tight font-mono whitespace-nowrap truncate', valueColor)}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1.5 min-w-0">
+          <div
+            title={valueTitle ?? displayValue}
+            className={cn(
+              'text-lg @[180px]:text-xl @[240px]:text-2xl @[320px]:text-3xl font-semibold tabular-nums tracking-tight font-mono whitespace-nowrap',
+              valueColor
+            )}
+          >
             <AnimatedNumber value={value} formatFn={formatFn} />
           </div>
           {delta && (
@@ -77,3 +87,4 @@ export function StatCard({
     </Card>
   )
 }
+
