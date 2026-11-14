@@ -58,7 +58,13 @@ export function AddExpenseDialog({
   token,
   onExpenseAdded,
 }: AddExpenseDialogProps) {
-  const activeMembers = useMemo(() => members.filter((m) => m.isActive), [members])
+  const [currentMembers, setCurrentMembers] = useState<SplitGroupMemberDto[]>(members)
+
+  useEffect(() => {
+    setCurrentMembers(members)
+  }, [members])
+
+  const activeMembers = useMemo(() => currentMembers.filter((m) => m.isActive), [currentMembers])
 
   const [title, setTitle] = useState('')
   const [amountStr, setAmountStr] = useState('')
@@ -73,7 +79,7 @@ export function AddExpenseDialog({
   const [loading, setLoading] = useState(false)
   const [payerOnlyConfirmOpen, setPayerOnlyConfirmOpen] = useState(false)
 
-  // Reset form and select all active members by default every time dialog opens or active members change
+  // Reset form and select all active members by default every time dialog opens or members refresh
   useEffect(() => {
     if (open) {
       setTitle('')
@@ -85,8 +91,23 @@ export function AddExpenseDialog({
       setPayerId(currentUserId || (activeMembers.length > 0 ? activeMembers[0].userId : ''))
       setSelectedUserIds(activeMembers.map((m) => m.userId))
       setPayerOnlyConfirmOpen(false)
+
+      // Fetch fresh member list to guarantee latest active members (e.g. newly accepted invites)
+      void splitExpensesApi
+        .getGroupMembers(groupId, token)
+        .then((fresh) => {
+          if (fresh && fresh.length > 0) {
+            setCurrentMembers(fresh)
+            const freshActive = fresh.filter((m) => m.isActive)
+            setSelectedUserIds(freshActive.map((m) => m.userId))
+            setPayerId((prev) => prev || currentUserId || freshActive[0]?.userId || '')
+          }
+        })
+        .catch(() => {
+          // Fallback to existing props
+        })
     }
-  }, [open, activeMembers, currentUserId])
+  }, [open, currentUserId, groupId, token])
 
   const handleSelectAll = () => {
     setSelectedUserIds(activeMembers.map((m) => m.userId))
@@ -96,10 +117,14 @@ export function AddExpenseDialog({
     setSelectedUserIds([])
   }
 
-  const toggleParticipant = (userId: string) => {
-    setSelectedUserIds((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    )
+  const toggleParticipant = (userId: string, forceChecked?: boolean) => {
+    setSelectedUserIds((prev) => {
+      const willCheck = forceChecked !== undefined ? forceChecked : !prev.includes(userId)
+      if (willCheck) {
+        return Array.from(new Set([...prev, userId]))
+      }
+      return prev.filter((id) => id !== userId)
+    })
   }
 
   const amount = parseFloat(amountStr) || 0
@@ -345,29 +370,31 @@ export function AddExpenseDialog({
                       isChecked ? 'bg-primary/5' : 'hover:bg-muted/40'
                     }`}
                   >
-                    <label
-                      htmlFor={`user-${m.userId}`}
-                      className="flex items-center gap-2.5 cursor-pointer select-none text-sm flex-1 truncate min-w-0"
-                    >
+                    <div className="flex items-center gap-2.5 flex-1 truncate min-w-0">
                       <Checkbox
                         id={`user-${m.userId}`}
                         checked={isChecked}
-                        onCheckedChange={() => toggleParticipant(m.userId)}
+                        onCheckedChange={(checked) => toggleParticipant(m.userId, !!checked)}
                         disabled={loading}
                       />
-                      <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                        {initials}
-                      </div>
-                      <div className="flex flex-col truncate min-w-0">
-                        <span className="truncate text-foreground font-medium text-xs">
-                          {name}
-                          {isYou && <span className="text-muted-foreground font-normal ml-1">(You)</span>}
-                        </span>
-                        {m.email && m.email !== name && (
-                          <span className="text-[11px] text-muted-foreground truncate">{m.email}</span>
-                        )}
-                      </div>
-                    </label>
+                      <label
+                        htmlFor={`user-${m.userId}`}
+                        className="flex items-center gap-2.5 cursor-pointer select-none text-sm flex-1 truncate min-w-0"
+                      >
+                        <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                          {initials}
+                        </div>
+                        <div className="flex flex-col truncate min-w-0">
+                          <span className="truncate text-foreground font-medium text-xs">
+                            {name}
+                            {isYou && <span className="text-muted-foreground font-normal ml-1">(You)</span>}
+                          </span>
+                          {m.email && m.email !== name && (
+                            <span className="text-[11px] text-muted-foreground truncate">{m.email}</span>
+                          )}
+                        </div>
+                      </label>
+                    </div>
                     {isChecked && share !== undefined && (
                       <span className="text-xs font-mono font-medium text-muted-foreground ml-2 shrink-0">
                         Rs. {share.toFixed(2)}

@@ -318,11 +318,15 @@ export function SplitGroupDetailsPage({
   // Realtime live updates & window focus refetch
   useEffect(() => {
     const onFocus = () => {
+      loadGroupDetails()
       loadBalancesAndSettlements()
+      loadExpenses()
     }
     window.addEventListener('focus', onFocus)
 
     const unsubscribe = realtimeService.subscribeSplitNotification(() => {
+      loadGroupDetails()
+      loadInvitations()
       loadBalancesAndSettlements()
       loadExpenses()
       loadActivities()
@@ -332,7 +336,7 @@ export function SplitGroupDetailsPage({
       window.removeEventListener('focus', onFocus)
       unsubscribe()
     }
-  }, [loadBalancesAndSettlements, loadExpenses, loadActivities])
+  }, [loadGroupDetails, loadInvitations, loadBalancesAndSettlements, loadExpenses, loadActivities])
 
   // Refetch when switching tabs
   const handleTabChange = (tab: string) => {
