@@ -56,15 +56,25 @@ namespace SpendwiseSystem.API.Controllers
         }
 
         [HttpGet("getall")]
-        public async Task<ActionResult<List<CreateCashBookDto>>> GetAllCashBooks(string id)
+        public async Task<ActionResult<List<CreateCashBookDto>>> GetAllCashBooks([FromQuery] string? id)
         {
-            var userId = _currentUserService.UserId.ToString();
-            if (string.IsNullOrEmpty(userId))
+            var userId = _currentUserService.UserId;
+            if (userId == null || userId == Guid.Empty)
             {
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
-            var response = await _cashBookService.GetAllCashBook(id, userId);
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return Ok(ApiResponses.SuccessWithData(new List<CreateCashBookDto>(), "No business specified."));
+            }
+
+            if (!Guid.TryParse(id, out _))
+            {
+                return BadRequest(ApiResponses.BadRequest("Invalid business ID."));
+            }
+
+            var response = await _cashBookService.GetAllCashBook(id, userId.Value.ToString());
 
             return Ok(ApiResponses.SuccessWithData(response.Data, response.Message));
         }

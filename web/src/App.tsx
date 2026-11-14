@@ -490,8 +490,14 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
   const reloadCashbooks = useCallback(
     async (targetBusinessId?: string, preferredCashbookId?: string) => {
       const bId = targetBusinessId !== undefined ? targetBusinessId : businessId
+      if (!bId) {
+        setBooks([])
+        setBook(null)
+        setTransactions([])
+        return
+      }
       try {
-        const query = bId ? `?id=${encodeURIComponent(bId)}` : ''
+        const query = `?id=${encodeURIComponent(bId)}`
         const list = await api<Cashbook[]>(
           `/api/CashBook/getall${query}`,
           token
@@ -552,7 +558,9 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
           await reloadCashbooks(active.id, preferredCashbookId)
         } else {
           setBusinessId('')
-          await reloadCashbooks('', preferredCashbookId)
+          setBooks([])
+          setBook(null)
+          setTransactions([])
         }
       } catch (e) {
         showToast(e instanceof Error ? e.message : 'Could not load businesses.')

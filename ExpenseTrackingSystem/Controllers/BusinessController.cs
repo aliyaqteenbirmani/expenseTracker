@@ -54,8 +54,11 @@ namespace SpendwiseSystem.API.Controllers
         public async Task<IActionResult> GetBusiness(string id)
         {
             var userId = _currentUser.UserId;
-            if(userId == Guid.Empty)
+            if (userId == null || userId == Guid.Empty)
                 return Unauthorized(ApiResponses.Unauthorized());
+
+            if (string.IsNullOrWhiteSpace(id) || !Guid.TryParse(id, out _))
+                return BadRequest(ApiResponses.BadRequest("Invalid business ID."));
 
             var result = await _businessService.GetBusiness(id);
             if (!result.Success)
@@ -67,12 +70,12 @@ namespace SpendwiseSystem.API.Controllers
         [HttpGet("all")]
         public async Task<ActionResult<ApiResponse<List<BusinessResponseDto>>>> GetAllBusinesses()
         {
-            var UserId = _currentUser.UserId.ToString();
+            var userId = _currentUser.UserId;
 
-            if (UserId == Guid.Empty.ToString())
-                return Unauthorized( ApiResponses.Unauthorized());
+            if (userId == null || userId == Guid.Empty)
+                return Unauthorized(ApiResponses.Unauthorized());
 
-            var result = await _businessService.GetAllBusiness(UserId);
+            var result = await _businessService.GetAllBusiness(userId.Value.ToString());
             if (result.StatusCode == 400)
                 return NotFound(ApiResponses.NotFound("There are no businesses of this User"));
 

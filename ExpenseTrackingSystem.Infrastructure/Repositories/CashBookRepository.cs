@@ -17,49 +17,54 @@ namespace CashBookSystem.Infrastructure.Repositories
 
         public async Task<CashBookCommandResultDbo> AddCashBook(CreateCashBookDto dto, string userId, string createdBy)
         {
+            var bId = Guid.TryParse(dto?.BusinessId, out var bid) ? bid : Guid.Empty;
+            var uId = Guid.TryParse(userId, out var uid) ? uid : Guid.Empty;
             return await _dapperContext.GetSingleAsync<CashBookCommandResultDbo>(
                 "SP_AddCashBook",
                 new
                 {
-                    Name = dto.CashBookName,
-                    BusinessId = Guid.Parse(dto.BusinessId),
-                    UserId = Guid.Parse(userId),
+                    Name = dto?.CashBookName,
+                    BusinessId = bId,
+                    UserId = uId,
                     CreatedBy = createdBy
                 });
         }
 
         public async Task<ApiResponseRaw> GetAllCashBooks(string businessId, string? userId = null)
         {
-            var pUserId = string.IsNullOrWhiteSpace(userId) ? (Guid?)null : Guid.Parse(userId);
+            var pUserId = string.IsNullOrWhiteSpace(userId) ? (Guid?)null : (Guid.TryParse(userId, out var uid) ? uid : (Guid?)null);
+            var pBusinessId = Guid.TryParse(businessId, out var bid) ? bid : Guid.Empty;
             return await _dapperContext.GetSingleAsync<ApiResponseRaw>(
                 "SP_GetCashBooksByBusinessId",
                 new
                 {
-                    BusinessId = Guid.Parse(businessId),
+                    BusinessId = pBusinessId,
                     UserId = pUserId
                 });
         }
 
         public async Task<ApiResponseRaw> GetCashBookById(Guid id, string userId)
         {
+            var uId = Guid.TryParse(userId, out var uid) ? uid : Guid.Empty;
             return await _dapperContext.GetSingleAsync<ApiResponseRaw>(
                 "sp_GetCashBookById",
                 new
                 {
                     Id = id,
-                    UserId = Guid.Parse(userId)
+                    UserId = uId
                 });
         }
 
         public async Task<ApiResponseRaw> UpdateCashBook(Guid id, string CashBookName, string userId, string modifiedBy)
         {
+            var uId = Guid.TryParse(userId, out var uid) ? uid : Guid.Empty;
             return await _dapperContext.GetSingleAsync<ApiResponseRaw>(
                 "SP_UpdateCashBook",
                 new
                 {
                     Id = id,
                     CashBookName = CashBookName,
-                    UserId = Guid.Parse(userId),
+                    UserId = uId,
                     ModifiedBy = modifiedBy
                 });
         }

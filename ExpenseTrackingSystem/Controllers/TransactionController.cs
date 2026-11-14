@@ -446,15 +446,25 @@ namespace SpendwiseSystem.API.Controllers
         }
 
         [HttpGet("getall")]
-        public async Task<ActionResult<List<AllCashTransactionDto>>> GetAllCashTransactions(string CashBookId)
+        public async Task<ActionResult<List<AllCashTransactionDto>>> GetAllCashTransactions([FromQuery] string? CashBookId)
         {
             var userId = _currentUserService.UserId;
-            if (userId == Guid.Empty)
+            if (userId == null || userId == Guid.Empty)
             {
                 return Unauthorized(ApiResponses.Unauthorized());
             }
 
-            var responseFromService = await _transactionService.GetAllTransactionsOfCashBook(CashBookId, userId ?? Guid.Empty);
+            if (string.IsNullOrWhiteSpace(CashBookId))
+            {
+                return Ok(ApiResponses.SuccessWithData(new List<AllCashTransactionDto>(), "No cashbook specified."));
+            }
+
+            if (!Guid.TryParse(CashBookId, out _))
+            {
+                return BadRequest(ApiResponses.BadRequest("CashBookId must be a valid GUID."));
+            }
+
+            var responseFromService = await _transactionService.GetAllTransactionsOfCashBook(CashBookId, userId.Value);
 
             if (responseFromService.Success)
             {

@@ -273,9 +273,12 @@ namespace SpendwiseSystem.Application.Services.TransactionService
             };
         }
 
-        public async Task<ApiResponse<List<AllCashTransactionDto>>> GetAllTransactionsOfCashBook(string CashBookId,Guid userId)
+        public async Task<ApiResponse<List<AllCashTransactionDto>>> GetAllTransactionsOfCashBook(string CashBookId, Guid userId)
         {
-            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(Guid.Parse(CashBookId), userId, CashbookPermission.TRANSACTION_VIEW.ToString());
+            if (string.IsNullOrWhiteSpace(CashBookId) || !Guid.TryParse(CashBookId, out var cashBookGuid))
+                return ApiResponse<List<AllCashTransactionDto>>.FailureResponse("CashBookId is required and must be a valid GUID.");
+
+            var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(cashBookGuid, userId, CashbookPermission.TRANSACTION_VIEW.ToString());
 
             if(!hasAccess)
                 return ApiResponse<List<AllCashTransactionDto>>.ForbiddenResponse("You do not have permission to view transactions of this cashbook.");

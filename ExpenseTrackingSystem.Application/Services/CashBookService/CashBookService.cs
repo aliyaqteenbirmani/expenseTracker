@@ -28,9 +28,15 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
             string userId,
             string createdBy)
         {
+            if (string.IsNullOrWhiteSpace(dto?.BusinessId) || !Guid.TryParse(dto.BusinessId, out var businessId))
+                return ApiResponses.BadRequest("Invalid or missing BusinessId.");
+
+            if (string.IsNullOrWhiteSpace(userId) || !Guid.TryParse(userId, out var userGuid))
+                return ApiResponses.Unauthorized("Invalid user ID.");
+
             var hasAccess = await _permissionAccessService.HasBusinessOrOwnerAccessAsync(
-                Guid.Parse(dto.BusinessId),
-                Guid.Parse(userId),
+                businessId,
+                userGuid,
                 BusinessPermission.CASHBOOK_CREATE.ToString()
             );
 
@@ -49,11 +55,15 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
 
         public async Task<ApiResponse<object>> DeleteCashBook(string id, string userId)
         {
-            var cashBookId = Guid.Parse(id);
+            if (string.IsNullOrWhiteSpace(id) || !Guid.TryParse(id, out var cashBookId))
+                return ApiResponses.BadRequest("Invalid cashbook ID.");
+
+            if (string.IsNullOrWhiteSpace(userId) || !Guid.TryParse(userId, out var userGuid))
+                return ApiResponses.Unauthorized("Invalid user ID.");
 
             var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(
                 cashBookId,
-                Guid.Parse(userId),
+                userGuid,
                 BusinessPermission.CASHBOOK_DELETE.ToString()
             );
 
@@ -91,8 +101,22 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
             string businessId,
             string userId)
         {
-            var bId = Guid.Parse(businessId);
-            var uId = Guid.Parse(userId);
+            if (string.IsNullOrWhiteSpace(businessId) || !Guid.TryParse(businessId, out var bId))
+            {
+                return ApiResponses.SuccessWithData(new List<CreateCashBookDto>(), "No business specified.");
+            }
+
+            if (string.IsNullOrWhiteSpace(userId) || !Guid.TryParse(userId, out var uId))
+            {
+                return new ApiResponse<List<CreateCashBookDto>>
+                {
+                    StatusCode = 401,
+                    Success = false,
+                    Message = "Invalid user ID.",
+                    ErrorCode = "UNAUTHORIZED",
+                    Data = new List<CreateCashBookDto>()
+                };
+            }
 
             var isOwnerOrBizMember = await _permissionAccessService.HasBusinessOrOwnerAccessAsync(
                 bId,
@@ -133,9 +157,12 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
 
         public async Task<ApiResponse<object>> GetCashBookById(Guid id, string userId)
         {
+            if (string.IsNullOrWhiteSpace(userId) || !Guid.TryParse(userId, out var userGuid))
+                return ApiResponses.Unauthorized("Invalid user ID.");
+
             var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(
                 id,
-                Guid.Parse(userId),
+                userGuid,
                 CashbookPermission.CASHBOOK_VIEW.ToString()
             );
 
@@ -168,9 +195,20 @@ namespace SpendwiseSystem.Application.Services.SpendwiseService
             string userId,
             string modifiedBy)
         {
+            if (string.IsNullOrWhiteSpace(userId) || !Guid.TryParse(userId, out var userGuid))
+            {
+                return new ApiResponse<CashBook>
+                {
+                    StatusCode = 401,
+                    Success = false,
+                    Message = "Unauthorized",
+                    ErrorCode = "UNAUTHORIZED"
+                };
+            }
+
             var hasAccess = await _permissionAccessService.HasCashbookOrOwnerAccessAsync(
                 id,
-                Guid.Parse(userId),
+                userGuid,
                 BusinessPermission.CASHBOOK_UPDATE.ToString()
             );
 

@@ -64,9 +64,10 @@ namespace SpendwiseSystem.Infrastructure.Repositories
 
         public async Task<ApiResponseRaw> GetAllTransactionsOfCashBook(string CashBookId)
         {
+            var cashBookGuid = Guid.TryParse(CashBookId, out var cid) ? cid : Guid.Empty;
             return await _dapperContext.GetSingleAsync<ApiResponseRaw>(
                 "SP_GetAllCashTransactionsForCashBook",
-                new { CashBookId = Guid.Parse(CashBookId) },
+                new { CashBookId = cashBookGuid },
                 commandType: System.Data.CommandType.StoredProcedure
                 );
         }
@@ -105,8 +106,9 @@ namespace SpendwiseSystem.Infrastructure.Repositories
 
         public async Task<SPResponseFromDb> GetTransactionFileName(string id)
         {
+            var tid = Guid.TryParse(id, out var parsed) ? parsed : Guid.Empty;
             return await _dapperContext.GetSingleAsync<SPResponseFromDb>("SP_GetCashTransactionFileNameById",
-                new { Id = Guid.Parse(id) },
+                new { Id = tid },
                 commandType: System.Data.CommandType.StoredProcedure);
         }
 

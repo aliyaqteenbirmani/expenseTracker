@@ -20,8 +20,9 @@ namespace SpendwiseSystem.Infrastructure.Repositories
             _context = context;
         }
 
-        public async Task<SPResponseFromDb> CreateBusiness(BusinessDto business, string CreatedBy,string UserId)
+        public async Task<SPResponseFromDb> CreateBusiness(BusinessDto business, string CreatedBy, string UserId)
         {
+            var uid = Guid.TryParse(UserId, out var parsedUid) ? parsedUid : Guid.Empty;
             return await _context.GetSingleAsync<SPResponseFromDb>("SP_CreateBusiness",
                new
                {
@@ -30,28 +31,31 @@ namespace SpendwiseSystem.Infrastructure.Repositories
                    Description = business.Description,
                    FileName = business.FileName,
                    CreatedBy = CreatedBy,
-                   UserId = Guid.Parse(UserId)
+                   UserId = uid
                },
                commandType: System.Data.CommandType.StoredProcedure);
         }
 
         public Task<SPResponseFromDb> GetAllBusiness(string UserId)
         {
-            return _context.GetSingleAsync<SPResponseFromDb>("SP_GetAllBusinessesByUserId", new { UserId = Guid.Parse(UserId) }, commandType: System.Data.CommandType.StoredProcedure);
+            var uid = Guid.TryParse(UserId, out var parsedUid) ? parsedUid : Guid.Empty;
+            return _context.GetSingleAsync<SPResponseFromDb>("SP_GetAllBusinessesByUserId", new { UserId = uid }, commandType: System.Data.CommandType.StoredProcedure);
         }
 
         public async Task<SPResponseFromDb> GetBusiness(string id)
         {
+            var bid = Guid.TryParse(id, out var parsedId) ? parsedId : Guid.Empty;
             return await _context.GetSingleAsync<SPResponseFromDb>("SP_GetBusinessById", 
                 new 
-                { Id = Guid.Parse(id) }, 
+                { Id = bid }, 
                 commandType: System.Data.CommandType.StoredProcedure);
         }
 
 
-        public async Task<SPResponseFromDb> DeleteBusiness(string id,string userName)
+        public async Task<SPResponseFromDb> DeleteBusiness(string id, string userName)
         {
-            return await _context.GetSingleAsync<SPResponseFromDb>("SP_DeleteBusinessById", new { Id = Guid.Parse(id),ModifiedBy = userName }, commandType: System.Data.CommandType.StoredProcedure);
+            var bid = Guid.TryParse(id, out var parsedId) ? parsedId : Guid.Empty;
+            return await _context.GetSingleAsync<SPResponseFromDb>("SP_DeleteBusinessById", new { Id = bid, ModifiedBy = userName }, commandType: System.Data.CommandType.StoredProcedure);
         }
         
         public async Task<SPResponseFromDb> UpdateBusiness(BusinessDto business, string CreatedBy)
