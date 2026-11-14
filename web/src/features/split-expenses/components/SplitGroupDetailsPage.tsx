@@ -74,6 +74,7 @@ import {
   CheckCircle2,
   Check,
   X,
+  XCircle,
   Trash2,
   Mail,
   UserX,
@@ -87,6 +88,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { format } from 'date-fns'
+import { cn } from '@/lib/utils'
 
 interface SplitGroupDetailsPageProps {
   groupId: string
@@ -541,29 +543,15 @@ export function SplitGroupDetailsPage({
         )
       case 'DeclinedByReceiver':
         return (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
-              Declined by receiver
-            </Badge>
-            {st.declineReason && (
-              <span className="text-[10px] text-muted-foreground italic truncate max-w-[200px]" title={st.declineReason}>
-                &quot;{st.declineReason}&quot;
-              </span>
-            )}
-          </div>
+          <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30 font-medium">
+            Declined
+          </Badge>
         )
       case 'DeclinedByOwner':
         return (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
-              Declined by admin
-            </Badge>
-            {st.declineReason && (
-              <span className="text-[10px] text-muted-foreground italic truncate max-w-[200px]" title={st.declineReason}>
-                &quot;{st.declineReason}&quot;
-              </span>
-            )}
-          </div>
+          <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30 font-medium">
+            Declined by admin
+          </Badge>
         )
       case 'Cancelled':
         return (
@@ -1132,6 +1120,7 @@ export function SplitGroupDetailsPage({
               <div className="rounded-xl border divide-y overflow-hidden bg-card">
                 {myRequests.map((req) => {
                   const isPending = req.status === 'PendingReceiver' || req.status === 'PendingOwner'
+                  const isDeclined = req.status === 'DeclinedByReceiver' || req.status === 'DeclinedByOwner'
                   const canCancel = (req.canCancel ?? true) && isPending
 
                   return (
@@ -1139,7 +1128,11 @@ export function SplitGroupDetailsPage({
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-sm">
-                            You paid {req.toUserName}
+                            {isDeclined
+                              ? `Payment to ${req.toUserName}`
+                              : isPending
+                              ? `Payment request to ${req.toUserName}`
+                              : `You paid ${req.toUserName}`}
                           </span>
                           {renderSettlementStatusChip(req)}
                         </div>
@@ -1147,10 +1140,21 @@ export function SplitGroupDetailsPage({
                           {format(new Date(req.settlementDate), 'MMM d, yyyy')}
                           {req.note && ` · "${req.note}"`}
                         </div>
+                        {isDeclined && req.declineReason && (
+                          <div className="text-xs text-destructive/90 flex items-center gap-1.5 pt-0.5">
+                            <span className="font-medium">
+                              {req.status === 'DeclinedByReceiver' ? 'Declined by receiver:' : 'Declined by admin:'}
+                            </span>
+                            <span className="italic">&quot;{req.declineReason}&quot;</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
-                        <span className="font-mono font-bold text-sm text-foreground">
+                        <span className={cn(
+                          "font-mono font-bold text-sm",
+                          isDeclined ? "text-muted-foreground line-through" : "text-foreground"
+                        )}>
                           Rs. {req.amount.toFixed(2)}
                         </span>
                         {canCancel && (
@@ -1245,26 +1249,47 @@ export function SplitGroupDetailsPage({
               <div className="rounded-xl border divide-y overflow-hidden bg-card">
                 {settlements.map((st) => {
                   const canReverse = (isOwner || st.canReverse) && st.status === 'Confirmed'
+                  const isDeclined = st.status === 'DeclinedByReceiver' || st.status === 'DeclinedByOwner'
 
                   return (
                     <div key={st.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 text-sm gap-2">
                       <div className="flex items-center gap-3 truncate min-w-0">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
-                          <HandCoins className="size-4" />
+                        <div className={cn(
+                          "flex size-8 items-center justify-center rounded-lg shrink-0",
+                          isDeclined
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-primary/10 text-primary"
+                        )}>
+                          {isDeclined ? <XCircle className="size-4" /> : <HandCoins className="size-4" />}
                         </div>
                         <div className="truncate min-w-0">
                           <div className="font-semibold truncate flex items-center gap-2 flex-wrap">
-                            <span>{st.fromUserName} paid {st.toUserName}</span>
+                            <span>
+                              {isDeclined
+                                ? `${st.fromUserName} → ${st.toUserName}`
+                                : `${st.fromUserName} paid ${st.toUserName}`}
+                            </span>
                             {renderSettlementStatusChip(st)}
                           </div>
                           <div className="text-xs text-muted-foreground truncate">
                             {format(new Date(st.settlementDate), 'MMM d, yyyy')}
                             {st.note && ` · ${st.note}`}
                           </div>
+                          {isDeclined && st.declineReason && (
+                            <div className="text-xs text-destructive/90 flex items-center gap-1.5 pt-0.5 truncate">
+                              <span className="font-medium">
+                                {st.status === 'DeclinedByReceiver' ? 'Declined by receiver:' : 'Declined by admin:'}
+                              </span>
+                              <span className="italic truncate">&quot;{st.declineReason}&quot;</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
-                        <div className="font-mono font-bold text-inflow">
+                        <div className={cn(
+                          "font-mono font-bold",
+                          isDeclined ? "text-muted-foreground line-through" : "text-inflow"
+                        )}>
                           Rs. {st.amount.toFixed(2)}
                         </div>
                         {canReverse && (
