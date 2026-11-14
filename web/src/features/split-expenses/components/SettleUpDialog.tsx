@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { ResponsiveDialog } from '@/components/app/ResponsiveDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,7 +7,7 @@ import { splitExpensesApi } from '../splitExpensesApi'
 import { toast } from 'sonner'
 import type { SplitGroupMemberDto, SplitSettlementDto, SuggestedSettlementDto } from '../types'
 import { ArrowRight, CheckCircle2, Loader2, Info } from 'lucide-react'
-import { MemberSelector, getMemberDisplayName } from './MemberSelector'
+import { MemberSelector, getMemberDisplayName, normalizeId } from './MemberSelector'
 
 interface SettleUpDialogProps {
   open: boolean
@@ -34,13 +34,19 @@ export function SettleUpDialog({
   token,
   onSettlementRecorded,
 }: SettleUpDialogProps) {
-  const activeMembers = members.filter((m) => m.isActive)
+  const [currentMembers, setCurrentMembers] = useState<SplitGroupMemberDto[]>(members)
+
+  useEffect(() => {
+    setCurrentMembers(members)
+  }, [members])
+
+  const activeMembers = useMemo(() => currentMembers.filter((m) => m.isActive), [currentMembers])
 
   const [fromUserId, setFromUserId] = useState<string>(
     initialSuggestion?.fromUserId || currentUserId || (activeMembers[0]?.userId ?? '')
   )
   const [toUserId, setToUserId] = useState<string>(
-    initialSuggestion?.toUserId || (activeMembers.find((m) => m.userId !== (initialSuggestion?.fromUserId || currentUserId))?.userId ?? '')
+    initialSuggestion?.toUserId || (activeMembers.find((m) => !normalizeId(m.userId, initialSuggestion?.fromUserId || currentUserId))?.userId ?? '')
   )
   const [amountStr, setAmountStr] = useState<string>(
     initialSuggestion?.amount ? initialSuggestion.amount.toString() : ''
@@ -49,36 +55,63 @@ export function SettleUpDialog({
   const [loading, setLoading] = useState<boolean>(false)
   const [confirmed, setConfirmed] = useState<boolean>(false)
 
-  // Sync with initialSuggestion or defaults when dialog opens or suggestion changes
+  // Track previous open state and suggestion so form initialization ONLY runs when dialog opens
+  // or when initialSuggestion changes, NEVER resetting confirmed or inputs on re-renders.
+  const prevOpenRef = useRef(false)
+  const prevSuggestionRef = useRef(initialSuggestion)
+
   useEffect(() => {
-    if (open) {
+    const wasOpened = !prevOpenRef.current && open
+    const suggestionChanged = prevSuggestionRef.current !== initialSuggestion
+    prevOpenRef.current = open
+    prevSuggestionRef.current = initialSuggestion
+
+    if (!open) {
+      setConfirmed(false)
+      return
+    }
+
+    if (wasOpened || suggestionChanged) {
       if (initialSuggestion) {
         setFromUserId(initialSuggestion.fromUserId)
         setToUserId(initialSuggestion.toUserId)
         setAmountStr(initialSuggestion.amount ? initialSuggestion.amount.toString() : '')
       } else {
         const defaultFrom = currentUserId || (activeMembers[0]?.userId ?? '')
-        setFromUserId((prev) => prev || defaultFrom)
-        setToUserId((prev) => {
-          if (prev && prev !== defaultFrom) return prev
-          const other = activeMembers.find((m) => m.userId !== defaultFrom)
-          return other?.userId ?? ''
-        })
+        setFromUserId(defaultFrom)
+        const other = activeMembers.find((m) => !normalizeId(m.userId, defaultFrom))
+        setToUserId(other?.userId ?? '')
+        setAmountStr('')
       }
+      setNote('')
       setConfirmed(false)
+
+      // Fetch fresh member list to guarantee latest active members
+      if (token && groupId) {
+        splitExpensesApi
+          .getGroupMembers(groupId, token)
+          .then((freshMembers) => {
+            if (Array.isArray(freshMembers) && freshMembers.length > 0) {
+              setCurrentMembers(freshMembers)
+            }
+          })
+          .catch(() => {
+            // fallback to props
+          })
+      }
     }
-  }, [open, initialSuggestion, currentUserId, activeMembers])
+  }, [open, initialSuggestion, currentUserId, activeMembers, token, groupId])
 
   const amount = parseFloat(amountStr) || 0
 
-  const fromMember = activeMembers.find((m) => m.userId === fromUserId)
-  const toMember = activeMembers.find((m) => m.userId === toUserId)
+  const fromMember = activeMembers.find((m) => normalizeId(m.userId, fromUserId))
+  const toMember = activeMembers.find((m) => normalizeId(m.userId, toUserId))
 
   // Determine if settlement will be confirmed immediately:
   // Owner recording on behalf of others, or owner is the receiver ("X paid me")
-  const effectiveOwner = isOwner || (ownerId && currentUserId === ownerId)
+  const effectiveOwner = isOwner || Boolean(ownerId && normalizeId(currentUserId, ownerId))
   const isImmediate = Boolean(
-    effectiveOwner && (fromUserId !== currentUserId || toUserId === ownerId)
+    effectiveOwner && (!normalizeId(fromUserId, currentUserId) || normalizeId(toUserId, ownerId))
   )
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,7 +122,7 @@ export function SettleUpDialog({
       return
     }
 
-    if (fromUserId === toUserId) {
+    if (normalizeId(fromUserId, toUserId)) {
       toast.error('Sender and receiver must be different members')
       return
     }
@@ -175,8 +208,8 @@ export function SettleUpDialog({
                   value={fromUserId}
                   onValueChange={(val) => {
                     setFromUserId(val)
-                    if (toUserId === val) {
-                      const next = activeMembers.find((m) => m.userId !== val)
+                    if (normalizeId(toUserId, val)) {
+                      const next = activeMembers.find((m) => !normalizeId(m.userId, val))
                       setToUserId(next?.userId ?? '')
                     }
                   }}
@@ -241,7 +274,7 @@ export function SettleUpDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={amount <= 0 || fromUserId === toUserId}>
+              <Button type="submit" disabled={amount <= 0 || normalizeId(fromUserId, toUserId)}>
                 Review & Confirm
               </Button>
             </div>

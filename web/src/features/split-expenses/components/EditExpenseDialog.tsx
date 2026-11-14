@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { ResponsiveDialog } from '@/components/app/ResponsiveDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,9 +73,17 @@ export function EditExpenseDialog({
   const [loading, setLoading] = useState(false)
   const [payerOnlyConfirmOpen, setPayerOnlyConfirmOpen] = useState(false)
 
-  // Populate form from existing expense
+  // Populate form from existing expense only when dialog opens or editing a different expense
+  const prevOpenRef = useRef(false)
+  const prevExpenseIdRef = useRef<string | null>(null)
+
   useEffect(() => {
-    if (open && expense) {
+    const wasOpened = !prevOpenRef.current && open
+    const expenseChanged = prevExpenseIdRef.current !== expense?.id
+    prevOpenRef.current = open
+    prevExpenseIdRef.current = expense?.id ?? null
+
+    if (open && expense && (wasOpened || expenseChanged)) {
       setTitle(expense.title || '')
       setAmountStr(expense.amount ? expense.amount.toString() : '')
       setPayerId(expense.payerId || '')
