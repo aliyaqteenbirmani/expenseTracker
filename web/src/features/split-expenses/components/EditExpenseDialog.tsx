@@ -24,7 +24,7 @@ import {
 import { splitExpensesApi } from '../splitExpensesApi'
 import { toast } from 'sonner'
 import type { SplitGroupMemberDto, SplitExpenseDetailDto } from '../types'
-import { Users } from 'lucide-react'
+import { Users, Info } from 'lucide-react'
 import { MemberSelector, getMemberDisplayName, getMemberInitials } from './MemberSelector'
 
 interface EditExpenseDialogProps {
@@ -282,6 +282,14 @@ export function EditExpenseDialog({
                 disabled={loading}
                 required
               />
+              {payerId && currentUserId && payerId !== currentUserId && (
+                <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5 mt-1">
+                  <Info className="size-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>{payerName}</strong> will be recorded as the payer.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">

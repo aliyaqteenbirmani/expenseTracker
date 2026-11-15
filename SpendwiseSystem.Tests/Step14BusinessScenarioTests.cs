@@ -409,6 +409,8 @@ namespace SpendwiseSystem.Tests
                 {
                     Id = expense.Id,
                     GroupId = expense.GroupId,
+                    CreatedBy = expense.CreatedBy,
+                    CreatedByName = creatorName,
                     PayerId = expense.PayerId,
                     Amount = expense.Amount,
                     Title = expense.Title,
@@ -444,6 +446,7 @@ namespace SpendwiseSystem.Tests
                 {
                     Id = existing.Id,
                     GroupId = existing.GroupId,
+                    CreatedBy = existing.CreatedBy,
                     PayerId = existing.PayerId,
                     Amount = existing.Amount,
                     Title = existing.Title,
@@ -3540,6 +3543,243 @@ namespace SpendwiseSystem.Tests
             // Zero activities logged to SplitGroupActivity table!
             Assert.Empty(groupRepo.Activities);
         }
+
+        #region UI Step 4: Member Expense Permissions and Notifications Tests
+
+        [Fact]
+        public async Task Step4_Member_AddsExpense_Successfully_AndNotifies_Owner_And_Participants()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var member1Id = Guid.NewGuid();
+            var member2Id = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Weekend Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = member1Id, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = member2Id, Role = "Member", IsActive = true });
+
+            var dto = new CreateSplitExpenseDto
+            {
+                Title = "Dinner",
+                Amount = 300.00m,
+                PayerId = member1Id,
+                ParticipantUserIds = new List<Guid> { ownerId, member1Id, member2Id }
+            };
+
+            // Member1 adds expense
+            var res = await service.AddExpenseAsync(groupId, dto, member1Id, "Member One");
+            Assert.True(res.Success);
+            Assert.Equal("Dinner", res.Data!.Title);
+            Assert.Equal(member1Id, res.Data.CreatedBy);
+            Assert.Equal(member1Id, res.Data.PayerId);
+
+            // Actor (Member1) gets NO notification
+            Assert.DoesNotContain(expenseRepo.Notifications, n => n.UserId == member1Id);
+
+            // Owner gets notification with their share
+            var ownerNotifs = expenseRepo.Notifications.Where(n => n.UserId == ownerId).ToList();
+            Assert.Single(ownerNotifs);
+            Assert.Contains("Your share: Rs. 100.00", ownerNotifs[0].Message);
+
+            // Participant Member2 gets notification with their share
+            var m2Notifs = expenseRepo.Notifications.Where(n => n.UserId == member2Id).ToList();
+            Assert.Single(m2Notifs);
+            Assert.Contains("Your share: Rs. 100.00", m2Notifs[0].Message);
+        }
+
+        [Fact]
+        public async Task Step4_Member_AddsExpense_OwnerNotParticipant_OwnerStillReceivesNotification()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var member1Id = Guid.NewGuid();
+            var member2Id = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Flatmates", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = member1Id, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = member2Id, Role = "Member", IsActive = true });
+
+            // Split only between member1 and member2 (owner is not a participant)
+            var dto = new CreateSplitExpenseDto
+            {
+                Title = "Snacks",
+                Amount = 100.00m,
+                PayerId = member1Id,
+                ParticipantUserIds = new List<Guid> { member1Id, member2Id }
+            };
+
+            var res = await service.AddExpenseAsync(groupId, dto, member1Id, "Member One");
+            Assert.True(res.Success);
+
+            // Owner was not a participant, but must still receive an in-app notification of expense added to their group
+            var ownerNotifs = expenseRepo.Notifications.Where(n => n.UserId == ownerId).ToList();
+            Assert.Single(ownerNotifs);
+            Assert.Contains("Member One added 'Snacks' (Rs. 100.00) to your group.", ownerNotifs[0].Message);
+        }
+
+        [Fact]
+        public async Task Step4_Member_Can_Edit_Own_Expense()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var memberId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Team", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = memberId, Role = "Member", IsActive = true });
+
+            var addRes = await service.AddExpenseAsync(groupId, new CreateSplitExpenseDto
+            {
+                Title = "Coffee",
+                Amount = 50.00m,
+                PayerId = memberId,
+                ParticipantUserIds = new List<Guid> { ownerId, memberId }
+            }, memberId, "Member");
+            Assert.True(addRes.Success);
+
+            var editRes = await service.EditExpenseAsync(groupId, addRes.Data!.Id, new UpdateSplitExpenseDto
+            {
+                Title = "Coffee & Donuts",
+                Amount = 75.00m,
+                PayerId = memberId,
+                ParticipantUserIds = new List<Guid> { ownerId, memberId }
+            }, memberId, "Member");
+
+            Assert.True(editRes.Success);
+            Assert.Equal("Coffee & Donuts", editRes.Data!.Title);
+            Assert.Equal(75.00m, editRes.Data.Amount);
+        }
+
+        [Fact]
+        public async Task Step4_Member_Cannot_Edit_SomeoneElses_Expense_ReturnsForbidden()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var member1Id = Guid.NewGuid();
+            var member2Id = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Team", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = member1Id, Role = "Member", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = member2Id, Role = "Member", IsActive = true });
+
+            // Member1 creates an expense
+            var addRes = await service.AddExpenseAsync(groupId, new CreateSplitExpenseDto
+            {
+                Title = "Lunch",
+                Amount = 100.00m,
+                PayerId = member1Id,
+                ParticipantUserIds = new List<Guid> { member1Id, member2Id }
+            }, member1Id, "Member1");
+            Assert.True(addRes.Success);
+
+            // Member2 attempts to edit Member1's expense
+            var editRes = await service.EditExpenseAsync(groupId, addRes.Data!.Id, new UpdateSplitExpenseDto
+            {
+                Title = "Hacked Lunch",
+                Amount = 200.00m,
+                PayerId = member2Id,
+                ParticipantUserIds = new List<Guid> { member1Id, member2Id }
+            }, member2Id, "Member2");
+
+            Assert.False(editRes.Success);
+            Assert.Equal(403, editRes.StatusCode);
+            Assert.Contains("Only the expense creator or the group owner can edit this expense.", editRes.Message);
+        }
+
+        [Fact]
+        public async Task Step4_Owner_Can_Edit_Any_Member_Expense()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var member1Id = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = member1Id, Role = "Member", IsActive = true });
+
+            // Member1 creates an expense
+            var addRes = await service.AddExpenseAsync(groupId, new CreateSplitExpenseDto
+            {
+                Title = "Gasoline",
+                Amount = 120.00m,
+                PayerId = member1Id,
+                ParticipantUserIds = new List<Guid> { ownerId, member1Id }
+            }, member1Id, "Member1");
+            Assert.True(addRes.Success);
+
+            // Group owner edits Member1's expense
+            var editRes = await service.EditExpenseAsync(groupId, addRes.Data!.Id, new UpdateSplitExpenseDto
+            {
+                Title = "Gasoline & Toll",
+                Amount = 150.00m,
+                PayerId = member1Id,
+                ParticipantUserIds = new List<Guid> { ownerId, member1Id }
+            }, ownerId, "Owner");
+
+            Assert.True(editRes.Success);
+            Assert.Equal("Gasoline & Toll", editRes.Data!.Title);
+            Assert.Equal(150.00m, editRes.Data.Amount);
+        }
+
+        [Fact]
+        public async Task Step4_Inactive_Or_Removed_Member_Cannot_AddExpense_ReturnsForbidden()
+        {
+            var groupRepo = new InMemoryGroupRepository();
+            var expenseRepo = new InMemoryExpenseRepository();
+            var calculator = new EqualSplitCalculatorService();
+            var service = new SplitExpenseService(expenseRepo, groupRepo, calculator);
+
+            var groupId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var removedMemberId = Guid.NewGuid();
+
+            groupRepo.Groups.Add(new SplitGroup { Id = groupId, Name = "Trip", OwnerId = ownerId, IsActive = true });
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = ownerId, Role = "Owner", IsActive = true });
+            // Member is marked inactive (e.g. removed or left)
+            groupRepo.Members.Add(new SplitGroupMember { GroupId = groupId, UserId = removedMemberId, Role = "Member", IsActive = false });
+
+            var res = await service.AddExpenseAsync(groupId, new CreateSplitExpenseDto
+            {
+                Title = "Snacks",
+                Amount = 50.00m,
+                PayerId = removedMemberId,
+                ParticipantUserIds = new List<Guid> { ownerId }
+            }, removedMemberId, "RemovedMember");
+
+            Assert.False(res.Success);
+            Assert.Equal(403, res.StatusCode);
+            Assert.Contains("You must be an active group member to add expenses.", res.Message);
+        }
+
+        #endregion
 
         #endregion
 

@@ -822,8 +822,12 @@ export function SplitGroupDetailsPage({
                         <div className="font-medium text-sm text-foreground truncate" title={exp.title}>
                           {exp.title}
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          Paid by {exp.payerName} · {format(new Date(exp.expenseDate), 'MMM d')}
+                        <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5 flex-wrap">
+                          <span>Paid by {exp.payerName} {exp.payerId === currentUserId && '(You)'}</span>
+                          <span>·</span>
+                          <span>Added by {exp.createdByName || 'Member'} {exp.createdBy === currentUserId && '(You)'}</span>
+                          <span>·</span>
+                          <span>{format(new Date(exp.expenseDate), 'MMM d')}</span>
                         </div>
                       </div>
                     </div>
@@ -921,9 +925,14 @@ export function SplitGroupDetailsPage({
                           </Badge>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        Paid by {exp.payerName} {exp.payerId === currentUserId && '(You)'} ·{' '}
-                        {format(new Date(exp.expenseDate), 'MMM d, yyyy')} · {exp.participantCount} shared
+                      <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5 flex-wrap">
+                        <span>Paid by {exp.payerName} {exp.payerId === currentUserId && '(You)'}</span>
+                        <span>·</span>
+                        <span>Added by {exp.createdByName || 'Member'} {exp.createdBy === currentUserId && '(You)'}</span>
+                        <span>·</span>
+                        <span>{format(new Date(exp.expenseDate), 'MMM d, yyyy')}</span>
+                        <span>·</span>
+                        <span>{exp.participantCount} shared</span>
                       </div>
                     </div>
                   </div>

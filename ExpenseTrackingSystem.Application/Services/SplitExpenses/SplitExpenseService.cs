@@ -148,6 +148,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             // 2. Also the payer if payer != creator and not already notified as participant
             if (payerId != currentUserId && !notifiedUserIds.Contains(payerId) && activeMemberIdSet.Contains(payerId))
             {
+                notifiedUserIds.Add(payerId);
                 notifications.Add(new SplitNotification
                 {
                     Id = Guid.NewGuid(),
@@ -157,6 +158,24 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                     ReferenceId = expense.Id,
                     Title = "Expense Added",
                     Message = $"{currentUserName} added '{expense.Title}' (Rs. {expense.Amount:N2}) with you as payer.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // 3. Also the group owner if owner != creator and not already notified as participant or payer
+            if (group.OwnerId != currentUserId && !notifiedUserIds.Contains(group.OwnerId) && activeMemberIdSet.Contains(group.OwnerId))
+            {
+                notifiedUserIds.Add(group.OwnerId);
+                notifications.Add(new SplitNotification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = group.OwnerId,
+                    Type = "ExpenseAdded",
+                    GroupId = groupId,
+                    ReferenceId = expense.Id,
+                    Title = "Expense Added",
+                    Message = $"{currentUserName} added '{expense.Title}' (Rs. {expense.Amount:N2}) to your group.",
                     IsRead = false,
                     CreatedAt = DateTime.UtcNow
                 });

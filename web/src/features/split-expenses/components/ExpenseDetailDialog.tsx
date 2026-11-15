@@ -45,7 +45,9 @@ export function ExpenseDetailDialog({
 
   if (!expense) return null
 
-  const canModify = isGroupOwner || expense.createdBy === currentUserId || expense.payerId === currentUserId
+  const canModify = Boolean(
+    isGroupOwner || (currentUserId && expense.createdBy === currentUserId)
+  )
 
   const handleDelete = async () => {
     try {
@@ -76,7 +78,7 @@ export function ExpenseDetailDialog({
         open={open}
         onOpenChange={onOpenChange}
         title={expense.title}
-        description={`Recorded by ${expense.createdByName} · ${formattedDate}`}
+        description={`Expense details · ${formattedDate}`}
       >
         <div className="space-y-4">
           {/* Amount and Meta Summary */}
@@ -102,20 +104,39 @@ export function ExpenseDetailDialog({
             </div>
           </div>
 
-          {/* Paid by info */}
-          <div className="flex items-center gap-3 p-3 rounded-lg border bg-card text-sm">
-            <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
-              {getMemberInitials(expense.payerName || expense.payerEmail)}
-            </div>
-            <div className="flex-1 truncate">
-              <span className="text-muted-foreground text-xs block">Paid by</span>
-              <span className="font-semibold text-foreground truncate">
-                {expense.payerName || expense.payerEmail || 'Member'} {expense.payerId === currentUserId && '(You)'}
+          {/* Paid by & Added by Info Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Paid by info */}
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card text-sm">
+              <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs shrink-0">
+                {getMemberInitials(expense.payerName || expense.payerEmail)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-muted-foreground text-xs block">Paid by</span>
+                <span className="font-semibold text-foreground truncate block" title={expense.payerName || expense.payerEmail}>
+                  {expense.payerName || expense.payerEmail || 'Member'} {expense.payerId === currentUserId && '(You)'}
+                </span>
+              </div>
+              <span className="font-mono text-sm font-semibold text-inflow shrink-0">
+                +Rs. {expense.amount.toFixed(2)}
               </span>
             </div>
-            <span className="font-mono text-sm font-semibold text-inflow">
-              +Rs. {expense.amount.toFixed(2)}
-            </span>
+
+            {/* Added by info */}
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-card text-sm">
+              <div className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground font-semibold text-xs shrink-0">
+                {getMemberInitials(expense.createdByName)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-muted-foreground text-xs block">Added by</span>
+                <span className="font-semibold text-foreground truncate block" title={expense.createdByName}>
+                  {expense.createdByName || 'Member'} {expense.createdBy === currentUserId && '(You)'}
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground shrink-0">
+                {formattedDate}
+              </span>
+            </div>
           </div>
 
           {/* Current User Share Highlight */}
