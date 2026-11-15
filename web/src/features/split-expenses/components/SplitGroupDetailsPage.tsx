@@ -556,41 +556,42 @@ export function SplitGroupDetailsPage({
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b pb-4">
+        {/* Title area */}
+        <div className="flex items-center gap-3 min-w-0">
           <Button
             variant="ghost"
             size="icon"
             onClick={onBack}
-            className="size-9 rounded-lg"
+            className="size-9 shrink-0 rounded-lg"
             aria-label="Back to dashboard"
           >
             <ArrowLeft className="size-4" />
           </Button>
-          <div className="flex size-11 items-center justify-center rounded-xl bg-muted/60 text-2xl shadow-xs border">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-2xl shadow-xs border">
             {group.icon || '👥'}
           </div>
-          <div>
+          <div className="min-w-0 space-y-0.5">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground truncate" title={group.name}>
                 {group.name}
               </h1>
               {isOwner && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-primary/30 text-primary gap-1">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-primary/30 text-primary gap-1 shrink-0">
                   <Crown className="size-2.5" />
                   Owner
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {group.memberCount} members · Owner: {group.ownerName}
+            <p className="text-xs text-muted-foreground truncate">
+              {splitLabels.overview.members.count(group.memberCount)} · Owner: {group.ownerName}
               {group.description && ` · ${group.description}`}
             </p>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Action Buttons: on mobile full-width row with consistent 8px gaps */}
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
           <SplitNotificationBell
             token={token}
             onInvitationProcessed={loadGroupDetails}
@@ -603,7 +604,7 @@ export function SplitGroupDetailsPage({
           <Button
             onClick={() => setAddExpenseOpen(true)}
             size="sm"
-            className="gap-1.5 shadow-xs"
+            className="gap-1.5 shadow-xs flex-1 sm:flex-initial"
           >
             <Plus className="size-4" />
             Add Expense
@@ -615,7 +616,7 @@ export function SplitGroupDetailsPage({
             }}
             variant="outline"
             size="sm"
-            className="gap-1.5 shadow-xs"
+            className="gap-1.5 shadow-xs flex-1 sm:flex-initial"
           >
             <HandCoins className="size-4" />
             {splitLabels.actions.recordPayment}
@@ -623,10 +624,11 @@ export function SplitGroupDetailsPage({
           {isOwner && (
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => setDeleteGroupOpen(true)}
-              className="text-destructive hover:bg-destructive/10"
+              className="size-8 text-destructive hover:bg-destructive/10 shrink-0"
               aria-label="Delete group"
+              title="Delete group"
             >
               <Trash2 className="size-4" />
             </Button>
@@ -636,26 +638,28 @@ export function SplitGroupDetailsPage({
 
       {/* Navigation Tabs */}
       <MotionTabs value={activeTab} onValueChange={handleTabChange} variant="underline">
-        <MotionTabsList className="w-full justify-start border-b rounded-none p-0 bg-transparent gap-4">
-          <MotionTabsTrigger value="overview" className="pb-2.5">
-            {splitLabels.tabs.overview}
-          </MotionTabsTrigger>
-          <MotionTabsTrigger value="expenses" className="pb-2.5">
-            {splitLabels.tabs.expenses(expenses.length)}
-          </MotionTabsTrigger>
-          <MotionTabsTrigger value="balances" className="pb-2.5">
-            {splitLabels.tabs.whoOwesWhom}
-          </MotionTabsTrigger>
-          <MotionTabsTrigger value="settle" className="pb-2.5">
-            {splitLabels.tabs.settleUp}
-          </MotionTabsTrigger>
-          <MotionTabsTrigger value="members" className="pb-2.5">
-            {splitLabels.tabs.members(group.members?.length || 0)}
-          </MotionTabsTrigger>
-          <MotionTabsTrigger value="activity" className="pb-2.5">
-            {splitLabels.tabs.activity}
-          </MotionTabsTrigger>
-        </MotionTabsList>
+        <div className="border-b overflow-hidden">
+          <MotionTabsList className="w-full justify-start rounded-none p-0 bg-transparent gap-5 sm:gap-6 overflow-x-auto flex-nowrap shrink-0 whitespace-nowrap px-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <MotionTabsTrigger value="overview" className="pb-2.5 px-1 shrink-0">
+              {splitLabels.tabs.overview}
+            </MotionTabsTrigger>
+            <MotionTabsTrigger value="expenses" className="pb-2.5 px-1 shrink-0">
+              {splitLabels.tabs.expenses(expenses.length)}
+            </MotionTabsTrigger>
+            <MotionTabsTrigger value="balances" className="pb-2.5 px-1 shrink-0">
+              {splitLabels.tabs.whoOwesWhom}
+            </MotionTabsTrigger>
+            <MotionTabsTrigger value="settle" className="pb-2.5 px-1 shrink-0">
+              {splitLabels.tabs.settleUp}
+            </MotionTabsTrigger>
+            <MotionTabsTrigger value="members" className="pb-2.5 px-1 shrink-0">
+              {splitLabels.tabs.members(group.members?.length || 0)}
+            </MotionTabsTrigger>
+            <MotionTabsTrigger value="activity" className="pb-2.5 px-1 shrink-0">
+              {splitLabels.tabs.activity}
+            </MotionTabsTrigger>
+          </MotionTabsList>
+        </div>
 
         {/* 1. OVERVIEW TAB */}
         <MotionTabsContent value="overview" className="space-y-6 pt-4">
@@ -663,10 +667,11 @@ export function SplitGroupDetailsPage({
             variants={reduce ? undefined : splitStaggerContainer}
             initial="hidden"
             animate="show"
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch"
           >
-            <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+            <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
               <StatCard
+                className="h-full"
                 label={splitLabels.overview.groupSpending.title}
                 value={group.totalExpenses}
                 formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
@@ -675,8 +680,9 @@ export function SplitGroupDetailsPage({
                 delta={splitLabels.overview.groupSpending.subtext}
               />
             </motion.div>
-            <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+            <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
               <StatCard
+                className="h-full"
                 label={splitLabels.overview.yourBalance.title}
                 value={myBalance}
                 formatFn={(val) =>
@@ -698,8 +704,9 @@ export function SplitGroupDetailsPage({
                 footer={pendingBalFooter}
               />
             </motion.div>
-            <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+            <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
               <StatCard
+                className="h-full"
                 label={splitLabels.overview.paymentsSettled.title}
                 value={totalSettledAmount}
                 formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
@@ -708,8 +715,9 @@ export function SplitGroupDetailsPage({
                 delta={splitLabels.overview.paymentsSettled.subtext}
               />
             </motion.div>
-            <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+            <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
               <StatCard
+                className="h-full"
                 label={splitLabels.overview.members.title}
                 value={group.memberCount}
                 formatFn={(val) => `${val}`}
@@ -779,45 +787,51 @@ export function SplitGroupDetailsPage({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-foreground">Recent Expenses</h3>
-              <Button variant="link" size="sm" onClick={() => handleTabChange('expenses')}>
-                View all ({expenses.length})
-              </Button>
+              {expenses.length > 0 && (
+                <Button variant="link" size="sm" onClick={() => handleTabChange('expenses')}>
+                  View all ({expenses.length})
+                </Button>
+              )}
             </div>
 
             {expenses.length === 0 ? (
               <EmptyState
-                title="No Expenses Yet"
+                icon={Receipt}
+                title="No expenses yet"
                 description="Add the first expense for this group to start sharing costs equally."
                 action={
-                  <Button onClick={() => setAddExpenseOpen(true)} size="sm">
+                  <Button onClick={() => setAddExpenseOpen(true)} size="sm" className="gap-1.5 shadow-xs">
+                    <Plus className="size-4" />
                     Add Expense
                   </Button>
                 }
               />
             ) : (
-              <div className="rounded-xl border divide-y overflow-hidden bg-card">
+              <div className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs">
                 {expenses.slice(0, 5).map((exp) => (
                   <div
                     key={exp.id}
                     onClick={() => handleOpenExpense(exp.id)}
-                    className="flex items-center justify-between p-3.5 hover:bg-muted/40 cursor-pointer transition-colors"
+                    className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3 hover:bg-muted/40 cursor-pointer transition-colors"
                   >
-                    <div className="flex items-center gap-3 truncate">
-                      <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                         <Receipt className="size-4" />
                       </div>
-                      <div className="truncate">
-                        <div className="font-semibold text-sm truncate">{exp.title}</div>
-                        <div className="text-xs text-muted-foreground">
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm text-foreground truncate" title={exp.title}>
+                          {exp.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
                           Paid by {exp.payerName} · {format(new Date(exp.expenseDate), 'MMM d')}
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-mono font-semibold text-sm">
+                    <div className="shrink-0 text-right whitespace-nowrap">
+                      <div className="font-mono font-semibold text-sm whitespace-nowrap">
                         Rs. {exp.amount.toFixed(2)}
                       </div>
-                      <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1">
+                      <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1 whitespace-nowrap">
                         {exp.currentUserShare > 0.005 ? (
                           <span>{splitLabels.expense.yourShare(`Rs. ${exp.currentUserShare.toFixed(2)}`)}</span>
                         ) : (
@@ -835,7 +849,7 @@ export function SplitGroupDetailsPage({
         </MotionTabsContent>
 
         {/* 2. EXPENSES TAB */}
-        <MotionTabsContent value="expenses" className="space-y-4 pt-4">
+        <MotionTabsContent value="expenses" className="space-y-6 pt-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-sm">
               <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -846,7 +860,7 @@ export function SplitGroupDetailsPage({
                 className="pl-9"
               />
             </div>
-            <Button onClick={() => setAddExpenseOpen(true)} size="sm" className="gap-1.5">
+            <Button onClick={() => setAddExpenseOpen(true)} size="sm" className="gap-1.5 shadow-xs">
               <Plus className="size-4" />
               Add Expense
             </Button>
@@ -860,12 +874,24 @@ export function SplitGroupDetailsPage({
             </div>
           ) : expenses.length === 0 ? (
             <EmptyState
-              title="No Expenses Found"
-              description="No expenses match your search query."
+              icon={Receipt}
+              title={expenseSearch ? 'No Expenses Found' : 'No expenses yet'}
+              description={
+                expenseSearch
+                  ? 'No expenses match your search query.'
+                  : 'Add the first expense for this group to start sharing costs equally.'
+              }
               action={
-                <Button onClick={() => setAddExpenseOpen(true)} size="sm">
-                  Add Expense
-                </Button>
+                expenseSearch ? (
+                  <Button variant="outline" size="sm" onClick={() => setExpenseSearch('')}>
+                    Clear search
+                  </Button>
+                ) : (
+                  <Button onClick={() => setAddExpenseOpen(true)} size="sm" className="gap-1.5 shadow-xs">
+                    <Plus className="size-4" />
+                    Add Expense
+                  </Button>
+                )
               }
             />
           ) : (
@@ -873,39 +899,39 @@ export function SplitGroupDetailsPage({
               variants={reduce ? undefined : splitStaggerContainer}
               initial="hidden"
               animate="show"
-              className="rounded-xl border divide-y overflow-hidden bg-card"
+              className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs"
             >
               {expenses.map((exp) => (
                 <motion.div
                   key={exp.id}
                   variants={reduce ? fadeOnly : splitCardVariants}
                   onClick={() => handleOpenExpense(exp.id)}
-                  className="flex items-center justify-between p-3.5 hover:bg-muted/40 cursor-pointer transition-colors"
+                  className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3 hover:bg-muted/40 cursor-pointer transition-colors"
                 >
-                  <div className="flex items-center gap-3 truncate">
-                    <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                       <Receipt className="size-4" />
                     </div>
-                    <div className="truncate">
-                      <div className="font-semibold text-sm truncate flex items-center gap-2">
-                        {exp.title}
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm text-foreground truncate flex items-center gap-2" title={exp.title}>
+                        <span className="truncate">{exp.title}</span>
                         {exp.category && (
-                          <Badge variant="secondary" className="font-normal text-[10px] h-4">
+                          <Badge variant="secondary" className="font-normal text-[10px] h-4 shrink-0">
                             {exp.category}
                           </Badge>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground truncate">
                         Paid by {exp.payerName} {exp.payerId === currentUserId && '(You)'} ·{' '}
                         {format(new Date(exp.expenseDate), 'MMM d, yyyy')} · {exp.participantCount} shared
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-mono font-semibold text-sm">
+                  <div className="shrink-0 text-right whitespace-nowrap">
+                    <div className="font-mono font-semibold text-sm whitespace-nowrap">
                       Rs. {exp.amount.toFixed(2)}
                     </div>
-                    <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1">
+                    <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1 whitespace-nowrap">
                       {exp.currentUserShare > 0.005 ? (
                         <span>{splitLabels.expense.yourShare(`Rs. ${exp.currentUserShare.toFixed(2)}`)}</span>
                       ) : (
@@ -922,107 +948,117 @@ export function SplitGroupDetailsPage({
         </MotionTabsContent>
 
         {/* 3. WHO OWES WHOM TAB */}
-        <MotionTabsContent value="balances" className="space-y-4 pt-4">
-          <div className="rounded-xl border bg-card p-4">
-            <h3 className="text-base font-semibold mb-1">{splitLabels.whoOwesWhom.title}</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              {splitLabels.whoOwesWhom.helperText}
-            </p>
+        <MotionTabsContent value="balances" className="space-y-6 pt-4">
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">{splitLabels.whoOwesWhom.title}</h3>
+              <p className="text-xs text-muted-foreground">
+                {splitLabels.whoOwesWhom.helperText}
+              </p>
+            </div>
 
-            <motion.div
-              variants={reduce ? undefined : splitStaggerContainer}
-              initial="hidden"
-              animate="show"
-              className="space-y-3"
-            >
-              {balances.map((m) => {
-                const bal = m.netBalance
-                const isZero = Math.abs(bal) < 0.005
-                const isPositive = bal > 0.005
-                const isNegative = bal < -0.005
-                const canSeePending = isOwner || m.userId === currentUserId
-                const hasPendingPaid = (m.pendingPaid ?? 0) > 0.005
-                const hasPendingRecv = (m.pendingReceived ?? 0) > 0.005
+            {balances.length === 0 ? (
+              <EmptyState
+                icon={Scale}
+                title="No balance records"
+                description="Balances will appear here once expenses are recorded."
+              />
+            ) : (
+              <motion.div
+                variants={reduce ? undefined : splitStaggerContainer}
+                initial="hidden"
+                animate="show"
+                className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs"
+              >
+                {balances.map((m) => {
+                  const bal = m.netBalance
+                  const isZero = Math.abs(bal) < 0.005
+                  const isPositive = bal > 0.005
+                  const isNegative = bal < -0.005
+                  const canSeePending = isOwner || m.userId === currentUserId
+                  const hasPendingPaid = (m.pendingPaid ?? 0) > 0.005
+                  const hasPendingRecv = (m.pendingReceived ?? 0) > 0.005
 
-                return (
-                  <motion.div
-                    key={m.userId}
-                    variants={reduce ? fadeOnly : splitCardVariants}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-lg border bg-muted/20 gap-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
-                        {getMemberInitials(m.fullName || m.email)}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-sm flex items-center gap-2 flex-wrap">
-                          <span>{m.fullName}</span>
-                          {m.userId === currentUserId && (
-                            <Badge variant="outline" className="text-[10px] h-4">
-                              You
-                            </Badge>
-                          )}
-                          {!m.isActive && (
-                            <Badge variant="secondary" className="text-[10px] h-4">
-                              Inactive
-                            </Badge>
-                          )}
-                          {canSeePending && hasPendingPaid && (
-                            <Badge variant="outline" className="text-[10px] h-4 text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 gap-1 font-mono">
-                              <Clock className="size-2.5" />
-                              Pending pay: Rs. {m.pendingPaid!.toFixed(2)}
-                            </Badge>
-                          )}
-                          {canSeePending && hasPendingRecv && (
-                            <Badge variant="outline" className="text-[10px] h-4 text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 gap-1 font-mono">
-                              <Clock className="size-2.5" />
-                              Pending recv: Rs. {m.pendingReceived!.toFixed(2)}
-                            </Badge>
-                          )}
+                  return (
+                    <motion.div
+                      key={m.userId}
+                      variants={reduce ? fadeOnly : splitCardVariants}
+                      className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3 hover:bg-muted/20 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
+                          {getMemberInitials(m.fullName || m.email)}
                         </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
-                          <span>Paid: Rs. {m.totalPaid.toFixed(2)}</span>
-                          <span>·</span>
-                          <span>Share: Rs. {m.totalShare.toFixed(2)}</span>
-                          <span>·</span>
-                          <span>
-                            Settled: +Rs. {(m.settlementsReceived ?? 0).toFixed(2)} / -Rs. {(m.settlementsPaid ?? 0).toFixed(2)}
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm text-foreground flex items-center gap-2 flex-wrap">
+                            <span className="truncate" title={m.fullName}>{m.fullName}</span>
+                            {m.userId === currentUserId && (
+                              <Badge variant="outline" className="text-[10px] h-4 shrink-0">
+                                You
+                              </Badge>
+                            )}
+                            {!m.isActive && (
+                              <Badge variant="secondary" className="text-[10px] h-4 shrink-0">
+                                Inactive
+                              </Badge>
+                            )}
+                            {canSeePending && hasPendingPaid && (
+                              <Badge variant="outline" className="text-[10px] h-4 text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 gap-1 font-mono shrink-0">
+                                <Clock className="size-2.5" />
+                                Pending pay: Rs. {m.pendingPaid!.toFixed(2)}
+                              </Badge>
+                            )}
+                            {canSeePending && hasPendingRecv && (
+                              <Badge variant="outline" className="text-[10px] h-4 text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 gap-1 font-mono shrink-0">
+                                <Clock className="size-2.5" />
+                                Pending recv: Rs. {m.pendingReceived!.toFixed(2)}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5 truncate">
+                            <span>Paid: Rs. {m.totalPaid.toFixed(2)}</span>
+                            <span>·</span>
+                            <span>Share: Rs. {m.totalShare.toFixed(2)}</span>
+                            <span>·</span>
+                            <span>
+                              Settled: +Rs. {(m.settlementsReceived ?? 0).toFixed(2)} / -Rs. {(m.settlementsPaid ?? 0).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-right whitespace-nowrap">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">
+                          {splitLabels.whoOwesWhom.status}
+                        </span>
+                        {isZero && (
+                          <span className="text-xs font-medium text-muted-foreground flex items-center justify-end gap-1">
+                            <CheckCircle2 className="size-3.5 text-emerald-500" />
+                            {splitLabels.whoOwesWhom.settledUp}
                           </span>
-                        </div>
+                        )}
+                        {isPositive && (
+                          <span className="text-sm font-semibold font-mono text-inflow flex items-center justify-end gap-1">
+                            <ArrowUpRight className="size-4" />
+                            {m.userId === currentUserId
+                              ? splitLabels.whoOwesWhom.youAreOwed(`Rs. ${Math.abs(bal).toFixed(2)}`)
+                              : splitLabels.whoOwesWhom.memberIsOwed(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`)}
+                          </span>
+                        )}
+                        {isNegative && (
+                          <span className="text-sm font-semibold font-mono text-outflow flex items-center justify-end gap-1">
+                            <ArrowDownLeft className="size-4" />
+                            {m.userId === currentUserId
+                              ? splitLabels.whoOwesWhom.youOwe(`Rs. ${Math.abs(bal).toFixed(2)}`)
+                              : splitLabels.whoOwesWhom.memberOwes(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`)}
+                          </span>
+                        )}
                       </div>
-                    </div>
-
-                    <div className="text-right sm:text-right flex sm:flex-col items-center sm:items-end justify-between sm:justify-start">
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground sm:block">
-                        {splitLabels.whoOwesWhom.status}
-                      </span>
-                      {isZero && (
-                        <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                          <CheckCircle2 className="size-3.5 text-emerald-500" />
-                          {splitLabels.whoOwesWhom.settledUp}
-                        </span>
-                      )}
-                      {isPositive && (
-                        <span className="text-sm font-bold font-mono text-inflow flex items-center gap-1">
-                          <ArrowUpRight className="size-4" />
-                          {m.userId === currentUserId
-                            ? splitLabels.whoOwesWhom.youAreOwed(`Rs. ${Math.abs(bal).toFixed(2)}`)
-                            : splitLabels.whoOwesWhom.memberIsOwed(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`)}
-                        </span>
-                      )}
-                      {isNegative && (
-                        <span className="text-sm font-bold font-mono text-outflow flex items-center gap-1">
-                          <ArrowDownLeft className="size-4" />
-                          {m.userId === currentUserId
-                            ? splitLabels.whoOwesWhom.youOwe(`Rs. ${Math.abs(bal).toFixed(2)}`)
-                            : splitLabels.whoOwesWhom.memberOwes(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`)}
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </motion.div>
+                    </motion.div>
+                  )
+                })}
+              </motion.div>
+            )}
           </div>
         </MotionTabsContent>
 
@@ -1045,7 +1081,7 @@ export function SplitGroupDetailsPage({
                   return (
                     <Card
                       key={item.id}
-                      className="rounded-xl border-amber-500/30 bg-amber-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="rounded-xl border-amber-500/30 bg-amber-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -1110,21 +1146,23 @@ export function SplitGroupDetailsPage({
             </p>
 
             {myRequests.length === 0 ? (
-              <Card className="rounded-xl border bg-card/60 p-5 text-center">
-                <p className="text-xs text-muted-foreground">No settlement requests submitted by you.</p>
-              </Card>
+              <EmptyState
+                icon={HandCoins}
+                title="No settlement requests"
+                description="Settlement requests you submit will appear here with their approval status."
+              />
             ) : (
-              <div className="rounded-xl border divide-y overflow-hidden bg-card">
+              <div className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs">
                 {myRequests.map((req) => {
                   const isPending = req.status === 'PendingReceiver' || req.status === 'PendingOwner'
                   const isDeclined = req.status === 'DeclinedByReceiver' || req.status === 'DeclinedByOwner'
                   const canCancel = (req.canCancel ?? true) && isPending
 
                   return (
-                    <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 gap-3">
-                      <div className="space-y-1 min-w-0">
+                    <div key={req.id} className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3">
+                      <div className="space-y-0.5 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm">
+                          <span className="font-medium text-sm text-foreground truncate" title={req.toUserName}>
                             {isDeclined
                               ? `Payment to ${req.toUserName}`
                               : isPending
@@ -1133,23 +1171,23 @@ export function SplitGroupDetailsPage({
                           </span>
                           {renderSettlementStatusChip(req)}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground truncate">
                           {format(new Date(req.settlementDate), 'MMM d, yyyy')}
                           {req.note && ` · "${req.note}"`}
                         </div>
                         {isDeclined && req.declineReason && (
-                          <div className="text-xs text-destructive/90 flex items-center gap-1.5 pt-0.5">
+                          <div className="text-xs text-destructive/90 flex items-center gap-1.5 pt-0.5 truncate">
                             <span className="font-medium">
                               {req.status === 'DeclinedByReceiver' ? 'Declined by receiver:' : 'Declined by admin:'}
                             </span>
-                            <span className="italic">&quot;{req.declineReason}&quot;</span>
+                            <span className="italic truncate">&quot;{req.declineReason}&quot;</span>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                      <div className="flex items-center gap-3 shrink-0 text-right whitespace-nowrap">
                         <span className={cn(
-                          "font-mono font-bold text-sm",
+                          "font-mono font-semibold text-sm whitespace-nowrap",
                           isDeclined ? "text-muted-foreground line-through" : "text-foreground"
                         )}>
                           Rs. {req.amount.toFixed(2)}
@@ -1187,7 +1225,7 @@ export function SplitGroupDetailsPage({
                   setSettleUpOpen(true)
                 }}
                 size="sm"
-                className="gap-1.5"
+                className="gap-1.5 shadow-xs"
               >
                 <Plus className="size-4" />
                 {splitLabels.actions.recordCustomPayment}
@@ -1195,26 +1233,24 @@ export function SplitGroupDetailsPage({
             </div>
 
             {settleOverview?.suggestedTransactions.length === 0 ? (
-              <div className="rounded-xl border bg-card p-6 text-center space-y-2">
-                <CheckCircle2 className="size-8 text-inflow mx-auto" />
-                <h4 className="font-semibold text-sm">{splitLabels.suggestedPayments.allSettledTitle}</h4>
-                <p className="text-xs text-muted-foreground">
-                  {splitLabels.suggestedPayments.allSettledSubtext}
-                </p>
-              </div>
+              <EmptyState
+                icon={CheckCircle2}
+                title={splitLabels.suggestedPayments.allSettledTitle}
+                description={splitLabels.suggestedPayments.allSettledSubtext}
+              />
             ) : (
               <motion.div
                 variants={reduce ? undefined : splitStaggerContainer}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch"
               >
                 {settleOverview?.suggestedTransactions.map((item, idx) => (
-                  <motion.div key={idx} variants={reduce ? fadeOnly : splitCardVariants}>
-                    <Card className="rounded-xl p-3.5 flex items-center justify-between">
+                  <motion.div key={idx} variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
+                    <Card className="rounded-xl p-4 flex items-center justify-between shadow-xs h-full gap-3">
                       <div>
                         <div className="text-xs text-muted-foreground">Payment {idx + 1}</div>
-                        <div className="text-sm font-semibold">
+                        <div className="text-sm font-semibold truncate" title={`${item.fromUserName} → ${item.toUserName}`}>
                           {item.fromUserName} → {item.toUserName}
                         </div>
                         <div className="text-sm font-mono font-bold text-foreground mt-0.5">
@@ -1223,6 +1259,7 @@ export function SplitGroupDetailsPage({
                       </div>
                       <Button
                         size="sm"
+                        className="shrink-0 shadow-xs"
                         onClick={() => {
                           setActiveSuggestion(item)
                           setSettleUpOpen(true)
@@ -1240,28 +1277,33 @@ export function SplitGroupDetailsPage({
           {/* Past Settlement History */}
           <div className="space-y-3">
             <h3 className="text-base font-semibold">Settlement Payment History</h3>
+
             {settlements.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No payments recorded yet.</p>
+              <EmptyState
+                icon={History}
+                title="No payments recorded yet"
+                description="Confirmed settlement payments will appear in this history."
+              />
             ) : (
-              <div className="rounded-xl border divide-y overflow-hidden bg-card">
+              <div className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs">
                 {settlements.map((st) => {
                   const canReverse = (isOwner || st.canReverse) && st.status === 'Confirmed'
                   const isDeclined = st.status === 'DeclinedByReceiver' || st.status === 'DeclinedByOwner'
 
                   return (
-                    <div key={st.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 text-sm gap-2">
-                      <div className="flex items-center gap-3 truncate min-w-0">
+                    <div key={st.id} className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className={cn(
-                          "flex size-8 items-center justify-center rounded-lg shrink-0",
+                          "flex size-10 items-center justify-center rounded-lg shrink-0",
                           isDeclined
                             ? "bg-destructive/10 text-destructive"
                             : "bg-primary/10 text-primary"
                         )}>
                           {isDeclined ? <XCircle className="size-4" /> : <HandCoins className="size-4" />}
                         </div>
-                        <div className="truncate min-w-0">
-                          <div className="font-semibold truncate flex items-center gap-2 flex-wrap">
-                            <span>
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm text-foreground truncate flex items-center gap-2 flex-wrap">
+                            <span className="truncate">
                               {isDeclined
                                 ? `${st.fromUserName} → ${st.toUserName}`
                                 : `${st.fromUserName} paid ${st.toUserName}`}
@@ -1282,9 +1324,9 @@ export function SplitGroupDetailsPage({
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                      <div className="flex items-center gap-3 shrink-0 text-right whitespace-nowrap">
                         <div className={cn(
-                          "font-mono font-bold",
+                          "font-mono font-semibold text-sm whitespace-nowrap",
                           isDeclined ? "text-muted-foreground line-through" : "text-inflow"
                         )}>
                           Rs. {st.amount.toFixed(2)}
@@ -1314,11 +1356,11 @@ export function SplitGroupDetailsPage({
         <MotionTabsContent value="members" className="space-y-6 pt-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-semibold">Active Members</h3>
+              <h3 className="text-base font-semibold text-foreground">Active Members</h3>
               <p className="text-xs text-muted-foreground">Members who can view and share expenses in this group.</p>
             </div>
             {isOwner && (
-              <Button onClick={() => setInviteOpen(true)} size="sm" className="gap-1.5 shadow-xs">
+              <Button onClick={() => setInviteOpen(true)} size="sm" className="gap-1.5 shadow-xs shrink-0">
                 <UserPlus className="size-4" />
                 Add Members
               </Button>
@@ -1335,32 +1377,32 @@ export function SplitGroupDetailsPage({
               <motion.div
                 key={m.userId}
                 variants={reduce ? fadeOnly : splitCardVariants}
-                className="flex items-center justify-between p-3.5 hover:bg-muted/20 transition-colors"
+                className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3 hover:bg-muted/20 transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs shrink-0">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">
                     {getMemberInitials(m.fullName || m.email)}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-semibold text-sm flex items-center gap-2 flex-wrap">
-                      <span className="truncate">{m.fullName}</span>
+                    <div className="font-medium text-sm text-foreground flex items-center gap-2 flex-wrap">
+                      <span className="truncate" title={m.fullName}>{m.fullName}</span>
                       {m.userId === currentUserId && (
-                        <Badge variant="outline" className="text-[10px] h-4">
+                        <Badge variant="outline" className="text-[10px] h-4 shrink-0">
                           You
                         </Badge>
                       )}
                       {m.role === 'Owner' ? (
-                        <Badge variant="secondary" className="text-[10px] h-4 gap-1">
+                        <Badge variant="secondary" className="text-[10px] h-4 gap-1 shrink-0">
                           <Crown className="size-2.5" />
                           Owner
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-[10px] h-4 text-muted-foreground">
+                        <Badge variant="outline" className="text-[10px] h-4 text-muted-foreground shrink-0">
                           Member
                         </Badge>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap truncate">
                       <span className="truncate font-mono">{m.email}</span>
                       {m.joinedAt && (
                         <>
@@ -1372,9 +1414,9 @@ export function SplitGroupDetailsPage({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="text-right">
-                    <span className="text-xs font-mono font-medium block">
+                <div className="flex items-center gap-3 shrink-0 text-right whitespace-nowrap">
+                  <div>
+                    <span className="text-xs font-mono font-medium block whitespace-nowrap">
                       Balance: Rs. {m.balance.toFixed(2)}
                     </span>
                   </div>
@@ -1382,7 +1424,7 @@ export function SplitGroupDetailsPage({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8 text-destructive hover:bg-destructive/10"
+                      className="size-8 text-destructive hover:bg-destructive/10 shrink-0"
                       onClick={() => setMemberToRemove(m.userId)}
                       aria-label="Remove member"
                       title="Remove member"
@@ -1409,9 +1451,9 @@ export function SplitGroupDetailsPage({
               </div>
               <div className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs">
                 {pendingInvites.map((inv) => (
-                  <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 text-sm gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                  <div key={inv.id} className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
                         <Mail className="size-4" />
                       </div>
                       <div className="min-w-0">
@@ -1424,11 +1466,11 @@ export function SplitGroupDetailsPage({
                           ) : (
                             <span className="font-semibold font-mono">{inv.invitedEmail}</span>
                           )}
-                          <Badge variant="outline" className="text-[9px] h-4 text-amber-600 dark:text-amber-400 border-amber-500/20 bg-amber-500/5">
+                          <Badge variant="outline" className="text-[9px] h-4 text-amber-600 dark:text-amber-400 border-amber-500/20 bg-amber-500/5 shrink-0">
                             Pending
                           </Badge>
                         </div>
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5 truncate">
                           <span>Sent {format(new Date(inv.createdAt), 'MMM d, yyyy')}</span>
                           <span>·</span>
                           <span>Expires {format(new Date(inv.expiresAt), 'MMM d, yyyy')}</span>
@@ -1448,7 +1490,7 @@ export function SplitGroupDetailsPage({
                       </div>
                     </div>
                     {isOwner && (
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      <div className="flex items-center gap-2 shrink-0">
                         <Button
                           variant="outline"
                           size="sm"
@@ -1495,7 +1537,7 @@ export function SplitGroupDetailsPage({
               {showHistory && (
                 <div className="rounded-xl border divide-y overflow-hidden bg-card/60 text-xs shadow-xs animate-in fade-in-50 duration-200">
                   {pastInvites.map((inv) => (
-                    <div key={inv.id} className="flex items-center justify-between p-3">
+                    <div key={inv.id} className="flex items-center justify-between py-2.5 px-4 min-h-[40px] gap-3">
                       <div className="min-w-0">
                         <div className="font-medium text-foreground truncate">
                           {inv.invitedUserName ? `${inv.invitedUserName} (${inv.invitedEmail})` : inv.invitedEmail}
@@ -1510,7 +1552,7 @@ export function SplitGroupDetailsPage({
                           )}
                         </div>
                       </div>
-                      <div>
+                      <div className="shrink-0">
                         {inv.status === 'Accepted' && (
                           <Badge variant="secondary" className="text-[9px] bg-inflow/10 text-inflow border-inflow/20">
                             Accepted
@@ -1541,37 +1583,46 @@ export function SplitGroupDetailsPage({
         </MotionTabsContent>
 
         {/* 6. ACTIVITY TAB */}
-        <MotionTabsContent value="activity" className="space-y-4 pt-4">
-          <div className="rounded-xl border bg-card p-4">
-            <h3 className="text-base font-semibold mb-3">Group Activity History</h3>
+        <MotionTabsContent value="activity" className="space-y-6 pt-4">
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Group Activity History</h3>
+              <p className="text-xs text-muted-foreground">Log of recorded expenses, settlements, and member changes.</p>
+            </div>
 
             {activities.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No activities recorded yet.</p>
+              <EmptyState
+                icon={History}
+                title="No activity yet"
+                description="Activities will be recorded here as members add expenses and settle payments."
+              />
             ) : (
-              <motion.div
-                variants={reduce ? undefined : splitStaggerContainer}
-                initial="hidden"
-                animate="show"
-                className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-px before:bg-border"
-              >
-                {activities.map((act) => (
-                  <motion.div
-                    key={act.id}
-                    variants={reduce ? fadeOnly : splitCardVariants}
-                    className="relative flex items-start gap-3"
-                  >
-                    <div className="absolute -left-6 mt-1 flex size-5 items-center justify-center rounded-full bg-primary/10 text-primary border border-background">
-                      <History className="size-2.5" />
-                    </div>
-                    <div className="space-y-0.5 text-xs">
-                      <p className="font-medium text-foreground">{act.description}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {format(new Date(act.createdAt), 'MMM d, yyyy · h:mm a')}
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
+              <div className="rounded-xl border bg-card p-6 shadow-xs">
+                <motion.div
+                  variants={reduce ? undefined : splitStaggerContainer}
+                  initial="hidden"
+                  animate="show"
+                  className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-px before:bg-border"
+                >
+                  {activities.map((act) => (
+                    <motion.div
+                      key={act.id}
+                      variants={reduce ? fadeOnly : splitCardVariants}
+                      className="relative flex items-start gap-3"
+                    >
+                      <div className="absolute -left-6 mt-1 flex size-5 items-center justify-center rounded-full bg-primary/10 text-primary border border-background">
+                        <History className="size-2.5" />
+                      </div>
+                      <div className="space-y-0.5 text-xs">
+                        <p className="font-medium text-foreground">{act.description}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {format(new Date(act.createdAt), 'MMM d, yyyy · h:mm a')}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </div>
             )}
           </div>
         </MotionTabsContent>

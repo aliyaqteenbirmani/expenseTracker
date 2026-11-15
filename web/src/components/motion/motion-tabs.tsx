@@ -103,14 +103,17 @@ export function MotionTabsContent({
   children,
   className,
   ...props
-}: React.ComponentProps<typeof TabsContent>) {
+}: Omit<React.ComponentProps<typeof TabsContent>, 'className'> & {
+  className?: string
+}) {
   const ctx = useTabsCtx()
   const { reduce } = useMotionSafe()
 
   return (
-    <TabsContent value={value} className={className} {...props}>
+    <TabsContent value={value} {...props}>
       <motion.div
         key={value}
+        className={className}
         initial={reduce ? { opacity: 0 } : { opacity: 0, x: 6 * ctx.dir }}
         animate={reduce ? { opacity: 1 } : { opacity: 1, x: 0 }}
         transition={

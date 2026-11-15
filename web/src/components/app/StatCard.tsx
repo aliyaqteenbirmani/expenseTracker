@@ -37,7 +37,7 @@ export function StatCard({
   return (
     <Card
       className={cn(
-        '@container relative overflow-hidden border border-border/80 bg-gradient-to-t from-primary/5 to-card p-6 shadow-xs transition-shadow hover:shadow-sm',
+        '@container relative overflow-hidden border border-border/80 bg-gradient-to-t from-primary/5 to-card p-6 shadow-xs transition-shadow hover:shadow-sm flex flex-col justify-between',
         className
       )}
     >
@@ -51,7 +51,7 @@ export function StatCard({
           </div>
         )}
       </CardHeader>
-      <CardContent className="p-0 pt-2">
+      <CardContent className="p-0 pt-2 flex-1 flex flex-col justify-between gap-y-2">
         <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1.5 min-w-0">
           <div
             title={valueTitle ?? displayValue}
@@ -82,7 +82,7 @@ export function StatCard({
           )}
         </div>
         {footer && (
-          <div className="mt-2 text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             {footer}
           </div>
         )}
