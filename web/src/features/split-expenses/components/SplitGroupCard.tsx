@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Users, ArrowUpRight, ArrowDownLeft, CheckCircle2, ChevronRight, Crown } from 'lucide-react'
+import { ArrowUpRight, ArrowDownLeft, CheckCircle2, ChevronRight, Crown } from 'lucide-react'
 import type { SplitGroupSummaryDto } from '../types'
 import { splitLabels, pluralMembers } from '../splitLabels'
 
@@ -17,73 +17,84 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
 
   return (
     <Card
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-xs transition-[border-color,box-shadow,transform] duration-(--duration-fast) ease-out hover:border-primary/40 hover:shadow-sm active:scale-[0.99]"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className="group cursor-pointer rounded-xl border border-border/80 bg-card p-5 shadow-xs transition-all duration-150 ease-out hover:border-primary/40 hover:shadow-sm active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex flex-col justify-between h-full"
     >
-      <CardContent className="p-0 space-y-3">
-        {/* Top Header: Icon, Title, Role */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-muted/60 text-2xl shadow-xs border">
-              {group.icon || '👥'}
-            </div>
-            <div className="space-y-0.5">
-              <h3 className="font-semibold text-base leading-tight text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
-                {group.name}
-              </h3>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Users className="size-3" />
-                  {pluralMembers(group.memberCount)}
-                </span>
-                <span>·</span>
-                <span className="truncate max-w-[120px]">
-                  {splitLabels.overview.members.owner(group.ownerName)}
-                </span>
+      <CardContent className="p-0 flex flex-col justify-between h-full space-y-4">
+        {/* Top: Icon, Group Name, Owner badge, Subtitle */}
+        <div className="space-y-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-2xl shadow-xs border">
+                {group.icon || '👥'}
+              </div>
+              <div className="min-w-0">
+                <h3
+                  className="font-semibold text-base leading-tight text-foreground group-hover:text-primary transition-colors truncate"
+                  title={group.name}
+                >
+                  {group.name}
+                </h3>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {pluralMembers(group.memberCount)} · Owner: {group.ownerName}
+                </p>
               </div>
             </div>
+
+            {group.currentUserRole === 'Owner' && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 border-primary/30 text-primary shrink-0">
+                <Crown className="size-2.5" />
+                Owner
+              </Badge>
+            )}
           </div>
 
-          {group.currentUserRole === 'Owner' && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 border-primary/30 text-primary">
-              <Crown className="size-2.5" />
-              Owner
-            </Badge>
+          {/* Group Description if present */}
+          {group.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2">{group.description}</p>
           )}
         </div>
 
-        {/* Group Description if present */}
-        {group.description && (
-          <p className="text-xs text-muted-foreground line-clamp-1">{group.description}</p>
-        )}
+        {/* Balance Status Section */}
+        <div className="space-y-1 rounded-lg bg-muted/30 p-2.5 border border-border/40">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
+            {splitLabels.overview.yourBalance.title}
+          </span>
+          {isSettled && (
+            <div className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+              <CheckCircle2 className="size-4 text-emerald-500/80" />
+              <span>Settled up</span>
+            </div>
+          )}
+          {isOwed && (
+            <div className="text-sm font-semibold font-mono text-inflow flex items-center gap-1">
+              <ArrowUpRight className="size-4 shrink-0" />
+              <span>You are owed Rs. {Math.abs(balance).toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
+            </div>
+          )}
+          {owes && (
+            <div className="text-sm font-semibold font-mono text-outflow flex items-center gap-1">
+              <ArrowDownLeft className="size-4 shrink-0" />
+              <span>You owe Rs. {Math.abs(balance).toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
+            </div>
+          )}
+        </div>
 
-        {/* Balance Status Footer */}
-        <div className="flex items-center justify-between border-t pt-3 mt-2">
-          <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
-              {splitLabels.overview.yourBalance.title}
-            </span>
-            {isSettled && (
-              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <CheckCircle2 className="size-3.5 text-muted-foreground" />
-                {splitLabels.overview.yourBalance.settled}
-              </span>
-            )}
-            {isOwed && (
-              <span className="text-xs font-semibold font-mono text-inflow flex items-center gap-0.5">
-                <ArrowUpRight className="size-3.5" />
-                {splitLabels.whoOwesWhom.youAreOwed(`Rs. ${Math.abs(balance).toFixed(2)}`)}
-              </span>
-            )}
-            {owes && (
-              <span className="text-xs font-semibold font-mono text-outflow flex items-center gap-0.5">
-                <ArrowDownLeft className="size-3.5" />
-                {splitLabels.whoOwesWhom.youOwe(`Rs. ${Math.abs(balance).toFixed(2)}`)}
-              </span>
-            )}
-          </div>
+        {/* Footer: Total Group Spending & View Group link */}
+        <div className="flex items-center justify-between border-t border-border/60 pt-3 text-xs">
+          <span className="text-muted-foreground truncate">
+            Spending: <span className="font-mono font-medium text-foreground">Rs. {group.totalExpenses.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
+          </span>
 
-          <div className="flex items-center text-xs text-muted-foreground group-hover:text-foreground transition-colors font-medium">
+          <div className="flex items-center text-muted-foreground group-hover:text-primary transition-colors font-medium shrink-0 ml-2">
             <span>View group</span>
             <ChevronRight className="size-4 ml-0.5 group-hover:translate-x-0.5 transition-transform" />
           </div>

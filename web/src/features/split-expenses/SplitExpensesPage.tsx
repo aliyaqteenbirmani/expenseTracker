@@ -175,17 +175,18 @@ export function SplitExpensesPage({
             <div className="space-y-6">
               {/* Header */}
               <PageHeader
+                className="border-b pb-4"
                 title="Split Expenses"
                 description="Share expenses with friends, flatmates, and travel groups. Automatically divide costs and simplify debt."
                 actions={
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
                     <SplitNotificationBell
                       token={token}
                       onInvitationProcessed={loadData}
                       onSettlementProcessed={loadData}
                       onNotificationClick={handleNotificationClick}
                     />
-                    <Button onClick={() => setCreateGroupOpen(true)} className="gap-2 shadow-xs">
+                    <Button onClick={() => setCreateGroupOpen(true)} className="gap-2 shadow-xs flex-1 sm:flex-initial">
                       <Plus className="size-4" />
                       Create Group
                     </Button>
@@ -198,10 +199,11 @@ export function SplitExpensesPage({
                 variants={reduce ? undefined : splitStaggerContainer}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch"
               >
-                <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+                <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
                   <StatCard
+                    className="h-full"
                     label={splitLabels.dashboard.youWillGet.title}
                     value={metrics.totalOwedToMe}
                     formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
@@ -210,8 +212,9 @@ export function SplitExpensesPage({
                     delta={splitLabels.dashboard.youWillGet.subtext}
                   />
                 </motion.div>
-                <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+                <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
                   <StatCard
+                    className="h-full"
                     label={splitLabels.dashboard.youNeedToPay.title}
                     value={metrics.totalIOwe}
                     formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
@@ -220,8 +223,9 @@ export function SplitExpensesPage({
                     delta={splitLabels.dashboard.youNeedToPay.subtext}
                   />
                 </motion.div>
-                <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+                <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
                   <StatCard
+                    className="h-full"
                     label={splitLabels.dashboard.overallBalance.title}
                     value={metrics.net}
                     formatFn={(val) => {
@@ -239,8 +243,9 @@ export function SplitExpensesPage({
                     valueClassName="text-base sm:text-lg @[240px]:text-xl whitespace-normal break-words"
                   />
                 </motion.div>
-                <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
+                <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
                   <StatCard
+                    className="h-full"
                     label={splitLabels.dashboard.myGroups.title}
                     value={groups.length}
                     formatFn={(val) => `${val}`}
@@ -258,7 +263,7 @@ export function SplitExpensesPage({
                   initial="hidden"
                   animate="show"
                 >
-                  <Card className="rounded-xl border border-primary/30 bg-primary/5 p-4 shadow-xs">
+                  <Card className="rounded-xl border border-primary/20 bg-primary/5 p-4 shadow-xs">
                     <div className="flex items-center gap-2 mb-3">
                       <Mail className="size-4 text-primary" />
                       <h3 className="font-semibold text-sm">
@@ -269,18 +274,18 @@ export function SplitExpensesPage({
                       {myInvitations.map((inv) => (
                         <div
                           key={inv.id}
-                          className="flex items-center justify-between p-3 rounded-lg border bg-background text-sm"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-lg border bg-background text-sm gap-3"
                         >
-                          <div className="truncate mr-2">
-                            <div className="font-semibold truncate">{inv.groupName}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              Invited by {inv.invitedByName}
-                            </div>
+                          <div className="truncate min-w-0">
+                            <p className="text-sm text-foreground truncate" title={`${inv.groupName} by ${inv.invitedByName}`}>
+                              You&apos;ve been invited to <span className="font-semibold">{inv.groupName}</span> by{' '}
+                              <span className="font-medium">{inv.invitedByName}</span>
+                            </p>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                             <Button
                               size="sm"
-                              className="h-8 gap-1 text-xs"
+                              className="h-8 gap-1 text-xs shadow-xs"
                               disabled={respondingInviteId === inv.id}
                               onClick={() => handleAcceptInvite(inv.id)}
                             >
@@ -308,17 +313,18 @@ export function SplitExpensesPage({
               {/* Groups Grid */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold tracking-tight text-foreground">
-                    My Expense Groups ({groups.length})
+                  <h2 className="text-base sm:text-lg font-semibold tracking-tight text-foreground">
+                    My Groups ({groups.length})
                   </h2>
                 </div>
 
                 {groups.length === 0 ? (
                   <EmptyState
+                    icon={Layers}
                     title="No Split Groups Yet"
-                    description="Create your first expense-sharing group or ask a group owner to invite you."
+                    description="Create your first group to start sharing expenses"
                     action={
-                      <Button onClick={() => setCreateGroupOpen(true)} className="gap-2">
+                      <Button onClick={() => setCreateGroupOpen(true)} className="gap-2 shadow-xs">
                         <Plus className="size-4" />
                         Create Group
                       </Button>
@@ -329,12 +335,13 @@ export function SplitExpensesPage({
                     variants={reduce ? undefined : splitStaggerContainer}
                     initial="hidden"
                     animate="show"
-                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch"
                   >
                     {groups.map((group) => (
                       <motion.div
                         key={group.id}
                         variants={reduce ? fadeOnly : splitCardVariants}
+                        className="h-full"
                       >
                         <SplitGroupCard
                           group={group}
