@@ -19,6 +19,7 @@ import {
 import { useMotionSafe } from '@/hooks/use-motion-safe'
 import { toast } from 'sonner'
 import type { SplitGroupSummaryDto, SplitGroupInvitationDto, SplitNotificationDto } from './types'
+import { splitLabels } from './splitLabels'
 import {
   Plus,
   Scale,
@@ -201,48 +202,51 @@ export function SplitExpensesPage({
               >
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
                   <StatCard
-                    label="Total You Are Owed"
+                    label={splitLabels.dashboard.youWillGet.title}
                     value={metrics.totalOwedToMe}
                     formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
                     icon={ArrowUpRight}
                     trend={metrics.totalOwedToMe > 0 ? 'up' : 'neutral'}
-                    delta="People owe you"
+                    delta={splitLabels.dashboard.youWillGet.subtext}
                   />
                 </motion.div>
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
                   <StatCard
-                    label="Total You Owe"
+                    label={splitLabels.dashboard.youNeedToPay.title}
                     value={metrics.totalIOwe}
                     formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
                     icon={ArrowDownLeft}
                     trend={metrics.totalIOwe > 0 ? 'down' : 'neutral'}
-                    delta="You owe others"
+                    delta={splitLabels.dashboard.youNeedToPay.subtext}
                   />
                 </motion.div>
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
                   <StatCard
-                    label="Net Balance"
+                    label={splitLabels.dashboard.overallBalance.title}
                     value={metrics.net}
-                    formatFn={(val) =>
-                      Math.abs(val) < 0.005
-                        ? 'Settled up'
-                        : val > 0
-                        ? `+Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`
-                        : `-Rs. ${Math.abs(val).toLocaleString('en-PK', { minimumFractionDigits: 2 })}`
-                    }
+                    formatFn={(val) => {
+                      if (Math.abs(val) < 0.005) {
+                        return splitLabels.dashboard.overallBalance.settled
+                      }
+                      const formatted = `Rs. ${Math.abs(val).toLocaleString('en-PK', { minimumFractionDigits: 2 })}`
+                      return val > 0
+                        ? splitLabels.dashboard.overallBalance.owed(formatted)
+                        : splitLabels.dashboard.overallBalance.owe(formatted)
+                    }}
                     icon={Scale}
                     trend={metrics.net > 0 ? 'up' : metrics.net < 0 ? 'down' : 'neutral'}
-                    delta={metrics.net > 0 ? 'Overall positive' : metrics.net < 0 ? 'Overall debt' : 'Zero balance'}
+                    delta={splitLabels.dashboard.overallBalance.subtext}
+                    valueClassName="text-base sm:text-lg @[240px]:text-xl whitespace-normal break-words"
                   />
                 </motion.div>
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
                   <StatCard
-                    label="Active Groups"
+                    label={splitLabels.dashboard.myGroups.title}
                     value={groups.length}
                     formatFn={(val) => `${val}`}
                     icon={Layers}
                     trend="neutral"
-                    delta={`${groups.length} groups`}
+                    delta={splitLabels.dashboard.myGroups.count(groups.length)}
                   />
                 </motion.div>
               </motion.div>

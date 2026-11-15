@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Users, ArrowUpRight, ArrowDownLeft, CheckCircle2, ChevronRight, Crown } from 'lucide-react'
 import type { SplitGroupSummaryDto } from '../types'
+import { splitLabels, pluralMembers } from '../splitLabels'
 
 interface SplitGroupCardProps {
   group: SplitGroupSummaryDto
@@ -33,11 +34,11 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Users className="size-3" />
-                  {group.memberCount} {group.memberCount === 1 ? 'member' : 'members'}
+                  {pluralMembers(group.memberCount)}
                 </span>
                 <span>·</span>
                 <span className="truncate max-w-[120px]">
-                  Owner: {group.ownerName}
+                  {splitLabels.overview.members.owner(group.ownerName)}
                 </span>
               </div>
             </div>
@@ -60,24 +61,24 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
         <div className="flex items-center justify-between border-t pt-3 mt-2">
           <div>
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
-              Your Balance
+              {splitLabels.overview.yourBalance.title}
             </span>
             {isSettled && (
               <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                 <CheckCircle2 className="size-3.5 text-muted-foreground" />
-                Settled up
+                {splitLabels.overview.yourBalance.settled}
               </span>
             )}
             {isOwed && (
               <span className="text-xs font-semibold font-mono text-inflow flex items-center gap-0.5">
                 <ArrowUpRight className="size-3.5" />
-                You get back Rs. {Math.abs(balance).toFixed(2)}
+                {splitLabels.whoOwesWhom.youAreOwed(`Rs. ${Math.abs(balance).toFixed(2)}`)}
               </span>
             )}
             {owes && (
               <span className="text-xs font-semibold font-mono text-outflow flex items-center gap-0.5">
                 <ArrowDownLeft className="size-3.5" />
-                You owe Rs. {Math.abs(balance).toFixed(2)}
+                {splitLabels.whoOwesWhom.youOwe(`Rs. ${Math.abs(balance).toFixed(2)}`)}
               </span>
             )}
           </div>

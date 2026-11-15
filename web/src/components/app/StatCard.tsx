@@ -16,6 +16,7 @@ interface StatCardProps {
   className?: string
   valueColor?: string
   valueTitle?: string
+  valueClassName?: string
 }
 
 export function StatCard({
@@ -29,6 +30,7 @@ export function StatCard({
   className,
   valueColor,
   valueTitle,
+  valueClassName,
 }: StatCardProps) {
   const displayValue = formatFn ? formatFn(value) : value.toLocaleString()
 
@@ -55,7 +57,8 @@ export function StatCard({
             title={valueTitle ?? displayValue}
             className={cn(
               'text-lg @[180px]:text-xl @[240px]:text-2xl @[320px]:text-3xl font-semibold tabular-nums tracking-tight font-mono whitespace-nowrap',
-              valueColor
+              valueColor,
+              valueClassName
             )}
           >
             <AnimatedNumber value={value} formatFn={formatFn} />

@@ -585,7 +585,7 @@ export function InviteMemberDialog({
           <div className="flex items-start gap-1.5">
             <Users className="size-3.5 text-muted-foreground shrink-0 mt-0.5" />
             <span>
-              Newly accepted members immediately gain access to view the ledger and be included in future expenses.
+              Newly accepted members immediately gain access to view group expenses and be included in future expenses.
             </span>
           </div>
         </div>

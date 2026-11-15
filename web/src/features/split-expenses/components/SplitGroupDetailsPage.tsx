@@ -48,6 +48,7 @@ import { InviteMemberDialog } from './InviteMemberDialog'
 import { toast } from 'sonner'
 import { getMemberInitials } from './MemberSelector'
 import { SplitNotificationBell } from './SplitNotificationBell'
+import { splitLabels } from '../splitLabels'
 import type {
   SplitGroupDetailDto,
   SplitExpenseListItemDto,
@@ -492,23 +493,12 @@ export function SplitGroupDetailsPage({
   const pendingPaidAmount = myMemberBal?.pendingPaid || 0
   const pendingRecvAmount = myMemberBal?.pendingReceived || 0
 
+  const pendingTotal = pendingPaidAmount + pendingRecvAmount
   let pendingBalFooter: React.ReactNode = null
-  if (pendingPaidAmount > 0.005 && pendingRecvAmount > 0.005) {
+  if (pendingTotal > 0.005) {
     pendingBalFooter = (
       <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium font-mono">
-        Rs. {pendingPaidAmount.toFixed(2)} pending confirmation · Rs. {pendingRecvAmount.toFixed(2)} pending receipt
-      </span>
-    )
-  } else if (pendingPaidAmount > 0.005) {
-    pendingBalFooter = (
-      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium font-mono">
-        Rs. {pendingPaidAmount.toFixed(2)} pending confirmation
-      </span>
-    )
-  } else if (pendingRecvAmount > 0.005) {
-    pendingBalFooter = (
-      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium font-mono">
-        Rs. {pendingRecvAmount.toFixed(2)} pending receipt
+        {splitLabels.overview.yourBalance.waitingConfirmation(`Rs. ${pendingTotal.toFixed(2)}`)}
       </span>
     )
   }
@@ -526,37 +516,32 @@ export function SplitGroupDetailsPage({
       case 'PendingReceiver':
         return (
           <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
-            Waiting for receiver
+            {splitLabels.settlementStatus.waitingFor(st.toUserName || 'receiver')}
           </Badge>
         )
       case 'PendingOwner':
         return (
           <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
-            Waiting for admin approval
+            {splitLabels.settlementStatus.waitingForOwner}
           </Badge>
         )
       case 'Confirmed':
         return (
           <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
-            Confirmed
+            {splitLabels.settlementStatus.confirmed}
           </Badge>
         )
       case 'DeclinedByReceiver':
-        return (
-          <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30 font-medium">
-            Declined
-          </Badge>
-        )
       case 'DeclinedByOwner':
         return (
           <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30 font-medium">
-            Declined by admin
+            {splitLabels.settlementStatus.declined}
           </Badge>
         )
       case 'Cancelled':
         return (
           <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground border-border">
-            Cancelled
+            {splitLabels.settlementStatus.cancelled}
           </Badge>
         )
       default:
@@ -633,7 +618,7 @@ export function SplitGroupDetailsPage({
             className="gap-1.5 shadow-xs"
           >
             <HandCoins className="size-4" />
-            Settle Up
+            {splitLabels.actions.recordPayment}
           </Button>
           {isOwner && (
             <Button
@@ -653,22 +638,22 @@ export function SplitGroupDetailsPage({
       <MotionTabs value={activeTab} onValueChange={handleTabChange} variant="underline">
         <MotionTabsList className="w-full justify-start border-b rounded-none p-0 bg-transparent gap-4">
           <MotionTabsTrigger value="overview" className="pb-2.5">
-            Overview
+            {splitLabels.tabs.overview}
           </MotionTabsTrigger>
           <MotionTabsTrigger value="expenses" className="pb-2.5">
-            Expenses ({expenses.length})
+            {splitLabels.tabs.expenses(expenses.length)}
           </MotionTabsTrigger>
           <MotionTabsTrigger value="balances" className="pb-2.5">
-            Balances ({balances.length})
+            {splitLabels.tabs.whoOwesWhom}
           </MotionTabsTrigger>
           <MotionTabsTrigger value="settle" className="pb-2.5">
-            Settle Up
+            {splitLabels.tabs.settleUp}
           </MotionTabsTrigger>
           <MotionTabsTrigger value="members" className="pb-2.5">
-            Members ({group.members?.length || 0})
+            {splitLabels.tabs.members(group.members?.length || 0)}
           </MotionTabsTrigger>
           <MotionTabsTrigger value="activity" className="pb-2.5">
-            Activity
+            {splitLabels.tabs.activity}
           </MotionTabsTrigger>
         </MotionTabsList>
 
@@ -682,49 +667,55 @@ export function SplitGroupDetailsPage({
           >
             <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
               <StatCard
-                label="Total Group Expenses"
+                label={splitLabels.overview.groupSpending.title}
                 value={group.totalExpenses}
                 formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
                 icon={Receipt}
                 trend="up"
-                delta="Recorded ledger"
+                delta={splitLabels.overview.groupSpending.subtext}
               />
             </motion.div>
             <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
               <StatCard
-                label="Your Net Balance"
+                label={splitLabels.overview.yourBalance.title}
                 value={myBalance}
                 formatFn={(val) =>
                   isSettled
-                    ? 'Settled up'
+                    ? splitLabels.overview.yourBalance.settled
                     : isOwed
                     ? `+Rs. ${Math.abs(val).toFixed(2)}`
                     : `-Rs. ${Math.abs(val).toFixed(2)}`
                 }
                 icon={Scale}
                 trend={isOwed ? 'up' : owes ? 'down' : 'neutral'}
-                delta={isOwed ? 'You get back' : owes ? 'You owe' : 'All clear'}
+                delta={
+                  isOwed
+                    ? splitLabels.overview.yourBalance.youAreOwed
+                    : owes
+                    ? splitLabels.overview.yourBalance.youOwe
+                    : splitLabels.overview.yourBalance.settled
+                }
                 footer={pendingBalFooter}
               />
             </motion.div>
             <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
               <StatCard
-                label="Total Settled"
+                label={splitLabels.overview.paymentsSettled.title}
                 value={totalSettledAmount}
                 formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
                 icon={HandCoins}
                 trend="neutral"
-                delta="Confirmed payments"
+                delta={splitLabels.overview.paymentsSettled.subtext}
               />
             </motion.div>
             <motion.div variants={reduce ? fadeOnly : splitCardVariants}>
               <StatCard
-                label="Group Members"
+                label={splitLabels.overview.members.title}
                 value={group.memberCount}
                 formatFn={(val) => `${val}`}
                 icon={Users}
                 trend="neutral"
-                delta={`Owner: ${group.ownerName}`}
+                delta={splitLabels.overview.members.owner(group.ownerName)}
               />
             </motion.div>
           </motion.div>
@@ -736,10 +727,10 @@ export function SplitGroupDetailsPage({
                 <div className="space-y-0.5">
                   <h4 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
                     <HandCoins className="size-4 text-primary" />
-                    Simplified Debt Suggestions
+                    {splitLabels.suggestedPayments.title}
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    Direct settlements calculated to minimize the number of payments.
+                    {splitLabels.suggestedPayments.subtext}
                   </p>
                 </div>
                 <Button
@@ -827,10 +818,11 @@ export function SplitGroupDetailsPage({
                         Rs. {exp.amount.toFixed(2)}
                       </div>
                       <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1">
-                        <span>Your share: Rs. {exp.currentUserShare.toFixed(2)}</span>
-                        {exp.currentUserShare === 0 && (
-                          <span className="text-[10px] text-muted-foreground/80 bg-muted px-1.5 py-0.2 rounded font-sans border border-border/50">
-                            Not included
+                        {exp.currentUserShare > 0.005 ? (
+                          <span>{splitLabels.expense.yourShare(`Rs. ${exp.currentUserShare.toFixed(2)}`)}</span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground/80 bg-muted px-1.5 py-0.5 rounded font-sans border border-border/50">
+                            {splitLabels.expense.notIncluded}
                           </span>
                         )}
                       </div>
@@ -914,10 +906,11 @@ export function SplitGroupDetailsPage({
                       Rs. {exp.amount.toFixed(2)}
                     </div>
                     <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1">
-                      <span>Your share: Rs. {exp.currentUserShare.toFixed(2)}</span>
-                      {exp.currentUserShare === 0 && (
-                        <span className="text-[10px] text-muted-foreground/80 bg-muted px-1.5 py-0.2 rounded font-sans border border-border/50">
-                          Not included
+                      {exp.currentUserShare > 0.005 ? (
+                        <span>{splitLabels.expense.yourShare(`Rs. ${exp.currentUserShare.toFixed(2)}`)}</span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground/80 bg-muted px-1.5 py-0.5 rounded font-sans border border-border/50">
+                          {splitLabels.expense.notIncluded}
                         </span>
                       )}
                     </div>
@@ -928,12 +921,12 @@ export function SplitGroupDetailsPage({
           )}
         </MotionTabsContent>
 
-        {/* 3. BALANCES TAB */}
+        {/* 3. WHO OWES WHOM TAB */}
         <MotionTabsContent value="balances" className="space-y-4 pt-4">
           <div className="rounded-xl border bg-card p-4">
-            <h3 className="text-base font-semibold mb-1">Member Balances</h3>
+            <h3 className="text-base font-semibold mb-1">{splitLabels.whoOwesWhom.title}</h3>
             <p className="text-xs text-muted-foreground mb-4">
-              Net balance calculates total paid minus total share, plus confirmed settlement payments.
+              {splitLabels.whoOwesWhom.helperText}
             </p>
 
             <motion.div
@@ -1001,24 +994,28 @@ export function SplitGroupDetailsPage({
 
                     <div className="text-right sm:text-right flex sm:flex-col items-center sm:items-end justify-between sm:justify-start">
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground sm:block">
-                        Net Status
+                        {splitLabels.whoOwesWhom.status}
                       </span>
                       {isZero && (
                         <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                           <CheckCircle2 className="size-3.5 text-emerald-500" />
-                          Settled up
+                          {splitLabels.whoOwesWhom.settledUp}
                         </span>
                       )}
                       {isPositive && (
                         <span className="text-sm font-bold font-mono text-inflow flex items-center gap-1">
                           <ArrowUpRight className="size-4" />
-                          {m.userId === currentUserId ? 'You get back' : `${m.fullName} gets back`} Rs. {Math.abs(bal).toFixed(2)}
+                          {m.userId === currentUserId
+                            ? splitLabels.whoOwesWhom.youAreOwed(`Rs. ${Math.abs(bal).toFixed(2)}`)
+                            : splitLabels.whoOwesWhom.memberIsOwed(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`)}
                         </span>
                       )}
                       {isNegative && (
                         <span className="text-sm font-bold font-mono text-outflow flex items-center gap-1">
                           <ArrowDownLeft className="size-4" />
-                          {m.userId === currentUserId ? 'You owe' : `${m.fullName} owes`} Rs. {Math.abs(bal).toFixed(2)}
+                          {m.userId === currentUserId
+                            ? splitLabels.whoOwesWhom.youOwe(`Rs. ${Math.abs(bal).toFixed(2)}`)
+                            : splitLabels.whoOwesWhom.memberOwes(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`)}
                         </span>
                       )}
                     </div>
@@ -1179,9 +1176,9 @@ export function SplitGroupDetailsPage({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-semibold">Suggested Payments</h3>
+                <h3 className="text-base font-semibold">{splitLabels.suggestedPayments.title}</h3>
                 <p className="text-xs text-muted-foreground">
-                  Debt simplification engine calculates the fewest transactions to settle all debts.
+                  {splitLabels.suggestedPayments.subtext}
                 </p>
               </div>
               <Button
@@ -1193,16 +1190,16 @@ export function SplitGroupDetailsPage({
                 className="gap-1.5"
               >
                 <Plus className="size-4" />
-                Record Custom Payment
+                {splitLabels.actions.recordCustomPayment}
               </Button>
             </div>
 
             {settleOverview?.suggestedTransactions.length === 0 ? (
               <div className="rounded-xl border bg-card p-6 text-center space-y-2">
                 <CheckCircle2 className="size-8 text-inflow mx-auto" />
-                <h4 className="font-semibold text-sm">Everyone is settled up!</h4>
+                <h4 className="font-semibold text-sm">{splitLabels.suggestedPayments.allSettledTitle}</h4>
                 <p className="text-xs text-muted-foreground">
-                  There are no outstanding debts in this group.
+                  {splitLabels.suggestedPayments.allSettledSubtext}
                 </p>
               </div>
             ) : (
@@ -1672,7 +1669,7 @@ export function SplitGroupDetailsPage({
           <AlertDialogHeader>
             <AlertDialogTitle>Remove member from group?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this member? Members with outstanding balances cannot be removed until settled.
+              Are you sure you want to remove this member? Members with unsettled balances cannot be removed until settled.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

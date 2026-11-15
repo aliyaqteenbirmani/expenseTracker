@@ -292,7 +292,7 @@ export function SettleUpDialog({
                 </h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {isImmediate
-                    ? 'This transaction will update the net balance for both members immediately.'
+                    ? 'This transaction will update the balance for both members immediately.'
                     : `Your request will be sent to ${getMemberDisplayName(toMember) || 'the receiver'} for confirmation before balances change.`}
                 </p>
               </div>
