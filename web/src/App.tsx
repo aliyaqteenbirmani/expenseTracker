@@ -408,6 +408,10 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
     toast(msg)
   }, [])
 
+  const selectedBusiness = useMemo(() => {
+    return businesses.find((b) => b.id === businessId) || null
+  }, [businesses, businessId])
+
   // Permissions calculation
   useEffect(() => {
     if (!businessId) {
@@ -420,7 +424,21 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
       token
     )
       .then((res) => {
-        if (res) setUserAccess(res)
+        if (res) {
+          const raw = res as unknown as {
+            isOwner?: boolean
+            IsOwner?: boolean
+            businessPermissions?: string[]
+            BusinessPermissions?: string[]
+            cashbookPermissions?: string[]
+            CashbookPermissions?: string[]
+          }
+          setUserAccess({
+            isOwner: Boolean(raw.isOwner ?? raw.IsOwner),
+            businessPermissions: raw.businessPermissions ?? raw.BusinessPermissions ?? [],
+            cashbookPermissions: raw.cashbookPermissions ?? raw.CashbookPermissions ?? [],
+          })
+        }
       })
       .catch(() => {
         const currentBiz = businesses.find((b) => b.id === businessId)
@@ -432,13 +450,29 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
       })
   }, [businessId, book?.id, token, businesses])
 
-  const isOwner = userAccess.isOwner
-  const canCreateCashbook = isOwner || userAccess.businessPermissions.includes('CASHBOOK_CREATE')
-  const canEditCashbook = isOwner || userAccess.businessPermissions.includes('CASHBOOK_UPDATE')
-  const canDeleteCashbook = isOwner || userAccess.businessPermissions.includes('CASHBOOK_DELETE')
-  const canCreateTransaction = isOwner || userAccess.cashbookPermissions.includes('TRANSACTION_CREATE')
-  const canEditTransaction = isOwner || userAccess.cashbookPermissions.includes('TRANSACTION_UPDATE')
-  const canDeleteTransaction = isOwner || userAccess.cashbookPermissions.includes('TRANSACTION_DELETE')
+  const isBusinessOwner = selectedBusiness?.isOwner ?? userAccess.isOwner
+  const isOwner = isBusinessOwner
+  const bizPerms = userAccess.businessPermissions || []
+  const cbPerms = userAccess.cashbookPermissions || []
+  const hasBizPerm = (code: string) => bizPerms.some((p) => p.toUpperCase() === code.toUpperCase())
+  const hasCbPerm = (code: string) => cbPerms.some((p) => p.toUpperCase() === code.toUpperCase())
+
+  const canCreateCashbook = isOwner || hasBizPerm('CASHBOOK_CREATE')
+  const canEditCashbook = isOwner || hasBizPerm('CASHBOOK_UPDATE')
+  const canDeleteCashbook = isOwner || hasBizPerm('CASHBOOK_DELETE')
+  const canCreateTransaction = isOwner || hasCbPerm('TRANSACTION_CREATE')
+  const canEditTransaction = isOwner || hasCbPerm('TRANSACTION_UPDATE')
+  const canDeleteTransaction = isOwner || hasCbPerm('TRANSACTION_DELETE')
+
+  const handleOpenCreateCashbook = useCallback(() => {
+    const targetBizId = businessId || selectedBusiness?.id || businesses[0]?.id
+    if (!targetBizId) {
+      showToast('Please create or select a workspace first.')
+      setShowCreateBusiness(true)
+      return
+    }
+    setShowCreateCashbook(true)
+  }, [businessId, selectedBusiness?.id, businesses, showToast])
 
   const fetchUnreadInvites = useCallback(async () => {
     try {
@@ -539,15 +573,19 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
     async (preferredBusinessId?: string, preferredCashbookId?: string) => {
       try {
         const list = await api<Business[]>('/api/Business/all', token)
-        const normalized = (list ?? []).map((item) => ({
-          ...item,
-          id: item.id ?? (item as Business & { Id: string }).Id,
-          name:
-            item.name ??
-            (item as Business & { Name?: string }).Name ??
-            (item as Business & { businessName?: string }).businessName ??
-            'Workspace',
-        }))
+        const normalized = (list ?? []).map((item) => {
+          const raw = item as unknown as { isOwner?: boolean; IsOwner?: boolean }
+          return {
+            ...item,
+            id: item.id ?? (item as Business & { Id: string }).Id,
+            name:
+              item.name ??
+              (item as Business & { Name?: string }).Name ??
+              (item as Business & { businessName?: string }).businessName ??
+              'Workspace',
+            isOwner: raw.isOwner ?? raw.IsOwner ?? true,
+          }
+        })
         setBusinesses(normalized)
         const active =
           (preferredBusinessId && normalized.find((b) => b.id === preferredBusinessId)) ||
@@ -729,10 +767,6 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
     }
   }, [book, canCreateTransaction])
 
-  const selectedBusiness = useMemo(() => {
-    return businesses.find((b) => b.id === businessId) || null
-  }, [businesses, businessId])
-
   const appUser: AppUser = {
     id: user.id ?? (user as unknown as { Id?: string }).Id,
     firstName: user.firstName ?? (user as unknown as { FirstName?: string }).FirstName,
@@ -792,7 +826,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
             void reloadTransactions(cb.id)
             showToast(`Switched active cashbook to "${cb.cashBookName ?? cb.name ?? 'Cashbook'}"`)
           }}
-          onAddCashbook={() => setShowCreateCashbook(true)}
+          onAddCashbook={handleOpenCreateCashbook}
           currentView={currentView}
           onNavigate={setCurrentView}
           isOwner={isOwner}
@@ -882,7 +916,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
                   void reloadTransactions(cb.id)
                   setCurrentView('transactions')
                 }}
-                onAddCashbook={() => setShowCreateCashbook(true)}
+                onAddCashbook={handleOpenCreateCashbook}
                 onEditCashbook={(cb) => setManageCashbook({ book: cb, mode: 'edit' })}
                 onDeleteCashbook={(cb) => setManageCashbook({ book: cb, mode: 'delete' })}
                 onBack={() => setCurrentView('overview')}
@@ -984,7 +1018,7 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
           setManualTxnInitialType(type)
           setShowManualTransaction(true)
         }}
-        onAddCashbook={() => setShowCreateCashbook(true)}
+        onAddCashbook={handleOpenCreateCashbook}
         onInviteMember={() => setCurrentView('members')}
         onOpenShortcuts={() => setShowShortcuts(true)}
         onOpenProfile={() => setShowProfile(true)}
@@ -1034,12 +1068,16 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
         />
       )}
 
-      {showCreateCashbook && businessId && (
+      {showCreateCashbook && (businessId || selectedBusiness?.id || businesses[0]?.id) && (
         <CreateCashbookDialog
           token={token}
-          businessId={businessId}
+          businessId={businessId || selectedBusiness?.id || businesses[0]?.id || ''}
           onClose={() => setShowCreateCashbook(false)}
-          onCreated={async () => reloadCashbooks()}
+          onCreated={async (name) => {
+            const activeBizId = businessId || selectedBusiness?.id || businesses[0]?.id
+            await reloadCashbooks(activeBizId)
+            showToast(`Cashbook "${name}" created successfully`)
+          }}
           api={api}
         />
       )}

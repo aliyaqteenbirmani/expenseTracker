@@ -266,6 +266,7 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
 
             if (isBusinessOwner)
             {
+                access.IsOwner = true;
                 access.BusinessPermissions = Enum.GetNames<BusinessPermission>().ToList();
             }
 
@@ -274,7 +275,7 @@ namespace SpendwiseSystem.Application.Services.MemberManagementService
                 access.IsOwner = true;
                 access.CashbookPermissions = Enum.GetNames<SpendwiseSystem.Domain.Enums.CashbookPermission>().ToList();
             }
-            else if (cashbookId.HasValue && !isCashbookOwner)
+            else if (cashbookId.HasValue && !isCashbookOwner && !isBusinessOwner)
             {
                 access.IsOwner = false;
             }
