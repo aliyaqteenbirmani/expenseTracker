@@ -45,6 +45,9 @@ import { EditExpenseDialog } from './EditExpenseDialog'
 import { ExpenseDetailDialog } from './ExpenseDetailDialog'
 import { SettleUpDialog } from './SettleUpDialog'
 import { InviteMemberDialog } from './InviteMemberDialog'
+import { GroupHeroBalanceBanner } from './GroupHeroBalanceBanner'
+import { ExpenseFeedItem } from './ExpenseFeedItem'
+import { SimplifiedDebtsCard } from './SimplifiedDebtsCard'
 import { toast } from 'sonner'
 import { getMemberInitials } from './MemberSelector'
 import { SplitNotificationBell } from './SplitNotificationBell'
@@ -636,6 +639,9 @@ export function SplitGroupDetailsPage({
         </div>
       </div>
 
+      {/* Splitwise Hero Balance Banner */}
+      <GroupHeroBalanceBanner balance={myBalance} memberCount={group.memberCount} />
+
       {/* Navigation Tabs */}
       <MotionTabs value={activeTab} onValueChange={handleTabChange} variant="underline">
         <div className="border-b overflow-hidden">
@@ -728,60 +734,26 @@ export function SplitGroupDetailsPage({
             </motion.div>
           </motion.div>
 
-          {/* Quick Settle Suggestions Banner */}
-          {settleOverview?.suggestedTransactions && settleOverview.suggestedTransactions.length > 0 && (
-            <Card className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <h4 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
-                    <HandCoins className="size-4 text-primary" />
-                    {splitLabels.suggestedPayments.title}
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    {splitLabels.suggestedPayments.subtext}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleTabChange('settle')}
-                  className="shrink-0"
-                >
-                  View All Settlements
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mt-3">
-                {settleOverview.suggestedTransactions.slice(0, 3).map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-2.5 rounded-lg border bg-background text-xs"
-                  >
-                    <div className="truncate mr-2">
-                      <span className="font-semibold">{item.fromUserName}</span> pays{' '}
-                      <span className="font-semibold">{item.toUserName}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-foreground">
-                        Rs. {item.amount.toFixed(2)}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 px-2 text-[10px]"
-                        onClick={() => {
-                          setActiveSuggestion(item)
-                          setSettleUpOpen(true)
-                        }}
-                      >
-                        Pay
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+          {/* Debt Simplification & Suggested Settlements */}
+          <SimplifiedDebtsCard
+            memberBalances={balances}
+            members={group.members || []}
+            currentUserId={currentUserId}
+            onSettleUp={(targetUserId, targetAmount) => {
+              if (targetUserId) {
+                setActiveSuggestion({
+                  fromUserId: currentUserId || '',
+                  fromUserName: 'You',
+                  fromUserEmail: group.members?.find((m) => m.userId === currentUserId)?.email || '',
+                  toUserId: targetUserId,
+                  toUserName: group.members?.find((m) => m.userId === targetUserId)?.fullName || 'Member',
+                  toUserEmail: group.members?.find((m) => m.userId === targetUserId)?.email || '',
+                  amount: targetAmount || 0,
+                })
+              }
+              setSettleUpOpen(true)
+            }}
+          />
 
           {/* Recent Expenses List */}
           <div className="space-y-3">
@@ -807,45 +779,14 @@ export function SplitGroupDetailsPage({
                 }
               />
             ) : (
-              <div className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs">
+              <div className="rounded-2xl border divide-y overflow-hidden bg-card/60 shadow-xs">
                 {expenses.slice(0, 5).map((exp) => (
-                  <div
+                  <ExpenseFeedItem
                     key={exp.id}
+                    expense={exp}
+                    currentUserId={currentUserId}
                     onClick={() => handleOpenExpense(exp.id)}
-                    className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3 hover:bg-muted/40 cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                        <Receipt className="size-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm text-foreground truncate" title={exp.title}>
-                          {exp.title}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5 flex-wrap">
-                          <span>Paid by {exp.payerName} {exp.payerId === currentUserId && '(You)'}</span>
-                          <span>·</span>
-                          <span>Added by {exp.createdByName || 'Member'} {exp.createdBy === currentUserId && '(You)'}</span>
-                          <span>·</span>
-                          <span>{format(new Date(exp.expenseDate), 'MMM d')}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right whitespace-nowrap">
-                      <div className="font-mono font-semibold text-sm whitespace-nowrap">
-                        Rs. {exp.amount.toFixed(2)}
-                      </div>
-                      <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1 whitespace-nowrap">
-                        {exp.currentUserShare > 0.005 ? (
-                          <span>{splitLabels.expense.yourShare(`Rs. ${exp.currentUserShare.toFixed(2)}`)}</span>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground/80 bg-muted px-1.5 py-0.5 rounded font-sans border border-border/50">
-                            {splitLabels.expense.notIncluded}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  />
                 ))}
               </div>
             )}
@@ -899,60 +840,35 @@ export function SplitGroupDetailsPage({
               }
             />
           ) : (
-            <motion.div
-              variants={reduce ? undefined : splitStaggerContainer}
-              initial="hidden"
-              animate="show"
-              className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs"
-            >
-              {expenses.map((exp) => (
-                <motion.div
-                  key={exp.id}
-                  variants={reduce ? fadeOnly : splitCardVariants}
-                  onClick={() => handleOpenExpense(exp.id)}
-                  className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3 hover:bg-muted/40 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                      <Receipt className="size-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm text-foreground truncate flex items-center gap-2" title={exp.title}>
-                        <span className="truncate">{exp.title}</span>
-                        {exp.category && (
-                          <Badge variant="secondary" className="font-normal text-[10px] h-4 shrink-0">
-                            {exp.category}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5 flex-wrap">
-                        <span>Paid by {exp.payerName} {exp.payerId === currentUserId && '(You)'}</span>
-                        <span>·</span>
-                        <span>Added by {exp.createdByName || 'Member'} {exp.createdBy === currentUserId && '(You)'}</span>
-                        <span>·</span>
-                        <span>{format(new Date(exp.expenseDate), 'MMM d, yyyy')}</span>
-                        <span>·</span>
-                        <span>{exp.participantCount} shared</span>
-                      </div>
-                    </div>
+            <div className="space-y-4">
+              {Object.entries(
+                expenses.reduce<Record<string, SplitExpenseListItemDto[]>>((acc, exp) => {
+                  const monthKey = format(
+                    new Date(exp.expenseDate || exp.createdAt),
+                    'MMMM yyyy'
+                  ).toUpperCase()
+                  if (!acc[monthKey]) acc[monthKey] = []
+                  acc[monthKey].push(exp)
+                  return acc
+                }, {})
+              ).map(([month, monthExpenses]) => (
+                <div key={month} className="space-y-1.5">
+                  <div className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase px-2 pt-1">
+                    {month}
                   </div>
-                  <div className="shrink-0 text-right whitespace-nowrap">
-                    <div className="font-mono font-semibold text-sm whitespace-nowrap">
-                      Rs. {exp.amount.toFixed(2)}
-                    </div>
-                    <div className="text-xs text-muted-foreground font-mono flex items-center justify-end gap-1 whitespace-nowrap">
-                      {exp.currentUserShare > 0.005 ? (
-                        <span>{splitLabels.expense.yourShare(`Rs. ${exp.currentUserShare.toFixed(2)}`)}</span>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground/80 bg-muted px-1.5 py-0.5 rounded font-sans border border-border/50">
-                          {splitLabels.expense.notIncluded}
-                        </span>
-                      )}
-                    </div>
+                  <div className="rounded-2xl border divide-y overflow-hidden bg-card/60 shadow-xs">
+                    {monthExpenses.map((exp) => (
+                      <ExpenseFeedItem
+                        key={exp.id}
+                        expense={exp}
+                        currentUserId={currentUserId}
+                        onClick={() => handleOpenExpense(exp.id)}
+                      />
+                    ))}
                   </div>
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
+            </div>
           )}
         </MotionTabsContent>
 
