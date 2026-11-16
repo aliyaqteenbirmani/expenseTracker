@@ -69,8 +69,12 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (payerMembership == null || !payerMembership.IsActive)
                 return ApiResponse<SplitExpenseDetailDto>.FailureResponse("The specified payer is not an active member of this group.");
 
-            // Validate participant list
-            var participantIds = (dto.ParticipantUserIds ?? new List<Guid>())
+            // Resolve participants and verify they are active members of the group
+            var activeMembers = await _groupRepository.GetGroupMembersAsync(groupId);
+            var activeMemberIdSet = activeMembers.Where(m => m.IsActive).Select(m => m.UserId).ToHashSet();
+
+            var splitType = string.IsNullOrWhiteSpace(dto.SplitType) ? "Equal" : dto.SplitType.Trim();
+            var participantIds = (dto.ParticipantSplits?.Select(p => p.UserId) ?? dto.ParticipantUserIds ?? new List<Guid>())
                 .Where(id => id != Guid.Empty)
                 .Distinct()
                 .ToList();
@@ -78,18 +82,38 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             if (participantIds.Count == 0)
                 return ApiResponse<SplitExpenseDetailDto>.FailureResponse("At least one group member must be included in the split.");
 
-            // Verify all participants are active members of the group
-            var activeMembers = await _groupRepository.GetGroupMembersAsync(groupId);
-            var activeMemberIdSet = activeMembers.Where(m => m.IsActive).Select(m => m.UserId).ToHashSet();
-
             foreach (var participantId in participantIds)
             {
                 if (!activeMemberIdSet.Contains(participantId))
                     return ApiResponse<SplitExpenseDetailDto>.FailureResponse("One or more selected participants are not active members of this group.");
             }
 
-            // Calculate equal split shares
-            var calculatedShares = _calculatorService.CalculateEqualSplit(dto.Amount, participantIds);
+            // Calculate shares based on SplitType
+            Dictionary<Guid, decimal> calculatedShares;
+            try
+            {
+                if (string.Equals(splitType, "Exact", StringComparison.OrdinalIgnoreCase) && dto.ParticipantSplits?.Count > 0)
+                {
+                    calculatedShares = _calculatorService.CalculateExactSplit(dto.Amount, dto.ParticipantSplits);
+                }
+                else if (string.Equals(splitType, "Percentage", StringComparison.OrdinalIgnoreCase) && dto.ParticipantSplits?.Count > 0)
+                {
+                    calculatedShares = _calculatorService.CalculatePercentageSplit(dto.Amount, dto.ParticipantSplits);
+                }
+                else if (string.Equals(splitType, "Shares", StringComparison.OrdinalIgnoreCase) && dto.ParticipantSplits?.Count > 0)
+                {
+                    calculatedShares = _calculatorService.CalculateSharesSplit(dto.Amount, dto.ParticipantSplits);
+                }
+                else
+                {
+                    splitType = "Equal";
+                    calculatedShares = _calculatorService.CalculateEqualSplit(dto.Amount, participantIds);
+                }
+            }
+            catch (ArgumentException ex)
+            {
+                return ApiResponse<SplitExpenseDetailDto>.FailureResponse(ex.Message);
+            }
 
             var expense = new SplitExpense
             {
@@ -104,7 +128,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 Category = dto.Category?.Trim(),
                 ExpenseDate = dto.ExpenseDate ?? DateTime.UtcNow,
                 ReceiptUrl = dto.ReceiptUrl?.Trim(),
-                SplitType = "Equal",
+                SplitType = splitType,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsDeleted = false
@@ -267,16 +291,17 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
                 return ApiResponse<SplitExpenseDetailDto>.FailureResponse("The specified payer is not an active member of this group.");
 
             // Validate participant list
-            var participantIds = (dto.ParticipantUserIds ?? new List<Guid>())
+            var activeMembers = await _groupRepository.GetGroupMembersAsync(groupId);
+            var activeMemberIdSet = activeMembers.Where(m => m.IsActive).Select(m => m.UserId).ToHashSet();
+
+            var splitType = string.IsNullOrWhiteSpace(dto.SplitType) ? (existingExpense.SplitType ?? "Equal") : dto.SplitType.Trim();
+            var participantIds = (dto.ParticipantSplits?.Select(p => p.UserId) ?? dto.ParticipantUserIds ?? new List<Guid>())
                 .Where(id => id != Guid.Empty)
                 .Distinct()
                 .ToList();
 
             if (participantIds.Count == 0)
                 return ApiResponse<SplitExpenseDetailDto>.FailureResponse("At least one group member must be included in the split.");
-
-            var activeMembers = await _groupRepository.GetGroupMembersAsync(groupId);
-            var activeMemberIdSet = activeMembers.Where(m => m.IsActive).Select(m => m.UserId).ToHashSet();
 
             foreach (var participantId in participantIds)
             {
@@ -291,8 +316,32 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             var oldShares = await _expenseRepository.GetExpenseSharesAsync(existingExpense.Id);
             var oldShareMap = oldShares.ToDictionary(s => s.UserId, s => s.ShareAmount);
 
-            // Recalculate shares
-            var calculatedShares = _calculatorService.CalculateEqualSplit(dto.Amount, participantIds);
+            // Recalculate shares based on SplitType
+            Dictionary<Guid, decimal> calculatedShares;
+            try
+            {
+                if (string.Equals(splitType, "Exact", StringComparison.OrdinalIgnoreCase) && dto.ParticipantSplits?.Count > 0)
+                {
+                    calculatedShares = _calculatorService.CalculateExactSplit(dto.Amount, dto.ParticipantSplits);
+                }
+                else if (string.Equals(splitType, "Percentage", StringComparison.OrdinalIgnoreCase) && dto.ParticipantSplits?.Count > 0)
+                {
+                    calculatedShares = _calculatorService.CalculatePercentageSplit(dto.Amount, dto.ParticipantSplits);
+                }
+                else if (string.Equals(splitType, "Shares", StringComparison.OrdinalIgnoreCase) && dto.ParticipantSplits?.Count > 0)
+                {
+                    calculatedShares = _calculatorService.CalculateSharesSplit(dto.Amount, dto.ParticipantSplits);
+                }
+                else
+                {
+                    splitType = "Equal";
+                    calculatedShares = _calculatorService.CalculateEqualSplit(dto.Amount, participantIds);
+                }
+            }
+            catch (ArgumentException ex)
+            {
+                return ApiResponse<SplitExpenseDetailDto>.FailureResponse(ex.Message);
+            }
 
             existingExpense.Title = dto.Title.Trim();
             existingExpense.Description = dto.Description?.Trim();
@@ -302,6 +351,7 @@ namespace SpendwiseSystem.Application.Services.SplitExpenses
             existingExpense.ExpenseDate = dto.ExpenseDate ?? existingExpense.ExpenseDate;
             existingExpense.PayerId = dto.PayerId;
             existingExpense.ReceiptUrl = dto.ReceiptUrl?.Trim();
+            existingExpense.SplitType = splitType;
             existingExpense.UpdatedAt = DateTime.UtcNow;
 
             var newShares = calculatedShares.Select(kv => new SplitExpenseShare

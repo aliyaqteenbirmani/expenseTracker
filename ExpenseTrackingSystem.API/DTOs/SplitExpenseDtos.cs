@@ -227,6 +227,14 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
 
     // --- Expense Management DTOs ---
 
+    public class ParticipantSplitRequestDto
+    {
+        public Guid UserId { get; set; }
+        public decimal? ExactAmount { get; set; }
+        public decimal? Percentage { get; set; }
+        public int? ShareParts { get; set; }
+    }
+
     public class CreateSplitExpenseDto
     {
         [Required(ErrorMessage = "Expense title is required.")]
@@ -252,9 +260,11 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         [StringLength(1000, ErrorMessage = "Receipt URL cannot exceed 1000 characters.")]
         public string? ReceiptUrl { get; set; }
 
-        [Required(ErrorMessage = "At least one participant must be included in the expense.")]
-        [MinLength(1, ErrorMessage = "At least one participant must be included in the expense.")]
-        public List<Guid> ParticipantUserIds { get; set; } = new();
+        public string SplitType { get; set; } = "Equal";
+
+        public List<ParticipantSplitRequestDto>? ParticipantSplits { get; set; }
+
+        public List<Guid>? ParticipantUserIds { get; set; }
     }
 
     public class UpdateSplitExpenseDto
@@ -283,9 +293,11 @@ namespace SpendwiseSystem.Domain.DTOs.SplitExpenseDtos
         [StringLength(1000, ErrorMessage = "Receipt URL cannot exceed 1000 characters.")]
         public string? ReceiptUrl { get; set; }
 
-        [Required(ErrorMessage = "At least one participant must be included in the expense.")]
-        [MinLength(1, ErrorMessage = "At least one participant must be included in the expense.")]
-        public List<Guid> ParticipantUserIds { get; set; } = new();
+        public string SplitType { get; set; } = "Equal";
+
+        public List<ParticipantSplitRequestDto>? ParticipantSplits { get; set; }
+
+        public List<Guid>? ParticipantUserIds { get; set; }
     }
 
     public class SplitExpenseListItemDto
