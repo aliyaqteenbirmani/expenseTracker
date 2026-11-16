@@ -268,6 +268,13 @@ export interface UpdateSplitGroupDto {
   icon?: string
 }
 
+export interface ParticipantSplitRequestDto {
+  userId: string
+  exactAmount?: number
+  percentage?: number
+  shareParts?: number
+}
+
 export interface CreateSplitExpenseDto {
   title: string
   amount: number
@@ -277,7 +284,9 @@ export interface CreateSplitExpenseDto {
   expenseDate?: string
   payerId?: string
   receiptUrl?: string
-  participantUserIds: string[]
+  splitType?: string
+  participantSplits?: ParticipantSplitRequestDto[]
+  participantUserIds?: string[]
 }
 
 export interface UpdateSplitExpenseDto {
@@ -289,7 +298,9 @@ export interface UpdateSplitExpenseDto {
   expenseDate?: string
   payerId: string
   receiptUrl?: string
-  participantUserIds: string[]
+  splitType?: string
+  participantSplits?: ParticipantSplitRequestDto[]
+  participantUserIds?: string[]
 }
 
 export interface RecordSettlementDto {
