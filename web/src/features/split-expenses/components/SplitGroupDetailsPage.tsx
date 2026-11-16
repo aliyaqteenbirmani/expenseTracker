@@ -1842,6 +1842,18 @@ export function SplitGroupDetailsPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Mobile Floating Action Button (Splitwise FAB) */}
+      <div className="sm:hidden fixed bottom-6 right-6 z-40">
+        <Button
+          onClick={() => setAddExpenseOpen(true)}
+          className="h-14 px-5 rounded-full shadow-lg gap-2 text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/95 active:scale-95 transition-transform border border-primary/20"
+          aria-label="Add expense"
+        >
+          <Plus className="size-5" />
+          <span>Add Expense</span>
+        </Button>
+      </div>
     </div>
   )
 }

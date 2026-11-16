@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label'
 import { splitExpensesApi } from '../splitExpensesApi'
 import { toast } from 'sonner'
 import type { SplitGroupMemberDto, SplitSettlementDto, SuggestedSettlementDto } from '../types'
-import { ArrowRight, CheckCircle2, Loader2, Info } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Loader2, Info, ArrowLeftRight, Sparkles } from 'lucide-react'
+import { formatMoney } from '@/lib/format'
 import { MemberSelector, getMemberDisplayName, normalizeId } from './MemberSelector'
 
 interface SettleUpDialogProps {
@@ -114,6 +115,28 @@ export function SettleUpDialog({
     effectiveOwner && (!normalizeId(fromUserId, currentUserId) || normalizeId(toUserId, ownerId))
   )
 
+  const suggestedBalance = useMemo(() => {
+    if (initialSuggestion?.amount && initialSuggestion.amount > 0) {
+      return initialSuggestion.amount
+    }
+    const fromMemberBal = fromMember?.balance ?? 0
+    if (fromMemberBal < -0.005) {
+      return Math.abs(fromMemberBal)
+    }
+    const toMemberBal = toMember?.balance ?? 0
+    if (toMemberBal > 0.005) {
+      return toMemberBal
+    }
+    return 0
+  }, [initialSuggestion, fromMember, toMember])
+
+  const handleSwap = () => {
+    const prevFrom = fromUserId
+    const prevTo = toUserId
+    setFromUserId(prevTo)
+    setToUserId(prevFrom)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -200,7 +223,7 @@ export function SettleUpDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="relative grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
               <div className="space-y-1.5">
                 <Label htmlFor="settle-from-user">Payer (Who paid?) *</Label>
                 <MemberSelector
@@ -221,8 +244,35 @@ export function SettleUpDialog({
                 />
               </div>
 
+              {/* Direction Swap Button */}
+              <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 bottom-1 z-10">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleSwap}
+                  className="size-8 rounded-full bg-background shadow-xs border-border/80 hover:bg-muted/60 active:scale-95 transition-transform"
+                  title="Swap payer and receiver"
+                  aria-label="Swap payer and receiver"
+                >
+                  <ArrowLeftRight className="size-3.5" />
+                </Button>
+              </div>
+
               <div className="space-y-1.5">
-                <Label htmlFor="settle-to-user">Receiver (Who received?) *</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="settle-to-user">Receiver (Who received?) *</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSwap}
+                    className="md:hidden h-5 px-1.5 text-[11px] text-muted-foreground gap-1"
+                  >
+                    <ArrowLeftRight className="size-3" />
+                    Swap
+                  </Button>
+                </div>
                 <MemberSelector
                   id="settle-to-user"
                   value={toUserId}
@@ -237,20 +287,42 @@ export function SettleUpDialog({
               </div>
             </div>
 
+            {/* Large Numeral Amount Input with 1-Click Balance Pill */}
             <div className="space-y-1.5">
               <Label htmlFor="settle-amount">Amount (Rs.) *</Label>
-              <Input
-                id="settle-amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="0.00"
-                value={amountStr}
-                onChange={(e) => setAmountStr(e.target.value)}
-                disabled={loading}
-                className="font-mono text-base"
-                required
-              />
+              <div className="relative flex items-center">
+                <span className="absolute left-3.5 text-xl font-bold font-mono text-muted-foreground">
+                  Rs.
+                </span>
+                <Input
+                  id="settle-amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="0.00"
+                  value={amountStr}
+                  onChange={(e) => setAmountStr(e.target.value)}
+                  disabled={loading}
+                  className="pl-14 text-2xl sm:text-3xl font-extrabold font-mono tabular-nums tracking-tight h-13"
+                  required
+                />
+              </div>
+
+              {/* 1-Click Fill Balance Pill */}
+              {suggestedBalance > 0.005 && (
+                <div className="flex items-center justify-end pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAmountStr(suggestedBalance.toFixed(2))}
+                    className="h-6 text-[11px] font-mono px-2 rounded-full border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 gap-1"
+                  >
+                    <Sparkles className="size-3" />
+                    Set to full balance: {formatMoney(suggestedBalance)}
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">

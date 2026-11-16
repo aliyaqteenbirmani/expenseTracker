@@ -15,9 +15,38 @@ import {
 import { splitExpensesApi } from '../splitExpensesApi'
 import { toast } from 'sonner'
 import type { SplitExpenseDetailDto } from '../types'
-import { Tag, Trash2, Pencil } from 'lucide-react'
+import {
+  Utensils,
+  Car,
+  ShoppingCart,
+  Home,
+  Lightbulb,
+  Film,
+  ShoppingBag,
+  Wrench,
+  HelpCircle,
+  Tag,
+  Trash2,
+  Pencil,
+  ArrowDownLeft,
+  ArrowUpRight,
+} from 'lucide-react'
 import { format } from 'date-fns'
+import { formatMoney } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { getMemberInitials } from './MemberSelector'
+
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  'Food & Dining': Utensils,
+  'Transport': Car,
+  'Groceries': ShoppingCart,
+  'Accommodation': Home,
+  'Utilities': Lightbulb,
+  'Entertainment': Film,
+  'Shopping': ShoppingBag,
+  'Services': Wrench,
+  'Other': HelpCircle,
+}
 
 interface ExpenseDetailDialogProps {
   open: boolean
@@ -70,7 +99,12 @@ export function ExpenseDetailDialog({
     : 'No date'
 
   const myShare = expense.shares?.find((s) => s.userId === currentUserId)
-  const isIncluded = Boolean(myShare)
+  const isPayer = expense.payerId === currentUserId
+  const userShare = myShare?.shareAmount || 0
+  const lentAmount = isPayer ? expense.amount - userShare : 0
+  const borrowedAmount = !isPayer ? userShare : 0
+
+  const CategoryIcon = CATEGORY_ICONS[expense.category || 'Other'] || HelpCircle
 
   return (
     <>
@@ -81,16 +115,22 @@ export function ExpenseDetailDialog({
         description={`Expense details · ${formattedDate}`}
       >
         <div className="space-y-4">
-          {/* Amount and Meta Summary */}
+          {/* Amount and Meta Summary with Category Icon */}
           <div className="rounded-xl border bg-muted/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
-                Total Amount
-              </span>
-              <div className="text-2xl font-bold font-mono tracking-tight text-foreground">
-                Rs. {expense.amount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <CategoryIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold block">
+                  Total Amount
+                </span>
+                <div className="text-2xl font-extrabold font-mono tracking-tight text-foreground">
+                  {formatMoney(expense.amount)}
+                </div>
               </div>
             </div>
+
             <div className="flex flex-wrap items-center gap-2">
               {expense.category && (
                 <Badge variant="secondary" className="gap-1 font-normal text-xs">
@@ -98,11 +138,58 @@ export function ExpenseDetailDialog({
                   {expense.category}
                 </Badge>
               )}
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs font-semibold">
                 {expense.splitType || 'Equal'} Split
               </Badge>
             </div>
           </div>
+
+          {/* Personal Financial Standing Banner */}
+          {currentUserId && (
+            <div
+              className={cn(
+                'rounded-xl border p-3 text-xs flex items-center justify-between',
+                isPayer && lentAmount > 0.005
+                  ? 'bg-inflow-muted/20 border-inflow/30 text-inflow-foreground'
+                  : borrowedAmount > 0.005
+                  ? 'bg-outflow-muted/20 border-outflow/30 text-outflow-foreground'
+                  : 'bg-muted/30 border-border/60 text-muted-foreground'
+              )}
+            >
+              <div className="flex items-center gap-2 font-medium">
+                {isPayer && lentAmount > 0.005 ? (
+                  <>
+                    <ArrowDownLeft className="size-4 text-inflow shrink-0" />
+                    <span>You paid and are owed for this expense</span>
+                  </>
+                ) : borrowedAmount > 0.005 ? (
+                  <>
+                    <ArrowUpRight className="size-4 text-outflow shrink-0" />
+                    <span>You owe for your share in this expense</span>
+                  </>
+                ) : (
+                  <span>You are not involved in this expense</span>
+                )}
+              </div>
+
+              <span
+                className={cn(
+                  'font-mono font-bold text-sm tabular-nums',
+                  isPayer && lentAmount > 0.005
+                    ? 'text-inflow'
+                    : borrowedAmount > 0.005
+                    ? 'text-outflow'
+                    : 'text-muted-foreground'
+                )}
+              >
+                {isPayer && lentAmount > 0.005
+                  ? `+${formatMoney(lentAmount)}`
+                  : borrowedAmount > 0.005
+                  ? `-${formatMoney(borrowedAmount)}`
+                  : 'Rs. 0.00'}
+              </span>
+            </div>
+          )}
 
           {/* Paid by & Added by Info Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -118,7 +205,7 @@ export function ExpenseDetailDialog({
                 </span>
               </div>
               <span className="font-mono text-sm font-semibold text-inflow shrink-0">
-                +Rs. {expense.amount.toFixed(2)}
+                +{formatMoney(expense.amount)}
               </span>
             </div>
 
@@ -139,55 +226,41 @@ export function ExpenseDetailDialog({
             </div>
           </div>
 
-          {/* Current User Share Highlight */}
-          {currentUserId && (
-            <div
-              className={`rounded-lg border p-2.5 text-xs flex items-center justify-between ${
-                isIncluded
-                  ? 'border-primary/20 bg-primary/5 text-foreground'
-                  : 'border-border/60 bg-muted/30 text-muted-foreground'
-              }`}
-            >
-              <span className="font-medium">Your share in this expense</span>
-              {isIncluded && myShare ? (
-                <span className="font-mono font-semibold text-primary">
-                  Rs. {myShare.shareAmount.toFixed(2)}
-                </span>
-              ) : (
-                <span className="font-mono font-medium text-muted-foreground flex items-center gap-1.5">
-                  Rs. 0.00
-                  <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-sans border text-muted-foreground">
-                    Not included
-                  </span>
-                </span>
-              )}
-            </div>
-          )}
-
           {/* Shares Breakdown */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Participants & Shares ({expense.shares?.length || 0})
             </h4>
             <div className="max-h-52 overflow-y-auto rounded-lg border divide-y text-sm">
-              {expense.shares?.map((share) => (
-                <div key={share.userId} className="flex items-center justify-between p-2.5">
-                  <div className="flex items-center gap-2.5 truncate">
-                    <div className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                      {getMemberInitials(share.userName || share.userEmail)}
-                    </div>
-                    <div className="truncate">
-                      <div className="font-medium truncate">
-                        {share.userName || share.userEmail || 'Member'} {share.userId === currentUserId && '(You)'}
+              {expense.shares?.map((share) => {
+                const pct = expense.amount > 0
+                  ? ((share.shareAmount / expense.amount) * 100).toFixed(0)
+                  : '0'
+
+                return (
+                  <div key={share.userId} className="flex items-center justify-between p-2.5">
+                    <div className="flex items-center gap-2.5 truncate">
+                      <div className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-medium shrink-0">
+                        {getMemberInitials(share.userName || share.userEmail)}
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">{share.userEmail}</div>
+                      <div className="truncate">
+                        <div className="font-medium truncate">
+                          {share.userName || share.userEmail || 'Member'} {share.userId === currentUserId && '(You)'}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">{share.userEmail}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] font-mono text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded border border-border/50">
+                        {pct}%
+                      </span>
+                      <span className="font-mono text-sm font-semibold text-foreground">
+                        {formatMoney(share.shareAmount)}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right font-mono text-sm font-medium">
-                    Rs. {share.shareAmount.toFixed(2)}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
