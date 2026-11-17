@@ -106,7 +106,7 @@ BEGIN
         CONSTRAINT FK_SplitExpenses_Users_PayerId FOREIGN KEY (PayerId) REFERENCES dbo.Users (Id),
         CONSTRAINT FK_SplitExpenses_Users_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES dbo.Users (Id),
         CONSTRAINT CK_SplitExpenses_Amount CHECK (Amount > 0),
-        CONSTRAINT CK_SplitExpenses_SplitType CHECK (SplitType IN ('Equal'))
+        CONSTRAINT CK_SplitExpenses_SplitType CHECK (SplitType IN ('Equal', 'Exact', 'Percentage', 'Shares'))
     );
 END;
 GO
