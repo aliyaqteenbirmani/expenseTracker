@@ -30,7 +30,7 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
           onClick()
         }
       }}
-      className="group cursor-pointer rounded-xl border border-border/80 bg-card p-5 shadow-xs transition-all duration-150 ease-out hover:border-primary/40 hover:shadow-sm active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex flex-col justify-between h-full"
+      className="group cursor-pointer rounded-xl border border-border/80 bg-card p-5 shadow-xs transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex flex-col justify-between h-full"
     >
       <CardContent className="p-0 flex flex-col justify-between h-full space-y-4">
         {/* Top: Icon, Group Name, Subtitle & Top-Right Total Spend */}
@@ -40,7 +40,7 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div
                 className={cn(
-                  'flex size-11 shrink-0 items-center justify-center rounded-xl shadow-xs border text-2xl transition-transform group-hover:scale-105',
+                  'flex size-11 shrink-0 items-center justify-center rounded-xl shadow-xs border text-2xl transition-transform duration-200 group-hover:scale-105',
                   visual.bgClass
                 )}
               >
@@ -73,11 +73,12 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
 
             {/* Top Right: Total Group Spend */}
             <div className="text-right shrink-0">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/90 block">
                 Total Spend
               </span>
-              <span className="font-mono text-xs sm:text-sm font-semibold text-foreground tabular-nums">
-                Rs. {group.totalExpenses.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
+              <span className="font-mono text-xs sm:text-sm font-semibold text-foreground tabular-nums flex items-baseline justify-end">
+                <span className="text-[10px] font-sans font-normal text-muted-foreground mr-0.5 select-none">Rs.</span>
+                <span>{group.totalExpenses.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
               </span>
             </div>
           </div>
@@ -106,7 +107,7 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
                 ? 'text-destructive/80 dark:text-destructive/90'
                 : isOwed
                 ? 'text-inflow/80 dark:text-inflow/90'
-                : 'text-muted-foreground'
+                : 'text-muted-foreground/90'
             )}
           >
             {splitLabels.overview.yourBalance.title}
@@ -118,15 +119,19 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
             </div>
           )}
           {isOwed && (
-            <div className="text-sm font-semibold font-mono text-inflow flex items-center gap-1">
-              <ArrowUpRight className="size-4 shrink-0" />
-              <span>You are owed Rs. {Math.abs(balance).toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
+            <div className="text-sm font-semibold font-mono text-inflow flex items-baseline gap-1">
+              <ArrowUpRight className="size-4 shrink-0 self-center" />
+              <span>You are owed</span>
+              <span className="text-xs font-sans font-normal opacity-80 ml-0.5 select-none">Rs.</span>
+              <span>{Math.abs(balance).toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
             </div>
           )}
           {owes && (
-            <div className="text-sm font-semibold font-mono text-destructive flex items-center gap-1">
-              <ArrowDownLeft className="size-4 shrink-0" />
-              <span>You owe Rs. {Math.abs(balance).toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
+            <div className="text-sm font-semibold font-mono text-destructive flex items-baseline gap-1">
+              <ArrowDownLeft className="size-4 shrink-0 self-center" />
+              <span>You owe</span>
+              <span className="text-xs font-sans font-normal opacity-80 ml-0.5 select-none">Rs.</span>
+              <span>{Math.abs(balance).toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
             </div>
           )}
         </div>
@@ -135,7 +140,7 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
         <div className="flex items-center justify-end border-t border-border/60 pt-3 text-xs">
           <div className="flex items-center text-muted-foreground group-hover:text-primary transition-colors font-medium">
             <span>View group</span>
-            <ChevronRight className="size-4 ml-0.5 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="size-4 ml-0.5 group-hover:translate-x-1 transition-transform duration-150 ease-out" />
           </div>
         </div>
       </CardContent>

@@ -20,6 +20,7 @@ import { useMotionSafe } from '@/hooks/use-motion-safe'
 import { toast } from 'sonner'
 import type { SplitGroupSummaryDto, SplitGroupInvitationDto, SplitNotificationDto } from './types'
 import { splitLabels } from './splitLabels'
+import { cn } from '@/lib/utils'
 import {
   Plus,
   Scale,
@@ -186,7 +187,10 @@ export function SplitExpensesPage({
                       onSettlementProcessed={loadData}
                       onNotificationClick={handleNotificationClick}
                     />
-                    <Button onClick={() => setCreateGroupOpen(true)} className="gap-2 shadow-xs flex-1 sm:flex-initial">
+                    <Button
+                      onClick={() => setCreateGroupOpen(true)}
+                      className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs hover:shadow transition-[color,background-color,box-shadow,transform] duration-150 active:scale-[0.98] flex-1 sm:flex-initial"
+                    >
                       <Plus className="size-4" />
                       Create Group
                     </Button>
@@ -203,27 +207,55 @@ export function SplitExpensesPage({
               >
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
                   <StatCard
-                    className="h-full border-inflow/20 bg-gradient-to-t from-inflow-muted/30 to-card"
+                    className={cn(
+                      "h-full transition-all duration-200",
+                      metrics.totalOwedToMe < 0.005
+                        ? "border-border/70 bg-card/60 opacity-80 hover:opacity-100"
+                        : "border-inflow/20 bg-gradient-to-t from-inflow-muted/30 to-card"
+                    )}
                     label={splitLabels.dashboard.youWillGet.title}
-                    labelClassName="text-inflow font-semibold"
+                    labelClassName={
+                      metrics.totalOwedToMe < 0.005
+                        ? "text-muted-foreground/90 font-semibold"
+                        : "text-inflow font-semibold"
+                    }
                     value={metrics.totalOwedToMe}
-                    formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
+                    currencySymbol="Rs."
+                    formatFn={(val) => val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
                     icon={ArrowUpRight}
-                    iconContainerClassName="bg-inflow/10 text-inflow"
-                    iconClassName="text-inflow"
-                    valueColor="text-inflow"
-                    trend="up"
+                    iconContainerClassName={
+                      metrics.totalOwedToMe < 0.005
+                        ? "bg-muted/60 text-muted-foreground"
+                        : "bg-inflow/10 text-inflow"
+                    }
+                    iconClassName={
+                      metrics.totalOwedToMe < 0.005
+                        ? "text-muted-foreground"
+                        : "text-inflow"
+                    }
+                    valueColor={
+                      metrics.totalOwedToMe < 0.005
+                        ? "text-muted-foreground"
+                        : "text-inflow"
+                    }
+                    trend={metrics.totalOwedToMe > 0.005 ? "up" : "neutral"}
                     delta={splitLabels.dashboard.youWillGet.subtext}
                     badgePosition="below"
                   />
                 </motion.div>
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
                   <StatCard
-                    className="h-full border-outflow/20 bg-gradient-to-t from-outflow-muted/30 to-card"
+                    className={cn(
+                      "h-full transition-all duration-200",
+                      metrics.totalIOwe > 0.005
+                        ? "border-outflow/30 bg-gradient-to-t from-outflow-muted/40 to-card shadow-xs ring-1 ring-outflow/20"
+                        : "border-outflow/20 bg-gradient-to-t from-outflow-muted/30 to-card"
+                    )}
                     label={splitLabels.dashboard.youNeedToPay.title}
                     labelClassName="text-outflow font-semibold"
                     value={metrics.totalIOwe}
-                    formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
+                    currencySymbol="Rs."
+                    formatFn={(val) => val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
                     icon={ArrowDownLeft}
                     iconContainerClassName="bg-outflow/10 text-outflow"
                     iconClassName="text-outflow"
@@ -237,14 +269,11 @@ export function SplitExpensesPage({
                   <StatCard
                     className="h-full"
                     label={splitLabels.dashboard.overallBalance.title}
-                    value={metrics.net}
-                    formatFn={(val) => {
-                      if (Math.abs(val) < 0.005) {
-                        return 'Rs. 0.00'
-                      }
-                      const formatted = `Rs. ${Math.abs(val).toLocaleString('en-PK', { minimumFractionDigits: 2 })}`
-                      return val > 0 ? `+${formatted}` : `-${formatted}`
-                    }}
+                    labelClassName="text-muted-foreground/90 font-semibold"
+                    value={Math.abs(metrics.net)}
+                    sign={metrics.net > 0.005 ? "+" : metrics.net < -0.005 ? "-" : undefined}
+                    currencySymbol="Rs."
+                    formatFn={(val) => val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
                     icon={Scale}
                     valueColor={
                       metrics.net > 0.005
@@ -253,13 +282,14 @@ export function SplitExpensesPage({
                         ? 'text-outflow'
                         : 'text-muted-foreground'
                     }
-                    trend={metrics.net > 0 ? 'up' : metrics.net < 0 ? 'down' : 'neutral'}
+                    trend={metrics.net > 0.005 ? 'up' : metrics.net < -0.005 ? 'down' : 'neutral'}
                   />
                 </motion.div>
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
                   <StatCard
                     className="h-full"
                     label={splitLabels.dashboard.myGroups.title}
+                    labelClassName="text-muted-foreground/90 font-semibold"
                     value={groups.length}
                     formatFn={(val) => `${val}`}
                     icon={Layers}

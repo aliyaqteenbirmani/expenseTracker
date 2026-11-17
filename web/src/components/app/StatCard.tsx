@@ -21,6 +21,8 @@ interface StatCardProps {
   iconClassName?: string
   iconContainerClassName?: string
   badgePosition?: 'inline' | 'below'
+  currencySymbol?: string
+  sign?: string
 }
 
 export function StatCard({
@@ -39,6 +41,8 @@ export function StatCard({
   iconClassName,
   iconContainerClassName,
   badgePosition = 'inline',
+  currencySymbol,
+  sign,
 }: StatCardProps) {
   const displayValue = formatFn ? formatFn(value) : value.toLocaleString()
 
@@ -50,7 +54,7 @@ export function StatCard({
       )}
     >
       <CardHeader className="p-0 flex flex-row items-center justify-between space-y-0 pb-2">
-        <span className={cn("text-xs font-medium uppercase tracking-wider text-muted-foreground", labelClassName)}>
+        <span className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground/90 dark:text-muted-foreground", labelClassName)}>
           {label}
         </span>
         {Icon && (
@@ -71,11 +75,17 @@ export function StatCard({
           <div
             title={valueTitle ?? displayValue}
             className={cn(
-              'text-lg @[180px]:text-xl @[240px]:text-2xl @[320px]:text-3xl font-semibold tabular-nums tracking-tight font-mono whitespace-nowrap',
+              'text-lg @[180px]:text-xl @[240px]:text-2xl @[320px]:text-3xl font-semibold tabular-nums tracking-tight font-mono whitespace-nowrap flex items-baseline',
               valueColor,
               valueClassName
             )}
           >
+            {sign && <span className="font-mono mr-0.5">{sign}</span>}
+            {currencySymbol && (
+              <span className="text-xs sm:text-sm font-sans font-medium opacity-80 mr-1 select-none">
+                {currencySymbol}
+              </span>
+            )}
             <AnimatedNumber value={value} formatFn={formatFn} />
           </div>
           {delta && (
