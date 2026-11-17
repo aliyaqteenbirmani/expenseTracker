@@ -19,6 +19,7 @@
 | Toasts | Sonner, `toast.promise` | in-place state morph; undo countdown bar |
 | Money/KPI/counts | `AnimatedNumber` (`components/motion/animated-number.tsx`) | 450ms digit roll via @number-flow/react |
 | Table rows | Data Table + `rowPresence` | first-load stagger ≤ 12; realtime insert/flash/collapse; "N new" pill if scrolled |
+| Transaction / settlement status card | `TransactionStatusCard` (`features/split-expenses/components/TransactionStatusCard.tsx`) | 16px padding, top row title & date, status badge, prominent alert box for declined reason with icon |
 | Bulk actions | floating bar | slide up `spring.smooth` |
 | Loading | shimmer `Skeleton` + `useDelayedFlag(150)` | crossfade to content, no shift |
 | Route change | `AnimatedOutlet` + `RouteProgressBar` (`components/motion/route-progress-bar.tsx`) | `pageTransition`, top-level segment only |

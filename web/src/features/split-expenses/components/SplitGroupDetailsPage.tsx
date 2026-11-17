@@ -48,6 +48,7 @@ import { InviteMemberDialog } from './InviteMemberDialog'
 import { GroupHeroBalanceBanner } from './GroupHeroBalanceBanner'
 import { ExpenseFeedItem } from './ExpenseFeedItem'
 import { SimplifiedDebtsCard } from './SimplifiedDebtsCard'
+import { TransactionStatusCard } from './TransactionStatusCard'
 import { toast } from 'sonner'
 import { getMemberInitials } from './MemberSelector'
 import { SplitNotificationBell } from './SplitNotificationBell'
@@ -90,6 +91,7 @@ import {
   ChevronUp,
   RotateCcw,
   Clock,
+  AlertCircle,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -1077,47 +1079,39 @@ export function SplitGroupDetailsPage({
                 description="Settlement requests you submit will appear here with their approval status."
               />
             ) : (
-              <div className="rounded-xl border divide-y overflow-hidden bg-card shadow-xs">
+              <div className="space-y-3">
                 {myRequests.map((req) => {
                   const isPending = req.status === 'PendingReceiver' || req.status === 'PendingOwner'
                   const isDeclined = req.status === 'DeclinedByReceiver' || req.status === 'DeclinedByOwner'
                   const canCancel = (req.canCancel ?? true) && isPending
 
                   return (
-                    <div key={req.id} className="flex items-center justify-between py-3 px-4 min-h-[44px] gap-3">
-                      <div className="space-y-0.5 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-sm text-foreground truncate" title={req.toUserName}>
-                            {isDeclined
-                              ? `Payment to ${req.toUserName}`
-                              : isPending
-                              ? `Payment request to ${req.toUserName}`
-                              : `You paid ${req.toUserName}`}
-                          </span>
-                          {renderSettlementStatusChip(req)}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {format(new Date(req.settlementDate), 'MMM d, yyyy')}
-                          {req.note && ` · "${req.note}"`}
-                        </div>
-                        {isDeclined && req.declineReason && (
-                          <div className="text-xs text-destructive/90 flex items-center gap-1.5 pt-0.5 truncate">
-                            <span className="font-medium">
-                              {req.status === 'DeclinedByReceiver' ? 'Declined by receiver:' : 'Declined by admin:'}
-                            </span>
-                            <span className="italic truncate">&quot;{req.declineReason}&quot;</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3 shrink-0 text-right whitespace-nowrap">
-                        <span className={cn(
-                          "font-mono font-semibold text-sm whitespace-nowrap",
-                          isDeclined ? "text-muted-foreground line-through" : "text-foreground"
-                        )}>
-                          Rs. {req.amount.toFixed(2)}
-                        </span>
-                        {canCancel && (
+                    <TransactionStatusCard
+                      key={req.id}
+                      title={
+                        isDeclined
+                          ? `Payment to ${req.toUserName}`
+                          : isPending
+                          ? `Payment request to ${req.toUserName}`
+                          : `You paid ${req.toUserName}`
+                      }
+                      status={
+                        isDeclined
+                          ? splitLabels.settlementStatus.declined
+                          : isPending
+                          ? (req.status === 'PendingOwner'
+                              ? splitLabels.settlementStatus.waitingForOwner
+                              : splitLabels.settlementStatus.waitingFor(req.toUserName))
+                          : splitLabels.settlementStatus.confirmed
+                      }
+                      date={format(new Date(req.settlementDate), 'MMM d, yyyy')}
+                      note={req.note}
+                      amount={req.amount}
+                      currency="Rs."
+                      declinedBy={req.status === 'DeclinedByReceiver' ? 'receiver' : 'admin'}
+                      declineReason={req.declineReason}
+                      actionButton={
+                        canCancel ? (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1126,9 +1120,9 @@ export function SplitGroupDetailsPage({
                           >
                             Cancel
                           </Button>
-                        )}
-                      </div>
-                    </div>
+                        ) : undefined
+                      }
+                    />
                   )
                 })}
               </div>
@@ -1240,11 +1234,16 @@ export function SplitGroupDetailsPage({
                             {st.note && ` · ${st.note}`}
                           </div>
                           {isDeclined && st.declineReason && (
-                            <div className="text-xs text-destructive/90 flex items-center gap-1.5 pt-0.5 truncate">
-                              <span className="font-medium">
-                                {st.status === 'DeclinedByReceiver' ? 'Declined by receiver:' : 'Declined by admin:'}
-                              </span>
-                              <span className="italic truncate">&quot;{st.declineReason}&quot;</span>
+                            <div className="mt-1.5 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/[0.05] p-2.5 text-xs text-destructive dark:border-destructive/30 dark:bg-destructive/10">
+                              <AlertCircle className="size-3.5 shrink-0 text-destructive mt-0.5" aria-hidden="true" />
+                              <div className="min-w-0 break-words leading-relaxed">
+                                <span className="font-semibold text-destructive">
+                                  {st.status === 'DeclinedByReceiver' ? 'Declined by receiver:' : 'Declined by admin:'}
+                                </span>{' '}
+                                <span className="italic font-normal">
+                                  &ldquo;{st.declineReason}&rdquo;
+                                </span>
+                              </div>
                             </div>
                           )}
                         </div>
