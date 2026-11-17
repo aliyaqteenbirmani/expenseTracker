@@ -38,7 +38,7 @@ export interface InviteeChip {
   isRegistered?: boolean
 }
 
-const PRESET_ICONS = ['👥', '🏖️', '🏠', '🍔', '🚗', '✈️', '💼', '🎉', '☕', '🛒']
+const PRESET_ICONS = ['🍕', '🍔', '☕', '👥', '🏖️', '🏠', '🚗', '✈️', '💼', '🎉', '🛒']
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function CreateGroupDialog({

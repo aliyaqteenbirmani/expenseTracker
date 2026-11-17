@@ -49,6 +49,7 @@ import { GroupHeroBalanceBanner } from './GroupHeroBalanceBanner'
 import { ExpenseFeedItem } from './ExpenseFeedItem'
 import { SimplifiedDebtsCard } from './SimplifiedDebtsCard'
 import { TransactionStatusCard } from './TransactionStatusCard'
+import { getGroupVisual } from '../lib/groupVisuals'
 import { toast } from 'sonner'
 import { getMemberInitials } from './MemberSelector'
 import { SplitNotificationBell } from './SplitNotificationBell'
@@ -573,9 +574,23 @@ export function SplitGroupDetailsPage({
           >
             <ArrowLeft className="size-4" />
           </Button>
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-2xl shadow-xs border">
-            {group.icon || '👥'}
-          </div>
+          {(() => {
+            const visual = getGroupVisual(group.name, group.icon)
+            return (
+              <div
+                className={cn(
+                  'flex size-11 shrink-0 items-center justify-center rounded-xl shadow-xs border text-2xl',
+                  visual.bgClass
+                )}
+              >
+                {visual.icon ? (
+                  <span>{visual.icon}</span>
+                ) : (
+                  <span className="text-sm font-bold tracking-tight">{visual.initials}</span>
+                )}
+              </div>
+            )
+          })()}
           <div className="min-w-0 space-y-0.5">
             <div className="flex items-center gap-2">
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground truncate" title={group.name}>
