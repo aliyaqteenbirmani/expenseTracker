@@ -33,12 +33,12 @@ export const splitLabels = {
     overallBalance: {
       title: 'Your Overall Balance',
       subtext: 'Across all groups',
-      settled: 'All settled up',
-      owed: (formattedAmount: string) => `You are owed ${formattedAmount}`,
-      owe: (formattedAmount: string) => `You owe ${formattedAmount}`,
+      settled: 'Rs. 0.00',
+      owed: (formattedAmount: string) => `+${formattedAmount}`,
+      owe: (formattedAmount: string) => `-${formattedAmount}`,
     },
     myGroups: {
-      title: 'My Groups',
+      title: 'Active Groups',
       count: (count: number) => pluralGroups(count),
     },
   },

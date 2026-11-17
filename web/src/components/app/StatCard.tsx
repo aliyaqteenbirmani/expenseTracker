@@ -17,6 +17,10 @@ interface StatCardProps {
   valueColor?: string
   valueTitle?: string
   valueClassName?: string
+  labelClassName?: string
+  iconClassName?: string
+  iconContainerClassName?: string
+  badgePosition?: 'inline' | 'below'
 }
 
 export function StatCard({
@@ -31,6 +35,10 @@ export function StatCard({
   valueColor,
   valueTitle,
   valueClassName,
+  labelClassName,
+  iconClassName,
+  iconContainerClassName,
+  badgePosition = 'inline',
 }: StatCardProps) {
   const displayValue = formatFn ? formatFn(value) : value.toLocaleString()
 
@@ -42,17 +50,24 @@ export function StatCard({
       )}
     >
       <CardHeader className="p-0 flex flex-row items-center justify-between space-y-0 pb-2">
-        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <span className={cn("text-xs font-medium uppercase tracking-wider text-muted-foreground", labelClassName)}>
           {label}
         </span>
         {Icon && (
-          <div className="flex size-8 items-center justify-center rounded-md bg-muted/60 text-muted-foreground">
-            <Icon className="size-4 stroke-[1.75]" />
+          <div className={cn("flex size-8 items-center justify-center rounded-md bg-muted/60 text-muted-foreground", iconContainerClassName)}>
+            <Icon className={cn("size-4 stroke-[1.75]", iconClassName)} />
           </div>
         )}
       </CardHeader>
       <CardContent className="p-0 pt-2 flex-1 flex flex-col justify-between gap-y-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1.5 min-w-0">
+        <div
+          className={cn(
+            'min-w-0',
+            badgePosition === 'below'
+              ? 'flex flex-col items-start gap-2'
+              : 'flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1.5'
+          )}
+        >
           <div
             title={valueTitle ?? displayValue}
             className={cn(

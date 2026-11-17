@@ -203,24 +203,34 @@ export function SplitExpensesPage({
               >
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
                   <StatCard
-                    className="h-full"
+                    className="h-full border-inflow/20 bg-gradient-to-t from-inflow-muted/30 to-card"
                     label={splitLabels.dashboard.youWillGet.title}
+                    labelClassName="text-inflow font-semibold"
                     value={metrics.totalOwedToMe}
                     formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
                     icon={ArrowUpRight}
-                    trend={metrics.totalOwedToMe > 0 ? 'up' : 'neutral'}
+                    iconContainerClassName="bg-inflow/10 text-inflow"
+                    iconClassName="text-inflow"
+                    valueColor="text-inflow"
+                    trend="up"
                     delta={splitLabels.dashboard.youWillGet.subtext}
+                    badgePosition="below"
                   />
                 </motion.div>
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
                   <StatCard
-                    className="h-full"
+                    className="h-full border-outflow/20 bg-gradient-to-t from-outflow-muted/30 to-card"
                     label={splitLabels.dashboard.youNeedToPay.title}
+                    labelClassName="text-outflow font-semibold"
                     value={metrics.totalIOwe}
                     formatFn={(val) => `Rs. ${val.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
                     icon={ArrowDownLeft}
-                    trend={metrics.totalIOwe > 0 ? 'down' : 'neutral'}
+                    iconContainerClassName="bg-outflow/10 text-outflow"
+                    iconClassName="text-outflow"
+                    valueColor="text-outflow"
+                    trend="down"
                     delta={splitLabels.dashboard.youNeedToPay.subtext}
+                    badgePosition="below"
                   />
                 </motion.div>
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
@@ -230,17 +240,20 @@ export function SplitExpensesPage({
                     value={metrics.net}
                     formatFn={(val) => {
                       if (Math.abs(val) < 0.005) {
-                        return splitLabels.dashboard.overallBalance.settled
+                        return 'Rs. 0.00'
                       }
                       const formatted = `Rs. ${Math.abs(val).toLocaleString('en-PK', { minimumFractionDigits: 2 })}`
-                      return val > 0
-                        ? splitLabels.dashboard.overallBalance.owed(formatted)
-                        : splitLabels.dashboard.overallBalance.owe(formatted)
+                      return val > 0 ? `+${formatted}` : `-${formatted}`
                     }}
                     icon={Scale}
+                    valueColor={
+                      metrics.net > 0.005
+                        ? 'text-inflow'
+                        : metrics.net < -0.005
+                        ? 'text-outflow'
+                        : 'text-muted-foreground'
+                    }
                     trend={metrics.net > 0 ? 'up' : metrics.net < 0 ? 'down' : 'neutral'}
-                    delta={splitLabels.dashboard.overallBalance.subtext}
-                    valueClassName="text-base sm:text-lg @[240px]:text-xl whitespace-normal break-words"
                   />
                 </motion.div>
                 <motion.div variants={reduce ? fadeOnly : splitCardVariants} className="h-full">
@@ -251,7 +264,6 @@ export function SplitExpensesPage({
                     formatFn={(val) => `${val}`}
                     icon={Layers}
                     trend="neutral"
-                    delta={splitLabels.dashboard.myGroups.count(groups.length)}
                   />
                 </motion.div>
               </motion.div>
