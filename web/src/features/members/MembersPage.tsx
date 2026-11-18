@@ -156,6 +156,13 @@ export function MembersPage({
   const [savingPermissions, setSavingPermissions] = useState(false)
   const [invited, setInvited] = useState(false)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
+  const [inviteError, setInviteError] = useState('')
+
+  useEffect(() => {
+    if (!cashbookId && books.length > 0) {
+      setCashbookId(books[0].id)
+    }
+  }, [books, cashbookId])
 
   const activeCashbook = books.find((b) => b.id === cashbookId) || books[0]
   const currentOptions = scope === 'business' ? businessPermissions : cashbookPermissions
@@ -240,28 +247,70 @@ export function MembersPage({
   // Handle invitation submission
   const handleInvite = async (e: FormEvent) => {
     e.preventDefault()
-    if (!email.trim()) return
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) return
+
+    if (!effectiveBusinessId) {
+      const msg = 'Business workspace ID is not available.'
+      setInviteError(msg)
+      onToast(msg)
+      return
+    }
+
+    if (scope === 'cashbook' && !cashbookId) {
+      const msg = 'Please select a cashbook to invite collaborator.'
+      setInviteError(msg)
+      onToast(msg)
+      return
+    }
+
+    if (permissions.length === 0) {
+      const msg = 'Please select at least one permission.'
+      setInviteError(msg)
+      onToast(msg)
+      return
+    }
+
     setBusy(true)
-    setError('')
+    setInviteError('')
     try {
-      await request('/api/Invitations/invite', token, {
+      const inviteUrl =
+        scope === 'business'
+          ? `/api/Invitations/business/${effectiveBusinessId}`
+          : `/api/Invitations/business/${effectiveBusinessId}/cashbooks/${cashbookId}`
+
+      const payload = {
+        invitedEmail: trimmedEmail,
+        permissions,
+        remarks: scope === 'business' ? 'Business invitation' : 'Cashbook invitation',
+      }
+
+      await request(inviteUrl, token, {
         method: 'POST',
-        body: JSON.stringify({
-          businessId: effectiveBusinessId,
-          cashbookId: scope === 'cashbook' ? cashbookId : null,
-          email: email.trim(),
-          permissions,
-        }),
+        body: JSON.stringify(payload),
       })
       setEmail('')
       setInvited(true)
       setTimeout(() => setInvited(false), 2000)
-      onToast(`Invitation successfully sent to ${email}`)
+      onToast(`Invitation successfully sent to ${trimmedEmail}`)
       await reload()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send invitation.')
+      const msg = err instanceof Error ? err.message : 'Failed to send invitation.'
+      setInviteError(msg)
+      onToast(msg)
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Handle invitation revocation
+  const handleRevokeInvitation = async (invitationId: string) => {
+    try {
+      await request(`/api/Invitations/${invitationId}/revoke`, token, { method: 'POST' })
+      onToast('Invitation revoked successfully.')
+      await reload()
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : 'Failed to revoke invitation.')
     }
   }
 
@@ -373,7 +422,16 @@ export function MembersPage({
 
             <MotionTabs
               value={scope}
-              onValueChange={(v) => setScope(v as 'cashbook' | 'business')}
+              onValueChange={(v) => {
+                const nextScope = v as 'cashbook' | 'business'
+                setScope(nextScope)
+                setInviteError('')
+                if (nextScope === 'cashbook') {
+                  setPermissions([1, 2, 3])
+                } else {
+                  setPermissions([1, 2, 4])
+                }
+              }}
             >
               <MotionTabsList className="h-8">
                 <MotionTabsTrigger value="cashbook" className="text-xs px-3">
@@ -697,7 +755,7 @@ export function MembersPage({
                           <TableCell className="text-muted-foreground">
                             {formatRelativeDate(inv.createdOn)}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right space-x-1">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -718,6 +776,17 @@ export function MembersPage({
                               )}
                               <span>Copy Link</span>
                             </Button>
+                            {inv.status.toLowerCase() === 'pending' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs px-2 gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => void handleRevokeInvitation(inv.id)}
+                              >
+                                <Trash2 className="size-3" />
+                                <span>Revoke</span>
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))
@@ -760,7 +829,10 @@ export function MembersPage({
                         required
                         placeholder="colleague@company.com"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value)
+                          if (inviteError) setInviteError('')
+                        }}
                         className="pl-8 h-8 text-xs"
                       />
                     </div>
@@ -874,7 +946,21 @@ export function MembersPage({
                     </AlertDescription>
                   </Alert>
 
-                  <Button type="submit" disabled={busy || !email.trim() || !effectiveBusinessId} loading={busy} success={invited} successLabel="Invitation Sent!" className="w-full h-8 text-xs">
+                  {inviteError && (
+                    <Alert variant="destructive" className="py-2.5 px-3 text-xs">
+                      <ShieldAlert className="size-3.5" />
+                      <AlertDescription className="text-[11px]">{inviteError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={busy || !email.trim() || !effectiveBusinessId || (scope === 'cashbook' && !cashbookId)}
+                    loading={busy}
+                    success={invited}
+                    successLabel="Invitation Sent!"
+                    className="w-full h-8 text-xs"
+                  >
                     <UserPlus className="size-3.5 mr-1.5" />
                     <span>Send Invitation</span>
                   </Button>
