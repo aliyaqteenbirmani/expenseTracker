@@ -5,9 +5,10 @@ import { cn } from '@/lib/utils'
 interface GroupHeroBalanceBannerProps {
   balance: number
   memberCount: number
+  owedToText?: string
 }
 
-export function GroupHeroBalanceBanner({ balance, memberCount }: GroupHeroBalanceBannerProps) {
+export function GroupHeroBalanceBanner({ balance, memberCount, owedToText }: GroupHeroBalanceBannerProps) {
   const isPositive = balance > 0.005
   const isNegative = balance < -0.005
   const isSettled = !isPositive && !isNegative
@@ -25,7 +26,7 @@ export function GroupHeroBalanceBanner({ balance, memberCount }: GroupHeroBalanc
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider opacity-80 block">
             {isPositive && 'Overall, you are owed'}
-            {isNegative && 'Overall, you owe'}
+            {isNegative && (owedToText ? `Overall, you owe to ${owedToText}` : 'Overall, you owe')}
             {isSettled && 'Settled status'}
           </span>
           <div className="flex items-baseline gap-2 mt-1">
@@ -43,7 +44,9 @@ export function GroupHeroBalanceBanner({ balance, memberCount }: GroupHeroBalanc
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Across {memberCount} active members in this group
+            {isNegative && owedToText
+              ? `You owe ${formatMoney(Math.abs(balance))} to ${owedToText}`
+              : `Across ${memberCount} active members in this group`}
           </p>
         </div>
 

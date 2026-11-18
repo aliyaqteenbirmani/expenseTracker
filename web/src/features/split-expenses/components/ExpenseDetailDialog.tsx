@@ -165,7 +165,11 @@ export function ExpenseDetailDialog({
                 ) : borrowedAmount > 0.005 ? (
                   <>
                     <ArrowUpRight className="size-4 text-outflow shrink-0" />
-                    <span>You owe for your share in this expense</span>
+                    <span>
+                      {expense.payerName
+                        ? `You owe ${expense.payerName} for your share in this expense`
+                        : 'You owe for your share in this expense'}
+                    </span>
                   </>
                 ) : (
                   <span>You are not involved in this expense</span>

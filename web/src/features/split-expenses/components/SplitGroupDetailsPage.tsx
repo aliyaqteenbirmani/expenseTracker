@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -54,6 +54,12 @@ import { toast } from 'sonner'
 import { getMemberInitials } from './MemberSelector'
 import { SplitNotificationBell } from './SplitNotificationBell'
 import { splitLabels } from '../splitLabels'
+import {
+  simplifyDebtsFromBalances,
+  formatRecipientNames,
+  getCreditorNamesForUser,
+  getDebtorNamesForUser,
+} from '../lib/debtUtils'
 import type {
   SplitGroupDetailDto,
   SplitExpenseListItemDto,
@@ -457,7 +463,11 @@ export function SplitGroupDetailsPage({
       await splitExpensesApi.deleteGroup(groupId, token)
       toast.success('Group deleted successfully')
       setDeleteGroupOpen(false)
-      onGroupDeleted ? onGroupDeleted() : onBack()
+      if (onGroupDeleted) {
+        onGroupDeleted()
+      } else {
+        onBack()
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to delete group'
       toast.error(msg)
@@ -465,6 +475,38 @@ export function SplitGroupDetailsPage({
       setDeletingGroup(false)
     }
   }
+
+  // Simplified debts from either settleOverview.suggestedTransactions or balances
+  const allDebts = useMemo(() => {
+    if (settleOverview?.suggestedTransactions && settleOverview.suggestedTransactions.length > 0) {
+      return settleOverview.suggestedTransactions
+    }
+    return simplifyDebtsFromBalances(balances)
+  }, [settleOverview, balances])
+
+  // Map of userId -> creditor names string (who this user owes)
+  const owesToMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const b of balances) {
+      if (b.netBalance < -0.005) {
+        const names = getCreditorNamesForUser(b.userId, allDebts)
+        map[b.userId] = formatRecipientNames(names)
+      }
+    }
+    return map
+  }, [balances, allDebts])
+
+  // Map of userId -> debtor names string (who owes this user)
+  const owedByMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const b of balances) {
+      if (b.netBalance > 0.005) {
+        const names = getDebtorNamesForUser(b.userId, allDebts)
+        map[b.userId] = formatRecipientNames(names)
+      }
+    }
+    return map
+  }, [balances, allDebts])
 
   if (loading && !group) {
     return <SplitGroupDetailsSkeleton />
@@ -516,6 +558,8 @@ export function SplitGroupDetailsPage({
   const myRequests = settlements.filter(
     (s) => s.createdBy === currentUserId || s.fromUserId === currentUserId
   )
+
+  const myOwedToText = currentUserId ? owesToMap[currentUserId] : ''
 
   const renderSettlementStatusChip = (st: SplitSettlementDto) => {
     switch (st.status) {
@@ -657,7 +701,11 @@ export function SplitGroupDetailsPage({
       </div>
 
       {/* Splitwise Hero Balance Banner */}
-      <GroupHeroBalanceBanner balance={myBalance} memberCount={group.memberCount} />
+      <GroupHeroBalanceBanner
+        balance={myBalance}
+        memberCount={group.memberCount}
+        owedToText={myOwedToText}
+      />
 
       {/* Navigation Tabs */}
       <MotionTabs value={activeTab} onValueChange={handleTabChange} variant="underline">
@@ -721,7 +769,9 @@ export function SplitGroupDetailsPage({
                   isOwed
                     ? splitLabels.overview.yourBalance.youAreOwed
                     : owes
-                    ? splitLabels.overview.yourBalance.youOwe
+                    ? myOwedToText
+                      ? splitLabels.overview.yourBalance.youOweTo(myOwedToText)
+                      : splitLabels.overview.yourBalance.youOwe
                     : splitLabels.overview.yourBalance.settled
                 }
                 footer={pendingBalFooter}
@@ -969,7 +1019,7 @@ export function SplitGroupDetailsPage({
                         </div>
                       </div>
 
-                      <div className="shrink-0 text-right whitespace-nowrap">
+                      <div className="shrink-0 text-right max-w-[65%] sm:max-w-none">
                         <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">
                           {splitLabels.whoOwesWhom.status}
                         </span>
@@ -980,19 +1030,23 @@ export function SplitGroupDetailsPage({
                           </span>
                         )}
                         {isPositive && (
-                          <span className="text-sm font-semibold font-mono text-inflow flex items-center justify-end gap-1">
-                            <ArrowUpRight className="size-4" />
-                            {m.userId === currentUserId
-                              ? splitLabels.whoOwesWhom.youAreOwed(`Rs. ${Math.abs(bal).toFixed(2)}`)
-                              : splitLabels.whoOwesWhom.memberIsOwed(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`)}
+                          <span className="text-sm font-semibold font-mono text-inflow flex items-center justify-end gap-1 flex-wrap">
+                            <ArrowUpRight className="size-4 shrink-0" />
+                            <span>
+                              {m.userId === currentUserId
+                                ? splitLabels.whoOwesWhom.youAreOwed(`Rs. ${Math.abs(bal).toFixed(2)}`, owedByMap[m.userId])
+                                : splitLabels.whoOwesWhom.memberIsOwed(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`, owedByMap[m.userId])}
+                            </span>
                           </span>
                         )}
                         {isNegative && (
-                          <span className="text-sm font-semibold font-mono text-outflow flex items-center justify-end gap-1">
-                            <ArrowDownLeft className="size-4" />
-                            {m.userId === currentUserId
-                              ? splitLabels.whoOwesWhom.youOwe(`Rs. ${Math.abs(bal).toFixed(2)}`)
-                              : splitLabels.whoOwesWhom.memberOwes(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`)}
+                          <span className="text-sm font-semibold font-mono text-outflow flex items-center justify-end gap-1 flex-wrap">
+                            <ArrowDownLeft className="size-4 shrink-0" />
+                            <span>
+                              {m.userId === currentUserId
+                                ? splitLabels.whoOwesWhom.youOwe(`Rs. ${Math.abs(bal).toFixed(2)}`, owesToMap[m.userId])
+                                : splitLabels.whoOwesWhom.memberOwes(m.fullName, `Rs. ${Math.abs(bal).toFixed(2)}`, owesToMap[m.userId])}
+                            </span>
                           </span>
                         )}
                       </div>

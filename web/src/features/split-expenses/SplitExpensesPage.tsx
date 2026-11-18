@@ -20,6 +20,7 @@ import { useMotionSafe } from '@/hooks/use-motion-safe'
 import { toast } from 'sonner'
 import type { SplitGroupSummaryDto, SplitGroupInvitationDto, SplitNotificationDto } from './types'
 import { splitLabels } from './splitLabels'
+import { simplifyDebtsFromBalances, formatRecipientNames } from './lib/debtUtils'
 import { cn } from '@/lib/utils'
 import {
   Plus,
@@ -53,6 +54,44 @@ export function SplitExpensesPage({
   const [loading, setLoading] = useState(true)
   const [createGroupOpen, setCreateGroupOpen] = useState(false)
   const [respondingInviteId, setRespondingInviteId] = useState<string | null>(null)
+  const [owedToMap, setOwedToMap] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const oweGroups = groups.filter((g) => g.currentUserBalance < -0.005)
+    if (oweGroups.length === 0) {
+      setOwedToMap({})
+      return
+    }
+
+    let isMounted = true
+    Promise.all(
+      oweGroups.map(async (g) => {
+        try {
+          const balances = await splitExpensesApi.getGroupBalances(g.id, token)
+          const debts = simplifyDebtsFromBalances(balances)
+          const myDebts = debts.filter((d) => d.fromUserId === currentUserId)
+          const names = Array.from(new Set(myDebts.map((d) => d.toUserName)))
+          return { groupId: g.id, text: formatRecipientNames(names) }
+        } catch {
+          if (g.memberCount === 2 && g.ownerName) {
+            return { groupId: g.id, text: g.ownerName }
+          }
+          return { groupId: g.id, text: '' }
+        }
+      })
+    ).then((results) => {
+      if (!isMounted) return
+      const map: Record<string, string> = {}
+      for (const r of results) {
+        if (r.text) map[r.groupId] = r.text
+      }
+      setOwedToMap(map)
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [groups, token, currentUserId])
 
   const handleNotificationClick = (notif: SplitNotificationDto) => {
     if (notif.groupId) {
@@ -388,6 +427,7 @@ export function SplitExpensesPage({
                         <SplitGroupCard
                           group={group}
                           onClick={() => setSelectedGroupId(group.id)}
+                          owedToText={owedToMap[group.id]}
                         />
                       </motion.div>
                     ))}

@@ -9,9 +9,10 @@ import { cn } from '@/lib/utils'
 interface SplitGroupCardProps {
   group: SplitGroupSummaryDto
   onClick: () => void
+  owedToText?: string
 }
 
-export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
+export function SplitGroupCard({ group, onClick, owedToText }: SplitGroupCardProps) {
   const balance = group.currentUserBalance
   const isSettled = Math.abs(balance) < 0.005
   const isOwed = balance > 0.005
@@ -127,11 +128,16 @@ export function SplitGroupCard({ group, onClick }: SplitGroupCardProps) {
             </div>
           )}
           {owes && (
-            <div className="text-sm font-semibold font-mono text-destructive flex items-baseline gap-1">
+            <div className="text-sm font-semibold font-mono text-destructive flex items-baseline gap-1 flex-wrap">
               <ArrowDownLeft className="size-4 shrink-0 self-center" />
               <span>You owe</span>
               <span className="text-xs font-sans font-normal opacity-80 ml-0.5 select-none">Rs.</span>
               <span>{Math.abs(balance).toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
+              {owedToText && (
+                <span className="text-xs font-sans font-normal text-muted-foreground ml-1">
+                  to {owedToText}
+                </span>
+              )}
             </div>
           )}
         </div>

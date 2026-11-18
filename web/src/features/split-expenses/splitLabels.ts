@@ -54,6 +54,7 @@ export const splitLabels = {
       settled: 'All settled up',
       youAreOwed: 'You are owed',
       youOwe: 'You owe',
+      youOweTo: (toNames: string) => `You owe to ${toNames}`,
       waitingConfirmation: (formattedAmount: string) => `${formattedAmount} waiting for confirmation`,
     },
     paymentsSettled: {
@@ -105,10 +106,14 @@ export const splitLabels = {
     helperText: 'Positive means they should get money back. Negative means they owe money.',
     status: 'Status',
     settledUp: 'Settled up',
-    youAreOwed: (formattedAmount: string) => `You are owed ${formattedAmount}`,
-    youOwe: (formattedAmount: string) => `You owe ${formattedAmount}`,
-    memberIsOwed: (name: string, formattedAmount: string) => `${name} is owed ${formattedAmount}`,
-    memberOwes: (name: string, formattedAmount: string) => `${name} owes ${formattedAmount}`,
+    youAreOwed: (formattedAmount: string, fromNames?: string) =>
+      fromNames ? `You are owed ${formattedAmount} by ${fromNames}` : `You are owed ${formattedAmount}`,
+    youOwe: (formattedAmount: string, toNames?: string) =>
+      toNames ? `You owe ${formattedAmount} to ${toNames}` : `You owe ${formattedAmount}`,
+    memberIsOwed: (name: string, formattedAmount: string, fromNames?: string) =>
+      fromNames ? `${name} is owed ${formattedAmount} by ${fromNames}` : `${name} is owed ${formattedAmount}`,
+    memberOwes: (name: string, formattedAmount: string, toNames?: string) =>
+      toNames ? `${name} owes ${formattedAmount} to ${toNames}` : `${name} owes ${formattedAmount}`,
   },
 
   // 8. Settlement statuses shown to users
