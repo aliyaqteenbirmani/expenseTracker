@@ -927,7 +927,10 @@ function DashboardApp({ user, onLogout }: { user: User; onLogout: () => void }) 
             {currentView === 'members' && (
               <MembersPage
                 token={token}
-                business={{ id: businessId, name: selectedBusiness?.name ?? 'Workspace' }}
+                business={{
+                  id: businessId || selectedBusiness?.id || businesses[0]?.id || books[0]?.businessId || '',
+                  name: selectedBusiness?.name ?? businesses[0]?.name ?? 'Workspace',
+                }}
                 books={books}
                 isOwner={isOwner}
                 currentUserId={user.id ?? (user as unknown as { Id?: string }).Id}

@@ -160,15 +160,35 @@ export function MembersPage({
   const activeCashbook = books.find((b) => b.id === cashbookId) || books[0]
   const currentOptions = scope === 'business' ? businessPermissions : cashbookPermissions
 
+  const effectiveBusinessId =
+    business?.id ||
+    activeCashbook?.businessId ||
+    books.find((b) => b.businessId)?.businessId ||
+    ''
+
+  const effectiveBusinessName =
+    business?.name && business.name !== 'Workspace'
+      ? business.name
+      : activeCashbook?.cashBookName
+      ? `${activeCashbook.cashBookName} Workspace`
+      : 'Workspace'
+
   const memberUrl =
     scope === 'business'
-      ? `/api/MemberManagement/businesses/${business.id}/members`
-      : `/api/MemberManagement/businesses/${business.id}/cashbooks/${cashbookId}/members`
+      ? `/api/MemberManagement/businesses/${effectiveBusinessId}/members`
+      : `/api/MemberManagement/businesses/${effectiveBusinessId}/cashbooks/${cashbookId}/members`
 
   const reload = useCallback(async () => {
+    if (!effectiveBusinessId) {
+      setMembers([])
+      setLoading(false)
+      setError('')
+      return
+    }
     if (scope === 'cashbook' && !cashbookId) {
       setMembers([])
       setLoading(false)
+      setError('')
       return
     }
     setLoading(true)
@@ -196,7 +216,7 @@ export function MembersPage({
     } finally {
       setLoading(false)
     }
-  }, [memberUrl, token, scope, cashbookId, isOwner, sentStatus])
+  }, [memberUrl, token, scope, cashbookId, isOwner, sentStatus, effectiveBusinessId])
 
   useEffect(() => {
     void reload()
@@ -227,7 +247,7 @@ export function MembersPage({
       await request('/api/Invitations/invite', token, {
         method: 'POST',
         body: JSON.stringify({
-          businessId: business.id,
+          businessId: effectiveBusinessId,
           cashbookId: scope === 'cashbook' ? cashbookId : null,
           email: email.trim(),
           permissions,
@@ -251,8 +271,8 @@ export function MembersPage({
     setBusy(true)
     const removeUrl =
       scope === 'business'
-        ? `/api/MemberManagement/businesses/${business.id}/members/${confirmRemove.userId}`
-        : `/api/MemberManagement/businesses/${business.id}/cashbooks/${cashbookId}/members/${confirmRemove.userId}`
+        ? `/api/MemberManagement/businesses/${effectiveBusinessId}/members/${confirmRemove.userId}`
+        : `/api/MemberManagement/businesses/${effectiveBusinessId}/cashbooks/${cashbookId}/members/${confirmRemove.userId}`
     try {
       await request(removeUrl, token, { method: 'DELETE' })
       onToast(`Removed ${confirmRemove.fullName} from ${scope}`)
@@ -271,8 +291,8 @@ export function MembersPage({
     setSavingPermissions(true)
     const updateUrl =
       scope === 'business'
-        ? `/api/MemberManagement/businesses/${business.id}/members/${editingMember.userId}/permissions`
-        : `/api/MemberManagement/businesses/${business.id}/cashbooks/${cashbookId}/members/${editingMember.userId}/permissions`
+        ? `/api/MemberManagement/businesses/${effectiveBusinessId}/members/${editingMember.userId}/permissions`
+        : `/api/MemberManagement/businesses/${effectiveBusinessId}/cashbooks/${cashbookId}/members/${editingMember.userId}/permissions`
     try {
       await request(updateUrl, token, {
         method: 'PUT',
@@ -368,13 +388,21 @@ export function MembersPage({
         }
       />
 
-      {error && (
+      {!effectiveBusinessId ? (
+        <Alert className="border-border/80 bg-muted/30">
+          <Building2 className="size-4 text-muted-foreground" />
+          <AlertTitle>No Workspace Selected</AlertTitle>
+          <AlertDescription>
+            You do not have an active business workspace selected. Please create or select a business workspace first to manage business-level members.
+          </AlertDescription>
+        </Alert>
+      ) : error ? (
         <Alert variant="destructive">
           <ShieldAlert className="size-4" />
           <AlertTitle>Access Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
       {/* 2. Two-column Layout on lg */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -390,7 +418,7 @@ export function MembersPage({
                   <strong className="text-foreground">
                     {scope === 'cashbook'
                       ? activeCashbook?.cashBookName ?? activeCashbook?.name ?? 'Cashbook'
-                      : business.name}
+                      : effectiveBusinessName}
                   </strong>
                 </CardDescription>
               </div>
@@ -429,8 +457,14 @@ export function MembersPage({
                       <TableCell colSpan={4} className="h-32 text-center p-0">
                         <EmptyState
                           icon={Users}
-                          title="No members found"
-                          description="Invite team members to collaborate on this cashbook."
+                          title={!effectiveBusinessId ? "No workspace selected" : "No members found"}
+                          description={
+                            !effectiveBusinessId
+                              ? "Create or select a business workspace first to view and invite members."
+                              : scope === 'business'
+                              ? "Invite team members to collaborate on this business workspace."
+                              : "Invite team members to collaborate on this cashbook."
+                          }
                           className="border-0 shadow-none"
                         />
                       </TableCell>
@@ -840,7 +874,7 @@ export function MembersPage({
                     </AlertDescription>
                   </Alert>
 
-                  <Button type="submit" disabled={busy || !email.trim()} loading={busy} success={invited} successLabel="Invitation Sent!" className="w-full h-8 text-xs">
+                  <Button type="submit" disabled={busy || !email.trim() || !effectiveBusinessId} loading={busy} success={invited} successLabel="Invitation Sent!" className="w-full h-8 text-xs">
                     <UserPlus className="size-3.5 mr-1.5" />
                     <span>Send Invitation</span>
                   </Button>
